@@ -51,6 +51,7 @@ import { PrivacyRequestModel } from './models/privacyRequests'
 import { SecurityQuestionModel } from './models/securityQuestion'
 
 import logger from './lib/logger'
+import { EXPOSED_FILE_MOUNTS, isHardened } from './lib/hardenedProfile'
 import * as utils from './lib/utils'
 import * as antiCheat from './lib/antiCheat'
 import * as security from './lib/insecurity'
@@ -218,7 +219,8 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
     acknowledgements: config.get('application.securityTxt.acknowledgements'),
     'Preferred-Languages': [...new Set(locales.map((locale: { key: string }) => locale.key.substr(0, 2)))].join(', '),
     hiring: config.get('application.securityTxt.hiring'),
-    csaf: config.get<string>('server.baseUrl') + config.get<string>('application.securityTxt.csaf'),
+    // The CSAF documents live under the /.well-known file mount, which the hardened profile does not serve
+    ...(isHardened() ? {} : { csaf: config.get<string>('server.baseUrl') + config.get<string>('application.securityTxt.csaf') }),
     expires: securityTxtExpiration.toUTCString()
   }))
 
@@ -264,6 +266,13 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
     next()
   }
 
+  /* Hardened profile: no directory listings and no file contents from the exposed mounts, only the generated security.txt above */
+  if (isHardened()) {
+    app.use(EXPOSED_FILE_MOUNTS as string[], (req: Request, res: Response) => {
+      res.status(404).end()
+    })
+  }
+
   /* /infrastructure directory browsing */
   app.use('/infrastructure', serveIndexMiddleware, serveIndex('infrastructure', { icons: true, view: 'details', filter: (filename) => filename !== 'README.md' }))
   app.use('/infrastructure', verify.accessControlChallenges())
@@ -305,7 +314,7 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument))
 
   app.use(express.static(path.resolve('frontend/dist/frontend')))
-  app.use(cookieParser('kekse'))
+  app.use(cookieParser(security.cookieSecret))
   // vuln-code-snippet end directoryListingChallenge accessLogDisclosureChallenge
 
   /* Serve vendor dependencies locally instead of from CDN */

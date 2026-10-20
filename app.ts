@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: MIT
  */
 
+import { MissingSigningSecretsError } from './lib/hardenedProfile'
+
 async function app () {
   const { default: validateDependencies } = await import('./lib/startup/validateDependenciesBasic')
   await validateDependencies()
@@ -13,5 +15,9 @@ async function app () {
 
 app()
   .catch(err => {
+    if (err instanceof MissingSigningSecretsError) {
+      console.error(err.message)
+      process.exit(1)
+    }
     throw err
   })
