@@ -15,7 +15,7 @@ RUN rm ftp/legal.md || true
 RUN rm i18n/*.json || true
 
 # keep version in sync with package.json
-ARG CYCLONEDX_NPM_VERSION='^2.0.0||^3.0.0||^4.0.0'
+ARG CYCLONEDX_NPM_VERSION='^6.0.0'
 RUN npm install -g @cyclonedx/cyclonedx-npm@$CYCLONEDX_NPM_VERSION
 RUN npm run sbom
 

@@ -4,7 +4,7 @@ on:
     tags:
       - v*
 env:
-  CYCLONEDX_NPM_VERSION: '^2.0.0||^3.0.0||^4.0.0'   # keep in sync with package.json
+  CYCLONEDX_NPM_VERSION: '^6.0.0'                   # keep in sync with package.json
   TYPESCRIPT_VERSION: '^6.0.3'                      # keep in sync with package.json
 jobs:
   create-release:
