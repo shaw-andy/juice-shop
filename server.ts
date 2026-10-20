@@ -51,6 +51,7 @@ import { PrivacyRequestModel } from './models/privacyRequests'
 import { SecurityQuestionModel } from './models/securityQuestion'
 
 import logger from './lib/logger'
+import { blockExposedFileMounts, isHardenedProfile } from './lib/hardenedProfile'
 import * as utils from './lib/utils'
 import * as antiCheat from './lib/antiCheat'
 import * as security from './lib/insecurity'
@@ -168,6 +169,8 @@ void collectDurationPromise('cleanupFtpFolder', cleanupFtpFolder)()
 void collectDurationPromise('validateConfig', validateConfig)({})
 
 function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
+  security.loadHardenedSecrets()
+
   /* Locals */
   app.locals.captchaId = 0
   app.locals.captchaReqId = 1
@@ -264,6 +267,10 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
     next()
   }
 
+  if (isHardenedProfile()) {
+    app.use(blockExposedFileMounts())
+  }
+
   /* /infrastructure directory browsing */
   app.use('/infrastructure', serveIndexMiddleware, serveIndex('infrastructure', { icons: true, view: 'details', filter: (filename) => filename !== 'README.md' }))
   app.use('/infrastructure', verify.accessControlChallenges())
@@ -305,7 +312,7 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument))
 
   app.use(express.static(path.resolve('frontend/dist/frontend')))
-  app.use(cookieParser('kekse'))
+  app.use(cookieParser(security.cookieSecret()))
   // vuln-code-snippet end directoryListingChallenge accessLogDisclosureChallenge
 
   /* Serve vendor dependencies locally instead of from CDN */
@@ -703,10 +710,17 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
 
 // Function called first to ensure that all the i18n files are reloaded successfully before other linked operations.
 if (process.env.NODE_ENV !== 'test') {
+  try {
+    security.loadHardenedSecrets()
+  } catch (error) {
+    logger.error(utils.getErrorMessage(error))
+    process.exit(1)
+  }
   restoreOverwrittenFilesWithOriginals().then(() => {
     configureApp(app, sequelize)
   }).catch((err) => {
-    console.error(err)
+    console.error(utils.getErrorMessage(err))
+    process.exit(1)
   })
 }
 
@@ -793,6 +807,7 @@ export function close (exitCode: number | undefined) {
 // vuln-code-snippet end exposedMetricsChallenge
 
 export async function createApp (options?: { inMemoryDb?: boolean }) {
+  security.loadHardenedSecrets()
   const seq = options?.inMemoryDb ? createSequelize({ inMemory: true }) : sequelize
   if (options?.inMemoryDb) {
     initModels(seq)
