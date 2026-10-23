@@ -4,6 +4,7 @@
  */
 
 import { type Request, type Response, type NextFunction } from 'express'
+import config from 'config'
 
 import * as utils from '../lib/utils'
 import * as models from '../models/index'
@@ -20,6 +21,10 @@ export function searchProducts () {
   return (req: Request, res: Response, next: NextFunction) => {
     let criteria: any = req.query.q === 'undefined' ? '' : req.query.q ?? ''
     criteria = (criteria.length <= 200) ? criteria : criteria.substring(0, 200)
+    if (config.get<string>('challenges.safetyMode') === 'enabled') { // vuln-code-snippet hide-line
+      searchProductsSafely(req.query.q, req, res, next) // vuln-code-snippet hide-line
+      return // vuln-code-snippet hide-line
+    } // vuln-code-snippet hide-line
     models.sequelize.query(`SELECT * FROM Products WHERE ((name LIKE '%${criteria}%' OR description LIKE '%${criteria}%') AND deletedAt IS NULL) ORDER BY name`) // vuln-code-snippet vuln-line unionSqlInjectionChallenge dbSchemaChallenge
       .then(([products]: any) => {
         const dataString = JSON.stringify(products)
@@ -72,3 +77,23 @@ export function searchProducts () {
   }
 }
 // vuln-code-snippet end unionSqlInjectionChallenge dbSchemaChallenge
+
+function escapeLikePattern (term: string) {
+  return term.replace(/[\\%_]/g, '\\$&')
+}
+
+function searchProductsSafely (query: unknown, req: Request, res: Response, next: NextFunction) {
+  const criteria = typeof query === 'string' && query !== 'undefined' ? query.substring(0, 200) : ''
+  models.sequelize.query(
+    'SELECT * FROM Products WHERE ((name LIKE :pattern ESCAPE \'\\\' OR description LIKE :pattern ESCAPE \'\\\') AND deletedAt IS NULL) ORDER BY name',
+    { replacements: { pattern: `%${escapeLikePattern(criteria)}%` } }
+  ).then(([products]: any) => {
+    for (const product of products) {
+      product.name = req.__(product.name)
+      product.description = req.__(product.description)
+    }
+    res.json(utils.queryResultToJson(products))
+  }).catch((error: ErrorWithParent) => {
+    next(error.parent)
+  })
+}

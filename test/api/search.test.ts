@@ -203,4 +203,86 @@ void describe('/rest/products/search', () => {
     assert.ok(searchRes.headers['content-type']?.includes('application/json'))
     assert.equal(searchRes.body.data.length, products.length)
   })
+
+  void it('GET product search with URL-encoded & and # reaches the API intact', async () => {
+    const ampersandRes = await request(app)
+      .get(`/rest/products/search?q=${encodeURIComponent('Sweet & tasty')}`)
+    assert.equal(ampersandRes.status, 200)
+    assert.deepEqual(ampersandRes.body.data.map((product: any) => product.name), ['Strawberry Juice (500ml)'])
+
+    const hashRes = await request(app)
+      .get(`/rest/products/search?q=${encodeURIComponent('/#recycle')}`)
+    assert.equal(hashRes.status, 200)
+    assert.deepEqual(hashRes.body.data.map((product: any) => product.name), ['Apple Pomace'])
+  })
+
+  void it('GET product search with double quotes returns matching products', async () => {
+    const res = await request(app)
+      .get(`/rest/products/search?q=${encodeURIComponent('"King of the Hill"')}`)
+    assert.equal(res.status, 200)
+    assert.deepEqual(res.body.data.map((product: any) => product.name), ['OWASP Juice Shop "King of the Hill" Facemask'])
+  })
+
+  void it('GET product search truncates terms longer than 200 characters', async () => {
+    const res = await request(app)
+      .get(`/rest/products/search?q=${encodeURIComponent('x'.repeat(200) + "'))--")}`)
+    assert.equal(res.status, 200)
+    assert.ok(res.headers['content-type']?.includes('application/json'))
+    assert.equal(res.body.data.length, 0)
+  })
+
+  void describe('in safety mode', () => {
+    const search = async (t: any, term: string) => {
+      const originalGet = config.get.bind(config)
+      t.mock.method(config, 'get', (setting: string) => setting === 'challenges.safetyMode' ? 'enabled' : originalGet(setting))
+      const res = await request(app).get(`/rest/products/search?q=${encodeURIComponent(term)}`)
+      assert.equal(res.status, 200)
+      assert.ok(res.headers['content-type']?.includes('application/json'))
+      return res.body.data.map((product: any) => product.name)
+    }
+
+    void it('returns products containing a single quote instead of failing', async (t) => {
+      assert.deepEqual(await search(t, "80's"), ['OWASP Juice Shop Holographic Sticker'])
+      assert.deepEqual(await search(t, "Apple'"), [])
+    })
+
+    void it('returns products containing double quotes', async (t) => {
+      assert.deepEqual(await search(t, '"King of the Hill"'), ['OWASP Juice Shop "King of the Hill" Facemask'])
+    })
+
+    void it('returns products containing & and #', async (t) => {
+      assert.deepEqual(await search(t, 'Sweet & tasty'), ['Strawberry Juice (500ml)'])
+      assert.deepEqual(await search(t, '/#recycle'), ['Apple Pomace'])
+    })
+
+    void it('matches % literally instead of as a wildcard', async (t) => {
+      assert.deepEqual(await search(t, '50% cotton'), ['OWASP Juice Shop "King of the Hill" Facemask'])
+      const allProducts = await search(t, '')
+      const percentProducts = await search(t, '%')
+      assert.ok(percentProducts.length > 0)
+      assert.ok(percentProducts.length < allProducts.length)
+    })
+
+    void it('matches _ literally instead of as a wildcard', async (t) => {
+      assert.deepEqual(await search(t, 'O_Saft'), [])
+      assert.ok((await search(t, '_blank')).includes('OWASP SSL Advanced Forensic Tool (O-Saft)'))
+    })
+
+    void it('returns all products for an empty term', async (t) => {
+      const productsRes = await request(app).get('/api/Products')
+      assert.equal((await search(t, '')).length, productsRes.body.data.length)
+    })
+
+    void it('truncates terms longer than 200 characters', async (t) => {
+      assert.deepEqual(await search(t, 'x'.repeat(250)), [])
+    })
+
+    void it('does not allow UNION SELECT SQL Injection', async (t) => {
+      assert.deepEqual(await search(t, "')) union select id,'2','3',email,password,'6','7','8','9' from users--"), [])
+    })
+
+    void it('does not allow selecting logically deleted products', async (t) => {
+      assert.deepEqual(await search(t, `${christmasProduct.name}'))--`), [])
+    })
+  })
 })
