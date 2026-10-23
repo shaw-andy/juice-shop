@@ -141,11 +141,20 @@ void describe('/rest/basket/:id/checkout', () => {
   })
 
   void it('POST placing an order for a basket with a negative total cost is possible', async () => {
+    // Adding a negative quantity is rejected by the add endpoint (see ADJ-19), but updating an
+    // existing basket item to a negative quantity remains possible, as exploited by the
+    // negativeOrderChallenge (see test/cypress/e2e/basket.spec.ts).
     const itemRes = await request(app)
       .post('/api/BasketItems')
       .set(authHeader)
-      .send({ BasketId: 2, ProductId: 10, quantity: -100 })
+      .send({ BasketId: 2, ProductId: 10, quantity: 1 })
     assert.equal(itemRes.status, 200)
+
+    const updateRes = await request(app)
+      .put('/api/BasketItems/' + itemRes.body.data.id)
+      .set(authHeader)
+      .send({ quantity: -100 })
+    assert.equal(updateRes.status, 200)
 
     const res = await request(app).post('/rest/basket/3/checkout').set(authHeader)
     assert.equal(res.status, 200)
