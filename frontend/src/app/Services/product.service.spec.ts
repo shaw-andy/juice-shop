@@ -36,6 +36,16 @@ describe('ProductService', () => {
         httpMock.verify()
     })
 
+    it('should URL-encode special characters in the search term', () => {
+        const service = TestBed.inject(ProductService)
+        const httpMock = TestBed.inject(HttpTestingController)
+
+        service.search('Juice & "Apple\'s" #1 50%').subscribe()
+        const req = httpMock.expectOne('http://localhost:3000/rest/products/search?q=Juice%20%26%20%22Apple\'s%22%20%231%2050%25')
+        req.flush({ data: [] })
+        httpMock.verify()
+    })
+
     it('should get all products directly from the rest api', () => {
         const service = TestBed.inject(ProductService)
         const httpMock = TestBed.inject(HttpTestingController)
