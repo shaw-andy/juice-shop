@@ -4,6 +4,7 @@
  */
 
 import { type Request, type Response, type NextFunction } from 'express'
+import { Op } from 'sequelize'
 import { BasketItemModel } from '../models/basketitem'
 import { QuantityModel } from '../models/quantity'
 import * as challengeUtils from '../lib/challengeUtils'
@@ -19,17 +20,13 @@ interface RequestWithRawBody extends Request {
 export function addBasketItem () {
   return async (req: Request, res: Response, next: NextFunction) => {
     const result = utils.parseJsonCustom((req as RequestWithRawBody).rawBody)
-    const productIds = []
     const basketIds = []
-    const quantities = []
 
+    // Only the first occurrence of a duplicated `BasketId` key is needed here, to check
+    // it against the authenticated user's own basket id (see basketManipulateChallenge below).
     for (let i = 0; i < result.length; i++) {
-      if (result[i].key === 'ProductId') {
-        productIds.push(result[i].value)
-      } else if (result[i].key === 'BasketId') {
+      if (result[i].key === 'BasketId') {
         basketIds.push(result[i].value)
-      } else if (result[i].key === 'quantity') {
-        quantities.push(result[i].value)
       }
     }
 
@@ -37,17 +34,25 @@ export function addBasketItem () {
     if (user && basketIds[0] && basketIds[0] !== 'undefined' && Number(user.bid) != Number(basketIds[0])) { // eslint-disable-line eqeqeq
       res.status(401).send('{\'error\' : \'Invalid BasketId\'}')
     } else {
+      // Use the already validated req.body values (set by quantityCheckBeforeBasketItemAddition)
+      // instead of re-parsing the raw body, so the stored quantity always matches the checked one.
       const basketItem = {
-        ProductId: productIds[productIds.length - 1],
-        BasketId: basketIds[basketIds.length - 1],
-        quantity: quantities[quantities.length - 1]
+        ProductId: req.body.ProductId,
+        BasketId: req.body.BasketId,
+        quantity: req.body.quantity
       }
       challengeUtils.solveIf(challenges.basketManipulateChallenge, () => { return user && basketItem.BasketId && basketItem.BasketId !== 'undefined' && user.bid != basketItem.BasketId }) // eslint-disable-line eqeqeq
 
-      const basketItemInstance = BasketItemModel.build(basketItem)
       try {
-        const addedBasketItem = await basketItemInstance.save()
-        res.json({ status: 'success', data: addedBasketItem })
+        const existingItem = await BasketItemModel.findOne({ where: basketItemLookupWhere(basketItem.ProductId, basketItem.BasketId) })
+        let savedBasketItem
+        if (existingItem != null) {
+          existingItem.quantity += basketItem.quantity
+          savedBasketItem = await existingItem.save()
+        } else {
+          savedBasketItem = await BasketItemModel.build(basketItem).save()
+        }
+        res.json({ status: 'success', data: savedBasketItem })
       } catch (error) {
         next(error)
       }
@@ -57,9 +62,17 @@ export function addBasketItem () {
 
 export function quantityCheckBeforeBasketItemAddition () {
   return (req: Request, res: Response, next: NextFunction) => {
-    void quantityCheck(req, res, next, req.body.ProductId, req.body.quantity).catch((error: Error) => {
-      next(error)
-    })
+    const quantity = req.body.quantity
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      res.status(400).json({ error: res.__('Invalid quantity.') })
+      return
+    }
+
+    void getExistingQuantity(req.body.ProductId, req.body.BasketId)
+      .then((existingQuantity) => quantityCheck(req, res, next, req.body.ProductId, existingQuantity + quantity))
+      .catch((error: Error) => {
+        next(error)
+      })
   }
 }
 export function quantityCheckBeforeBasketItemUpdate () {
@@ -72,7 +85,7 @@ export function quantityCheckBeforeBasketItemUpdate () {
         if (item == null) {
           throw new Error('No such item found!')
         }
-        void quantityCheck(req, res, next, item.ProductId, req.body.quantity)
+        await quantityCheck(req, res, next, item.ProductId, req.body.quantity)
       } else {
         next()
       }
@@ -80,6 +93,15 @@ export function quantityCheckBeforeBasketItemUpdate () {
       next(error)
     }
   }
+}
+
+function basketItemLookupWhere (productId: number, basketId: number | undefined) {
+  return { ProductId: productId, BasketId: basketId === undefined ? { [Op.is]: null } : basketId }
+}
+
+async function getExistingQuantity (productId: number, basketId: number | undefined) {
+  const existingItem = await BasketItemModel.findOne({ where: basketItemLookupWhere(productId, basketId) })
+  return existingItem?.quantity ?? 0
 }
 
 async function quantityCheck (req: Request, res: Response, next: NextFunction, id: number, quantity: number) {

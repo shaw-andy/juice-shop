@@ -144,8 +144,16 @@ void describe('/rest/basket/:id/checkout', () => {
     const itemRes = await request(app)
       .post('/api/BasketItems')
       .set(authHeader)
-      .send({ BasketId: 2, ProductId: 10, quantity: -100 })
+      .send({ BasketId: 2, ProductId: 10, quantity: 1 })
     assert.equal(itemRes.status, 200)
+
+    // Negative quantities are only accepted via the PUT update route (see negativeOrderChallenge),
+    // not when adding a new basket item, which now requires a positive integer quantity.
+    const updateRes = await request(app)
+      .put('/api/BasketItems/' + itemRes.body.data.id)
+      .set(authHeader)
+      .send({ quantity: -100 })
+    assert.equal(updateRes.status, 200)
 
     const res = await request(app).post('/rest/basket/3/checkout').set(authHeader)
     assert.equal(res.status, 200)

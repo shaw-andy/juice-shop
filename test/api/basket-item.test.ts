@@ -89,6 +89,91 @@ void describe('/api/BasketItems', () => {
       .send({ BasketId: 2, ProductId: 999, quantity: 1 })
     assert.equal(res.status, 500) // quantityCheck throws Error which is caught and passed to next(error)
   })
+
+  void it('POST adding a product already in the basket increments the existing line instead of creating a new one', async () => {
+    const firstRes = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 6, quantity: 1 })
+    assert.equal(firstRes.status, 200)
+    assert.equal(firstRes.body.data.quantity, 1)
+
+    const secondRes = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 6, quantity: 2 })
+    assert.equal(secondRes.status, 200)
+    assert.equal(secondRes.body.data.id, firstRes.body.data.id)
+    assert.equal(secondRes.body.data.quantity, 3)
+
+    const getRes = await request(app).get('/api/BasketItems').set(authHeader)
+    const matchingRows = getRes.body.data.filter((item: { ProductId: number, BasketId: number }) => item.ProductId === 6 && item.BasketId === 2)
+    assert.equal(matchingRows.length, 1)
+  })
+
+  void it('POST adding a product already in the basket beyond the per-user limit is forbidden', async () => {
+    const firstRes = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 1, quantity: 3 })
+    assert.equal(firstRes.status, 200)
+    assert.equal(firstRes.body.data.quantity, 3)
+
+    const secondRes = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 1, quantity: 3 })
+    assert.equal(secondRes.status, 400)
+    assert.equal(secondRes.body.error, 'You can order only up to 5 items of this product.')
+  })
+
+  void it('POST adding a product already in the basket beyond available stock is forbidden', async () => {
+    const firstRes = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 35, quantity: 5 })
+    assert.equal(firstRes.status, 200)
+    assert.equal(firstRes.body.data.quantity, 5)
+
+    const secondRes = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 35, quantity: 5 })
+    assert.equal(secondRes.status, 400)
+    assert.equal(secondRes.body.error, 'We are out of stock! Sorry for the inconvenience.')
+  })
+
+  void it('POST new basket item with zero quantity is forbidden', async () => {
+    const res = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 2, quantity: 0 })
+    assert.equal(res.status, 400)
+  })
+
+  void it('POST new basket item with negative quantity is forbidden', async () => {
+    const res = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 2, quantity: -1 })
+    assert.equal(res.status, 400)
+  })
+
+  void it('POST new basket item with decimal quantity is forbidden', async () => {
+    const res = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 2, quantity: 1.5 })
+    assert.equal(res.status, 400)
+  })
+
+  void it('POST new basket item with missing quantity is forbidden', async () => {
+    const res = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 2 })
+    assert.equal(res.status, 400)
+  })
 })
 
 void describe('/api/BasketItems/:id', () => {
