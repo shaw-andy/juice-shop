@@ -84,6 +84,7 @@
     "vitest": "^4.1.1"
   },
   "overrides": {
+    "vite": "8.3.3",
     "lru-cache@^11": "~11.2.7",
     "angularx-qrcode": {
       "@angular/core": "$@angular/core",
