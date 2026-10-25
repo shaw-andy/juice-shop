@@ -84,6 +84,9 @@
     "vitest": "^4.1.1"
   },
   "overrides": {
+    "@ethersproject/providers": {
+      "ws": "8.21.0"
+    },
     "lru-cache@^11": "~11.2.7",
     "angularx-qrcode": {
       "@angular/core": "$@angular/core",
