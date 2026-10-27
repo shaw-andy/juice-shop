@@ -4,6 +4,7 @@
  */
 
 import { type Request, type Response, type NextFunction } from 'express'
+import { UniqueConstraintError } from 'sequelize'
 import { BasketItemModel } from '../models/basketitem'
 import { QuantityModel } from '../models/quantity'
 import * as challengeUtils from '../lib/challengeUtils'
@@ -45,14 +46,21 @@ export function addBasketItem () {
       challengeUtils.solveIf(challenges.basketManipulateChallenge, () => { return user && basketItem.BasketId && basketItem.BasketId !== 'undefined' && user.bid != basketItem.BasketId }) // eslint-disable-line eqeqeq
 
       try {
-        const existingBasketItem = await findExistingBasketItem(basketItem.ProductId, basketItem.BasketId)
-        if (existingBasketItem != null) {
-          await existingBasketItem.increment('quantity', { by: basketItem.quantity })
-          res.json({ status: 'success', data: await existingBasketItem.reload() })
-          return
+        let existingBasketItem = await findExistingBasketItem(basketItem.ProductId, basketItem.BasketId)
+        if (existingBasketItem == null) {
+          try {
+            const addedBasketItem = await BasketItemModel.build(basketItem).save()
+            res.json({ status: 'success', data: addedBasketItem })
+            return
+          } catch (error) {
+            // A concurrent add of the same product can insert the row between lookup and save
+            if (!(error instanceof UniqueConstraintError)) throw error
+            existingBasketItem = await findExistingBasketItem(basketItem.ProductId, basketItem.BasketId)
+            if (existingBasketItem == null) throw error
+          }
         }
-        const addedBasketItem = await BasketItemModel.build(basketItem).save()
-        res.json({ status: 'success', data: addedBasketItem })
+        await existingBasketItem.increment('quantity', { by: basketItem.quantity })
+        res.json({ status: 'success', data: await existingBasketItem.reload() })
       } catch (error) {
         next(error)
       }

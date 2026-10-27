@@ -159,6 +159,20 @@ void describe('/api/BasketItems repeat adds of the same product', () => {
     assert.equal(appleJuice.BasketItem.quantity, 4)
   })
 
+  void it('concurrent POSTs of a product not yet in the basket result in a single item with the combined quantity', async () => {
+    const add = async () => await request(app)
+      .post('/api/BasketItems')
+      .set(benderAuthHeader)
+      .send({ BasketId: benderBasketId, ProductId: 5, quantity: 1 })
+    const responses = await Promise.all([add(), add(), add()])
+    responses.forEach((res) => { assert.equal(res.status, 200) })
+
+    const basket = await getBasket()
+    const lines = basket.Products.filter((product: { id: number }) => product.id === 5)
+    assert.equal(lines.length, 1)
+    assert.equal(lines[0].BasketItem.quantity, 3)
+  })
+
   void it('POST same product up to exactly limitPerUser through repeat adds is allowed', async () => {
     const res = await request(app)
       .post('/api/BasketItems')
