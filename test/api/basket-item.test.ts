@@ -173,6 +173,23 @@ void describe('/api/BasketItems repeat adds of the same product', () => {
     assert.equal(lines[0].BasketItem.quantity, 3)
   })
 
+  void it('concurrent POSTs that would each reach limitPerUser do not exceed the limit', async () => {
+    const add = async () => await request(app)
+      .post('/api/BasketItems')
+      .set(benderAuthHeader)
+      .send({ BasketId: benderBasketId, ProductId: 7, quantity: 5 })
+    const responses = await Promise.all([add(), add()])
+    const statuses = responses.map((res) => res.status).sort()
+    assert.deepEqual(statuses, [200, 400])
+    const rejected = responses.find((res) => res.status === 400)
+    assert.equal(rejected?.body.error, 'You can order only up to 5 items of this product.')
+
+    const basket = await getBasket()
+    const lines = basket.Products.filter((product: { id: number }) => product.id === 7)
+    assert.equal(lines.length, 1)
+    assert.equal(lines[0].BasketItem.quantity, 5)
+  })
+
   void it('POST same product up to exactly limitPerUser through repeat adds is allowed', async () => {
     const res = await request(app)
       .post('/api/BasketItems')

@@ -4,7 +4,7 @@
  */
 
 import { type Request, type Response, type NextFunction } from 'express'
-import { UniqueConstraintError } from 'sequelize'
+import { UniqueConstraintError, Op, literal } from 'sequelize'
 import { BasketItemModel } from '../models/basketitem'
 import { QuantityModel } from '../models/quantity'
 import * as challengeUtils from '../lib/challengeUtils'
@@ -15,6 +15,12 @@ import * as security from '../lib/insecurity'
 
 interface RequestWithRawBody extends Request {
   rawBody: string
+}
+
+class BasketQuantityError extends Error {
+  constructor (readonly clientMessage: string) {
+    super(clientMessage)
+  }
 }
 
 export function addBasketItem () {
@@ -59,9 +65,13 @@ export function addBasketItem () {
             if (existingBasketItem == null) throw error
           }
         }
-        await existingBasketItem.increment('quantity', { by: basketItem.quantity })
-        res.json({ status: 'success', data: await existingBasketItem.reload() })
+        const data = await incrementBasketItemWithinLimits(req, res, existingBasketItem, basketItem.ProductId, Number(basketItem.quantity))
+        res.json({ status: 'success', data })
       } catch (error) {
+        if (error instanceof BasketQuantityError) {
+          res.status(400).json({ error: error.clientMessage })
+          return
+        }
         next(error)
       }
     }
@@ -105,7 +115,37 @@ async function findExistingBasketItem (productId: number, basketId: number | str
   return await BasketItemModel.findOne({ where: { ProductId: productId, BasketId: basketId } })
 }
 
-async function quantityCheck (req: Request, res: Response, next: NextFunction, id: number, quantity: number) {
+async function incrementBasketItemWithinLimits (req: Request, res: Response, existingBasketItem: BasketItemModel, productId: number, addBy: number) {
+  const product = await QuantityModel.findOne({ where: { ProductId: productId } })
+  if (product == null) {
+    throw new Error('No such product found!')
+  }
+
+  let maxAllowed = product.quantity
+  if (product.limitPerUser && !security.isDeluxe(req)) {
+    maxAllowed = Math.min(maxAllowed, product.limitPerUser)
+  }
+
+  // Atomic conditional increment so concurrent adds cannot push quantity past limit/stock
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const [affectedCount] = await BasketItemModel.update(
+      { quantity: literal(`quantity + ${addBy}`) },
+      {
+        where: {
+          id: existingBasketItem.id,
+          quantity: { [Op.lte]: maxAllowed - addBy }
+        }
+      }
+    )
+    if (affectedCount > 0) {
+      return await existingBasketItem.reload()
+    }
+    await assertQuantityAllowed(req, res, productId, (await existingBasketItem.reload()).quantity + addBy)
+  }
+  throw new BasketQuantityError(res.__('We are out of stock! Sorry for the inconvenience.'))
+}
+
+async function assertQuantityAllowed (req: Request, res: Response, id: number, quantity: number) {
   const product = await QuantityModel.findOne({ where: { ProductId: id } })
   if (product == null) {
     throw new Error('No such product found!')
@@ -114,11 +154,22 @@ async function quantityCheck (req: Request, res: Response, next: NextFunction, i
   // is product limited per user and order, except if user is deluxe?
   if (!product.limitPerUser || (product.limitPerUser && product.limitPerUser >= quantity) || security.isDeluxe(req)) {
     if (product.quantity >= quantity) { // enough in stock?
-      next()
-    } else {
-      res.status(400).json({ error: res.__('We are out of stock! Sorry for the inconvenience.') })
+      return
     }
-  } else {
-    res.status(400).json({ error: res.__('You can order only up to {{quantity}} items of this product.', { quantity: product.limitPerUser.toString() }) })
+    throw new BasketQuantityError(res.__('We are out of stock! Sorry for the inconvenience.'))
+  }
+  throw new BasketQuantityError(res.__('You can order only up to {{quantity}} items of this product.', { quantity: product.limitPerUser.toString() }))
+}
+
+async function quantityCheck (req: Request, res: Response, next: NextFunction, id: number, quantity: number) {
+  try {
+    await assertQuantityAllowed(req, res, id, quantity)
+    next()
+  } catch (error) {
+    if (error instanceof BasketQuantityError) {
+      res.status(400).json({ error: error.clientMessage })
+      return
+    }
+    throw error
   }
 }
