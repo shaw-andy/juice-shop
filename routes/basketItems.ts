@@ -4,6 +4,7 @@
  */
 
 import { type Request, type Response, type NextFunction } from 'express'
+import { UniqueConstraintError } from 'sequelize'
 import { BasketItemModel } from '../models/basketitem'
 import { QuantityModel } from '../models/quantity'
 import * as challengeUtils from '../lib/challengeUtils'
@@ -44,10 +45,21 @@ export function addBasketItem () {
       }
       challengeUtils.solveIf(challenges.basketManipulateChallenge, () => { return user && basketItem.BasketId && basketItem.BasketId !== 'undefined' && user.bid != basketItem.BasketId }) // eslint-disable-line eqeqeq
 
-      const basketItemInstance = BasketItemModel.build(basketItem)
       try {
-        const addedBasketItem = await basketItemInstance.save()
-        res.json({ status: 'success', data: addedBasketItem })
+        const existingBasketItem = await findBasketItem(basketItem.BasketId, basketItem.ProductId)
+        if (existingBasketItem != null) {
+          res.json({ status: 'success', data: await incrementQuantity(existingBasketItem, basketItem.quantity) })
+          return
+        }
+        try {
+          const addedBasketItem = await BasketItemModel.build(basketItem).save()
+          res.json({ status: 'success', data: addedBasketItem })
+        } catch (error) {
+          // A concurrent request for the same product may have inserted the row in the meantime
+          const concurrentlyAddedItem = error instanceof UniqueConstraintError ? await findBasketItem(basketItem.BasketId, basketItem.ProductId) : null
+          if (concurrentlyAddedItem == null) throw error
+          res.json({ status: 'success', data: await incrementQuantity(concurrentlyAddedItem, basketItem.quantity) })
+        }
       } catch (error) {
         next(error)
       }
@@ -55,9 +67,23 @@ export function addBasketItem () {
   }
 }
 
+async function findBasketItem (basketId: unknown, productId: unknown) {
+  if (basketId == null || productId == null) return null
+  return await BasketItemModel.findOne({ where: { BasketId: basketId as number, ProductId: productId as number } })
+}
+
+async function incrementQuantity (basketItem: BasketItemModel, quantity: unknown) {
+  await basketItem.increment('quantity', { by: Number(quantity) })
+  return await basketItem.reload()
+}
+
 export function quantityCheckBeforeBasketItemAddition () {
   return (req: Request, res: Response, next: NextFunction) => {
-    void quantityCheck(req, res, next, req.body.ProductId, req.body.quantity).catch((error: Error) => {
+    void (async () => {
+      const existingBasketItem = await findBasketItem(req.body.BasketId, req.body.ProductId)
+      const combinedQuantity = Number(req.body.quantity) + (existingBasketItem?.quantity ?? 0)
+      await quantityCheck(req, res, next, req.body.ProductId, combinedQuantity)
+    })().catch((error: Error) => {
       next(error)
     })
   }
@@ -72,7 +98,7 @@ export function quantityCheckBeforeBasketItemUpdate () {
         if (item == null) {
           throw new Error('No such item found!')
         }
-        void quantityCheck(req, res, next, item.ProductId, req.body.quantity)
+        await quantityCheck(req, res, next, item.ProductId, req.body.quantity)
       } else {
         next()
       }
