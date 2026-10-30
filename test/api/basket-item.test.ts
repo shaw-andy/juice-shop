@@ -9,6 +9,7 @@ import request from 'supertest'
 import type { Express } from 'express'
 import { createTestApp } from './helpers/setup'
 import { login } from './helpers/auth'
+import { QuantityModel } from '../../models/quantity'
 
 let app: Express
 let authHeader: { Authorization: string, 'content-type': string }
@@ -88,6 +89,87 @@ void describe('/api/BasketItems', () => {
       .set(authHeader)
       .send({ BasketId: 2, ProductId: 999, quantity: 1 })
     assert.equal(res.status, 500) // quantityCheck throws Error which is caught and passed to next(error)
+  })
+
+  void it('POST same product twice increments quantity of the existing basket item', async () => {
+    const firstRes = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 5, quantity: 1 })
+    assert.equal(firstRes.status, 200)
+
+    const secondRes = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 5, quantity: '1' })
+    assert.equal(secondRes.status, 200)
+    assert.equal(secondRes.body.data.id, firstRes.body.data.id)
+    assert.equal(secondRes.body.data.quantity, 2)
+
+    const basketRes = await request(app).get('/rest/basket/2').set(authHeader)
+    assert.equal(basketRes.status, 200)
+    const lines = basketRes.body.data.Products.filter((product: { id: number }) => product.id === 5)
+    assert.equal(lines.length, 1)
+    assert.equal(lines[0].BasketItem.quantity, 2)
+  })
+
+  void it('basket total reflects aggregated quantities after repeated adds', async () => {
+    const totalOf = (products: Array<{ price: number, BasketItem: { quantity: number } }>) =>
+      products.reduce((total, product) => total + product.price * product.BasketItem.quantity, 0)
+
+    await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 24, quantity: 1 })
+    const before = await request(app).get('/rest/basket/2').set(authHeader)
+    const unitPrice = before.body.data.Products.find((product: { id: number }) => product.id === 24).price
+
+    const addRes = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 24, quantity: 1 })
+    assert.equal(addRes.status, 200)
+
+    const after = await request(app).get('/rest/basket/2').set(authHeader)
+    assert.equal(after.body.data.Products.length, before.body.data.Products.length)
+    assert.equal(totalOf(after.body.data.Products), totalOf(before.body.data.Products) + unitPrice)
+  })
+
+  void it('POST same product beyond limitPerUser through repeated adds is forbidden', async () => {
+    const firstRes = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 7, quantity: 3 })
+    assert.equal(firstRes.status, 200)
+
+    const secondRes = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 7, quantity: 3 })
+    assert.equal(secondRes.status, 400)
+    assert.equal(secondRes.body.error, 'You can order only up to 5 items of this product.')
+
+    const itemRes = await request(app).get('/api/BasketItems/' + firstRes.body.data.id).set(authHeader)
+    assert.equal(itemRes.body.data.quantity, 3)
+  })
+
+  void it('POST same product beyond available stock through repeated adds is forbidden', async () => {
+    const stock = await QuantityModel.findOne({ where: { ProductId: 11 } })
+    assert.ok(stock)
+    assert.equal(stock.limitPerUser, null)
+
+    const firstRes = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 11, quantity: stock.quantity })
+    assert.equal(firstRes.status, 200)
+
+    const secondRes = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 11, quantity: 1 })
+    assert.equal(secondRes.status, 400)
+    assert.equal(secondRes.body.error, 'We are out of stock! Sorry for the inconvenience.')
   })
 })
 
@@ -226,6 +308,22 @@ void describe('/api/BasketItems/:id', () => {
       .delete('/api/BasketItems/' + createRes.body.data.id)
       .set(authHeader)
     assert.equal(res.status, 200)
+  })
+
+  void it('PUT update basket item passes errors from quantity check to error handler', async (t) => {
+    const createRes = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 13, quantity: 1 })
+    assert.equal(createRes.status, 200)
+
+    t.mock.method(QuantityModel, 'findOne', async () => { throw new Error('Quantity error') })
+    const res = await request(app)
+      .put('/api/BasketItems/' + createRes.body.data.id)
+      .set(authHeader)
+      .send({ quantity: 2 })
+    assert.equal(res.status, 500)
+    assert.match(res.text, /Quantity error/)
   })
 
   void it('PUT update non-existent basket item', async () => {

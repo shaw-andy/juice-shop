@@ -44,10 +44,14 @@ export function addBasketItem () {
       }
       challengeUtils.solveIf(challenges.basketManipulateChallenge, () => { return user && basketItem.BasketId && basketItem.BasketId !== 'undefined' && user.bid != basketItem.BasketId }) // eslint-disable-line eqeqeq
 
-      const basketItemInstance = BasketItemModel.build(basketItem)
       try {
-        const addedBasketItem = await basketItemInstance.save()
-        res.json({ status: 'success', data: addedBasketItem })
+        const existingBasketItem = await findExistingBasketItem(basketItem.BasketId, basketItem.ProductId)
+        if (existingBasketItem != null) {
+          existingBasketItem.quantity = existingBasketItem.quantity + Number(basketItem.quantity)
+          res.json({ status: 'success', data: await existingBasketItem.save() })
+        } else {
+          res.json({ status: 'success', data: await BasketItemModel.build(basketItem).save() })
+        }
       } catch (error) {
         next(error)
       }
@@ -56,12 +60,17 @@ export function addBasketItem () {
 }
 
 export function quantityCheckBeforeBasketItemAddition () {
-  return (req: Request, res: Response, next: NextFunction) => {
-    void quantityCheck(req, res, next, req.body.ProductId, req.body.quantity).catch((error: Error) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const existingBasketItem = await findExistingBasketItem(req.body.BasketId, req.body.ProductId)
+      const resultingQuantity = existingBasketItem != null ? existingBasketItem.quantity + Number(req.body.quantity) : req.body.quantity
+      await quantityCheck(req, res, next, req.body.ProductId, resultingQuantity)
+    } catch (error) {
       next(error)
-    })
+    }
   }
 }
+
 export function quantityCheckBeforeBasketItemUpdate () {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -72,7 +81,7 @@ export function quantityCheckBeforeBasketItemUpdate () {
         if (item == null) {
           throw new Error('No such item found!')
         }
-        void quantityCheck(req, res, next, item.ProductId, req.body.quantity)
+        await quantityCheck(req, res, next, item.ProductId, req.body.quantity)
       } else {
         next()
       }
@@ -80,6 +89,13 @@ export function quantityCheckBeforeBasketItemUpdate () {
       next(error)
     }
   }
+}
+
+async function findExistingBasketItem (basketId: unknown, productId: unknown) {
+  if (basketId == null || basketId === 'undefined' || productId == null) {
+    return null
+  }
+  return await BasketItemModel.findOne({ where: { BasketId: basketId as number, ProductId: productId as number } })
 }
 
 async function quantityCheck (req: Request, res: Response, next: NextFunction, id: number, quantity: number) {
