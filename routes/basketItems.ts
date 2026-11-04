@@ -4,6 +4,7 @@
  */
 
 import { type Request, type Response, type NextFunction } from 'express'
+import { UniqueConstraintError } from 'sequelize'
 import { BasketItemModel } from '../models/basketitem'
 import { QuantityModel } from '../models/quantity'
 import * as challengeUtils from '../lib/challengeUtils'
@@ -44,10 +45,23 @@ export function addBasketItem () {
       }
       challengeUtils.solveIf(challenges.basketManipulateChallenge, () => { return user && basketItem.BasketId && basketItem.BasketId !== 'undefined' && user.bid != basketItem.BasketId }) // eslint-disable-line eqeqeq
 
-      const basketItemInstance = BasketItemModel.build(basketItem)
       try {
-        const addedBasketItem = await basketItemInstance.save()
-        res.json({ status: 'success', data: addedBasketItem })
+        const existingBasketItem = await findExistingBasketItem(basketItem.BasketId, basketItem.ProductId)
+        if (existingBasketItem != null) {
+          res.json({ status: 'success', data: await incrementQuantity(existingBasketItem, basketItem.quantity) })
+          return
+        }
+        try {
+          const addedBasketItem = await BasketItemModel.build(basketItem).save()
+          res.json({ status: 'success', data: addedBasketItem })
+        } catch (error) {
+          // A concurrent request for the same product may have created the row in the meantime
+          const concurrentBasketItem = error instanceof UniqueConstraintError ? await findExistingBasketItem(basketItem.BasketId, basketItem.ProductId) : null
+          if (concurrentBasketItem == null) {
+            throw error
+          }
+          res.json({ status: 'success', data: await incrementQuantity(concurrentBasketItem, basketItem.quantity) })
+        }
       } catch (error) {
         next(error)
       }
@@ -55,11 +69,27 @@ export function addBasketItem () {
   }
 }
 
+async function findExistingBasketItem (basketId: unknown, productId: unknown) {
+  if (basketId == null || basketId === 'undefined' || productId == null) {
+    return null
+  }
+  return await BasketItemModel.findOne({ where: { BasketId: basketId as number, ProductId: productId as number } })
+}
+
+async function incrementQuantity (basketItem: BasketItemModel, quantity: unknown) {
+  await basketItem.increment('quantity', { by: Number(quantity) })
+  return await basketItem.reload()
+}
+
 export function quantityCheckBeforeBasketItemAddition () {
-  return (req: Request, res: Response, next: NextFunction) => {
-    void quantityCheck(req, res, next, req.body.ProductId, req.body.quantity).catch((error: Error) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const existingBasketItem = await findExistingBasketItem(req.body.BasketId, req.body.ProductId)
+      const combinedQuantity = existingBasketItem == null ? req.body.quantity : existingBasketItem.quantity + Number(req.body.quantity)
+      await quantityCheck(req, res, next, req.body.ProductId, combinedQuantity)
+    } catch (error) {
       next(error)
-    })
+    }
   }
 }
 export function quantityCheckBeforeBasketItemUpdate () {
@@ -72,7 +102,7 @@ export function quantityCheckBeforeBasketItemUpdate () {
         if (item == null) {
           throw new Error('No such item found!')
         }
-        void quantityCheck(req, res, next, item.ProductId, req.body.quantity)
+        await quantityCheck(req, res, next, item.ProductId, req.body.quantity)
       } else {
         next()
       }
