@@ -118,7 +118,7 @@
     "file-type": "^16.5.4",
     "finale-rest": "^1.2.2",
     "fs-extra": "^9.1.0",
-    "glob": "^10.4.5",
+    "glob": "14.0.2",
     "graceful-fs": "^4.2.11",
     "hashids": "^2.3.0",
     "hbs": "^4.2.0",
@@ -206,6 +206,14 @@
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.57.1"
+  },
+  "overrides": {
+    "cacache": {
+      "glob": "14.0.2"
+    },
+    "rimraf": {
+      "glob": "7.2.3"
+    }
   },
   "engines": {
     "node": "22 - 26"
