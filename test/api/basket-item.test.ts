@@ -9,6 +9,7 @@ import request from 'supertest'
 import type { Express } from 'express'
 import { createTestApp } from './helpers/setup'
 import { login } from './helpers/auth'
+import { QuantityModel } from '../../models/quantity'
 
 let app: Express
 let authHeader: { Authorization: string, 'content-type': string }
@@ -88,6 +89,80 @@ void describe('/api/BasketItems', () => {
       .set(authHeader)
       .send({ BasketId: 2, ProductId: 999, quantity: 1 })
     assert.equal(res.status, 500) // quantityCheck throws Error which is caught and passed to next(error)
+  })
+
+  void it('POST same product twice increments quantity of the existing basket item', async () => {
+    const first = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 13, quantity: 1 })
+    assert.equal(first.status, 200)
+
+    const second = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 13, quantity: 1 })
+    assert.equal(second.status, 200)
+    assert.equal(second.body.data.id, first.body.data.id)
+    assert.equal(second.body.data.quantity, 2)
+
+    const basket = await request(app).get('/rest/basket/2').set(authHeader)
+    const lines = basket.body.data.Products.filter((product: any) => product.id === 13)
+    assert.equal(lines.length, 1)
+    assert.equal(lines[0].BasketItem.quantity, 2)
+    assert.equal(lines[0].BasketItem.quantity * lines[0].price, 2 * lines[0].price)
+  })
+
+  void it('POST same product with combined quantity above the per-user limit is forbidden', async () => {
+    const first = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 5, quantity: 4 })
+    assert.equal(first.status, 200)
+
+    const res = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 5, quantity: 2 })
+    assert.equal(res.status, 400)
+    assert.equal(res.body.error, 'You can order only up to 5 items of this product.')
+
+    const item = await request(app).get('/api/BasketItems/' + first.body.data.id).set(authHeader)
+    assert.equal(item.body.data.quantity, 4)
+  })
+
+  void it('POST same product with combined quantity above the available stock is forbidden', async () => {
+    const stock = await QuantityModel.findOne({ where: { ProductId: 11 } })
+    assert.ok(stock)
+    assert.equal(stock.limitPerUser, null)
+
+    const first = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 11, quantity: stock.quantity })
+    assert.equal(first.status, 200)
+
+    const res = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 11, quantity: 1 })
+    assert.equal(res.status, 400)
+    assert.equal(res.body.error, 'We are out of stock! Sorry for the inconvenience.')
+  })
+
+  void it('POST same product with duplicate BasketId keys aggregates into the last given basket', async () => {
+    const send = async () => await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send('{ "ProductId": 14, "BasketId": "2", "quantity": 1, "BasketId": "1" }')
+    const first = await send()
+    assert.equal(first.status, 200)
+    assert.equal(Number(first.body.data.BasketId), 1)
+
+    const second = await send()
+    assert.equal(second.status, 200)
+    assert.equal(second.body.data.id, first.body.data.id)
+    assert.equal(second.body.data.quantity, 2)
   })
 })
 
@@ -234,5 +309,21 @@ void describe('/api/BasketItems/:id', () => {
       .set(authHeader)
       .send({ quantity: 1 })
     assert.equal(res.status, 500)
+  })
+
+  void it('PUT update basket item passes quantity check errors to the error handler', async (t) => {
+    const createRes = await request(app)
+      .post('/api/BasketItems')
+      .set(authHeader)
+      .send({ BasketId: 2, ProductId: 15, quantity: 1 })
+    assert.equal(createRes.status, 200)
+
+    t.mock.method(QuantityModel, 'findOne', async () => { throw new Error('Quantity lookup failed') })
+    const res = await request(app)
+      .put('/api/BasketItems/' + createRes.body.data.id)
+      .set(authHeader)
+      .send({ quantity: 2 })
+    assert.equal(res.status, 500)
+    assert.match(res.text, /Quantity lookup failed/)
   })
 })

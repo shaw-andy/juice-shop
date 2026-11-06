@@ -44,10 +44,14 @@ export function addBasketItem () {
       }
       challengeUtils.solveIf(challenges.basketManipulateChallenge, () => { return user && basketItem.BasketId && basketItem.BasketId !== 'undefined' && user.bid != basketItem.BasketId }) // eslint-disable-line eqeqeq
 
-      const basketItemInstance = BasketItemModel.build(basketItem)
       try {
-        const addedBasketItem = await basketItemInstance.save()
-        res.json({ status: 'success', data: addedBasketItem })
+        const existingBasketItem = await findExistingBasketItem(basketItem.BasketId, basketItem.ProductId)
+        if (existingBasketItem != null) {
+          existingBasketItem.quantity = Number(existingBasketItem.quantity) + Number(basketItem.quantity)
+          res.json({ status: 'success', data: await existingBasketItem.save() })
+        } else {
+          res.json({ status: 'success', data: await BasketItemModel.build(basketItem).save() })
+        }
       } catch (error) {
         next(error)
       }
@@ -57,10 +61,20 @@ export function addBasketItem () {
 
 export function quantityCheckBeforeBasketItemAddition () {
   return (req: Request, res: Response, next: NextFunction) => {
-    void quantityCheck(req, res, next, req.body.ProductId, req.body.quantity).catch((error: Error) => {
+    void findExistingBasketItem(req.body.BasketId, req.body.ProductId).then(async (existingBasketItem) => {
+      const quantityInBasket = existingBasketItem != null ? Number(existingBasketItem.quantity) : 0
+      await quantityCheck(req, res, next, req.body.ProductId, quantityInBasket + Number(req.body.quantity))
+    }).catch((error: Error) => {
       next(error)
     })
   }
+}
+
+async function findExistingBasketItem (basketId: unknown, productId: unknown) {
+  if (basketId == null || basketId === 'undefined' || productId == null) {
+    return null
+  }
+  return await BasketItemModel.findOne({ where: { BasketId: basketId as number, ProductId: productId as number } })
 }
 export function quantityCheckBeforeBasketItemUpdate () {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -72,7 +86,7 @@ export function quantityCheckBeforeBasketItemUpdate () {
         if (item == null) {
           throw new Error('No such item found!')
         }
-        void quantityCheck(req, res, next, item.ProductId, req.body.quantity)
+        await quantityCheck(req, res, next, item.ProductId, req.body.quantity)
       } else {
         next()
       }
