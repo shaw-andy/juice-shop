@@ -120,9 +120,11 @@ router.post('/', (req: Request<Record<string, unknown>, Record<string, unknown>,
           next(new Error('File access not allowed'))
         }
       } else {
+        // hbs treats `layout` as a template path. Do not forward it when the challenge is disabled.
         res.render('dataErasureResult', {
           ...req.body,
-          ...themeVars
+          ...themeVars,
+          layout: false
         })
       }
     } catch (error) {

@@ -7,6 +7,7 @@ import { describe, it, before } from 'node:test'
 import assert from 'node:assert/strict'
 import request from 'supertest'
 import type { Express } from 'express'
+import config from 'config'
 import { createTestApp } from './helpers/setup'
 import { login } from './helpers/auth'
 import { challenges } from '../../data/datacache'
@@ -87,6 +88,47 @@ void describe('/dataerasure', () => {
       .send({ layout: null })
 
     assert.equal(res.status, 200)
+  })
+
+  void it('POST erasure request does not read local files when the local file read challenge is disabled', async (t) => {
+    const originalGet = config.get.bind(config)
+    t.mock.method(config, 'get', (setting: string) => {
+      if (setting === 'challenges.safetyMode') {
+        return 'enabled'
+      }
+      return originalGet(setting)
+    })
+    const challenge = challenges.lfrChallenge
+    const originalDisabledEnv = challenge.disabledEnv
+    const wasSolved = challenge.solved
+    challenge.disabledEnv = 'Docker'
+    challenge.solved = false
+
+    try {
+      const { token } = await login(app, { email: 'bjoern.kimminich@gmail.com', password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI=' })
+
+      const res = await request(app)
+        .post('/dataerasure/')
+        .set({ Cookie: 'token=' + token })
+        .send({ layout: '../package.json' })
+
+      assert.equal(res.status, 200)
+      assert.ok(res.text.includes('Sorry to see you leave'))
+      assert.equal(res.text.includes('"juice-shop"'), false)
+      assert.equal(challenge.solved, false)
+
+      const sensitive = await request(app)
+        .post('/dataerasure/')
+        .set({ Cookie: 'token=' + token })
+        .send({ layout: '../encryptionkeys/premium.key' })
+
+      assert.equal(sensitive.status, 200)
+      assert.ok(sensitive.text.includes('Sorry to see you leave'))
+      assert.equal(challenge.solved, false)
+    } finally {
+      challenge.disabledEnv = originalDisabledEnv
+      challenge.solved = wasSolved
+    }
   })
 
   if (utils.isChallengeEnabled(challenges.lfrChallenge)) {
