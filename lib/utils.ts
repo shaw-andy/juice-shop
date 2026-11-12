@@ -191,6 +191,35 @@ export const parseJsonCustom = (jsonString: string) => {
   return result
 }
 
+export const hasDuplicateJsonKeys = (jsonString: string) => {
+  const parser = clarinet.parser()
+  const scopes: Array<Set<string>> = []
+  let duplicate = false
+  const addKey = (key: string) => {
+    const keys = scopes[scopes.length - 1]
+    if (keys.has(key)) {
+      duplicate = true
+    }
+    keys.add(key)
+  }
+  parser.onopenobject = (key?: string) => {
+    scopes.push(new Set())
+    if (key !== undefined) {
+      addKey(key)
+    }
+  }
+  parser.onkey = addKey
+  parser.oncloseobject = () => {
+    scopes.pop()
+  }
+  parser.onerror = (error: Error) => {
+    throw error
+  }
+  parser.write(jsonString)
+  parser.close()
+  return duplicate
+}
+
 export const toSimpleIpAddress = (ipv6: string) => {
   if (ipv6?.startsWith('::ffff:')) {
     return ipv6.substr(7)
