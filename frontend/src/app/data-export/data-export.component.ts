@@ -79,6 +79,9 @@ export class DataExportComponent implements OnInit {
         this.error = error.error
         this.confirmation = null
         this.resetFormError()
+        if (this.presenceOfCaptcha) {
+          this.getNewCaptcha()
+        }
       }
     })
   }
