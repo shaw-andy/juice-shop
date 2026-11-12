@@ -11,7 +11,7 @@ import * as security from '../lib/insecurity'
 
 export function changePassword () {
   return async ({ query, headers, connection }: Request, res: Response, next: NextFunction) => {
-    const currentPassword = query.current as string
+    const currentPassword = query.current
     const newPassword = query.new as string
     const newPasswordInString = newPassword?.toString()
     const repeatPassword = query.repeat
@@ -36,15 +36,20 @@ export function changePassword () {
       return
     }
 
-    if (currentPassword && security.hash(currentPassword) !== loggedInUser.data.password) {
+    if (typeof currentPassword !== 'string' || currentPassword === '') {
       res.status(401).send(res.__('Current password is not correct.'))
       return
     }
 
     try {
-      const user = await UserModel.findByPk(loggedInUser.data.id)
+      const authenticatedUserId = loggedInUser.data.id
+      const user = await UserModel.findByPk(authenticatedUserId)
       if (!user) {
         res.status(404).send(res.__('User not found.'))
+        return
+      }
+      if (user.id !== authenticatedUserId || security.hash(currentPassword) !== user.password) {
+        res.status(401).send(res.__('Current password is not correct.'))
         return
       }
 
