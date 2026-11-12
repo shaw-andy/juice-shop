@@ -14,6 +14,7 @@ import fs from 'node:fs'
 import { type AddressInfo } from 'node:net'
 import { createTestApp } from './helpers/setup'
 import { login } from './helpers/auth'
+import { UserModel } from '../../models/user'
 
 let app: Express
 
@@ -219,17 +220,15 @@ void describe('/profile/image/url (with local mock server)', () => {
     assert.ok(res.headers.location?.endsWith('/profile'))
   })
 
-  void it('POST with PNG URL extension saves file using PNG extension', async () => {
+  void it('POST with PNG URL extension saves file using the detected image type', async () => {
     await request(app)
       .post('/profile/image/url')
       .set('Cookie', `token=${token}`)
       .field('imageUrl', `http://localhost:${mockPort}/photo.png`)
       .redirects(0)
 
-    assert.ok(
-      fs.existsSync(`frontend/dist/frontend/assets/public/images/uploads/${userId}.png`),
-      `Expected file frontend/dist/frontend/assets/public/images/uploads/${userId}.png to exist`
-    )
+    const user = await UserModel.findByPk(userId)
+    assert.equal(user?.profileImage, `/assets/public/images/uploads/${userId}.jpg`)
   })
 
   void it('POST with unrecognised URL extension defaults to JPG extension', async () => {
