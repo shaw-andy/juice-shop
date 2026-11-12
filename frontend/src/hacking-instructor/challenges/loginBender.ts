@@ -9,7 +9,7 @@ import {
   waitInMs,
   waitForAngularRouteToBeVisited,
   waitForLogOut,
-  waitForInputToNotHaveValueAndNotBeEmpty,
+  waitForInputToNotBeEmpty,
   isChallengeSolved
 } from '../helpers/helpers'
 import { type ChallengeInstruction } from '../'
@@ -81,7 +81,7 @@ export const LoginBenderInstruction: ChallengeInstruction = {
       text: "Now put anything in the **password field**. Let's assume we don't know it yet, even if you happen to already do.",
       fixture: '#password',
       unskippable: true,
-      resolved: waitForInputToNotHaveValueAndNotBeEmpty('#password', 'OhG0dPlease1nsertLiquor!')
+      resolved: waitForInputToNotBeEmpty('#password')
     },
     {
       text: 'Press the _Log in_ button.',

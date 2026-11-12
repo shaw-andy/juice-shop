@@ -79,25 +79,6 @@ export function waitForInputToNotHaveValue (inputSelector: string, value: string
   }
 }
 
-export function waitForInputToNotHaveValueAndNotBeEmpty (inputSelector: string, value: string, options = { ignoreCase: true }) {
-  return async () => {
-    const inputElement: HTMLInputElement = document.querySelector(
-      inputSelector
-    )
-
-    while (true) {
-      if (inputElement.value !== '') {
-        if (options.ignoreCase && inputElement.value.toLowerCase() !== value.toLowerCase()) {
-          break
-        } else if (!options.ignoreCase && inputElement.value !== value) {
-          break
-        }
-      }
-      await sleep(100)
-    }
-  }
-}
-
 export function waitForInputToNotBeEmpty (inputSelector: string) {
   return async () => {
     const inputElement: HTMLInputElement = document.querySelector(

@@ -8,7 +8,7 @@ import {
   waitForInputToNotBeEmpty,
   waitForElementToGetClicked,
   waitInMs,
-  waitForAngularRouteToBeVisited, waitForLogOut
+  waitForAngularRouteToBeVisited, waitForLogOut, waitForAdminLogIn
 } from '../helpers/helpers'
 import { type ChallengeInstruction } from '../'
 
@@ -49,34 +49,16 @@ export const PasswordStrengthInstruction: ChallengeInstruction = {
       resolved: waitForInputToNotBeEmpty('#password')
     },
     {
-      text: "🤦‍♂️ Nah, that was wrong! Keep trying! I'll tell you when you're one the right track.",
-      fixture: '#password',
-      unskippable: true,
-      resolved: waitForInputToHaveValue('#password', 'admin')
-    },
-    {
-      text: 'Okay, you are one the right track, but this would have been the worst password in the world for an admin. He spiced it up a little bit with some extra non-letter characters. Keep trying!',
-      fixture: '#password',
-      unskippable: true,
-      resolved: waitForInputToHaveValue('#password', 'admin1')
-    },
-    {
-      text: "🔥 Yes, it's getting warmer! Try adding some more numbers maybe?",
-      fixture: '#password',
-      unskippable: true,
-      resolved: waitForInputToHaveValue('#password', 'admin12')
-    },
-    {
-      text: "🧯 It's getting hot! Just one more digit...",
-      fixture: '#password',
-      unskippable: true,
-      resolved: waitForInputToHaveValue('#password', 'admin123')
-    },
-    {
       text: 'Okay, now press the _Log in_ button.',
       fixture: '#rememberMe',
       unskippable: true,
       resolved: waitForElementToGetClicked('#loginButton')
+    },
+    {
+      text: "🤦‍♂️ If that didn't work, keep trying! Think of the most common passwords and how someone might spice them up a little with some extra non-letter characters. I'll tell you when you're in.",
+      fixture: '#password',
+      unskippable: true,
+      resolved: waitForAdminLogIn()
     },
     {
       text:
