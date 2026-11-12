@@ -183,9 +183,20 @@ export const appendUserId = () => {
   }
 }
 
+const hasRs256Signature = (token: string) => {
+  const [header, payload, signature] = token.split('.')
+  if (!header || !payload || !signature) return false
+  try {
+    if (JSON.parse(Buffer.from(header, 'base64url').toString()).alg !== 'RS256') return false
+    return crypto.verify('RSA-SHA256', Buffer.from(`${header}.${payload}`), publicKey, Buffer.from(signature, 'base64url'))
+  } catch {
+    return false
+  }
+}
+
 export const updateAuthenticatedUsers = () => (req: Request, res: Response, next: NextFunction) => {
   const token = req.cookies.token || utils.jwtFrom(req)
-  if (token && authenticatedUsers.get(token) === undefined) {
+  if (token && authenticatedUsers.get(token) === undefined && hasRs256Signature(token)) {
     jwt.verify(token, publicKey, (err: Error | null, decoded: any) => {
       if (err === null && decoded?.data !== undefined) {
         authenticatedUsers.put(token, decoded)

@@ -536,6 +536,13 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
     } // vuln-code-snippet neutral-line registerAdminChallenge
     // vuln-code-snippet end registerAdminChallenge
 
+    if (name === 'BasketItem') {
+      resource.list.fetch.before(basketItems.listSessionBasketItems())
+      resource.read.fetch.before(basketItems.restrictFetchToSessionBasket())
+      resource.update.fetch.before(basketItems.restrictFetchToSessionBasket())
+      resource.delete.fetch.before(basketItems.restrictFetchToSessionBasket())
+    }
+
     // translate challenge descriptions on-the-fly
     if (name === 'Challenge') {
       resource.list.fetch.after((req: Request, res: Response, context: { instance: string | any[], continue: any }) => {

@@ -34,15 +34,18 @@ export function addBasketItem () {
     }
 
     const user = security.authenticatedUsers.from(req)
-    if (user && basketIds[0] && basketIds[0] !== 'undefined' && Number(user.bid) != Number(basketIds[0])) { // eslint-disable-line eqeqeq
+    const isForeignBasket = (basketId: unknown) => Number(basketId) !== Number(user?.bid)
+    if (user?.bid == null || (basketIds.length > 0 && isForeignBasket(basketIds[0]))) {
+      res.status(401).send('{\'error\' : \'Invalid BasketId\'}')
+    } else if (basketIds.some(isForeignBasket)) {
+      challengeUtils.solveIf(challenges.basketManipulateChallenge, () => true)
       res.status(401).send('{\'error\' : \'Invalid BasketId\'}')
     } else {
       const basketItem = {
         ProductId: productIds[productIds.length - 1],
-        BasketId: basketIds[basketIds.length - 1],
+        BasketId: user.bid,
         quantity: quantities[quantities.length - 1]
       }
-      challengeUtils.solveIf(challenges.basketManipulateChallenge, () => { return user && basketItem.BasketId && basketItem.BasketId !== 'undefined' && user.bid != basketItem.BasketId }) // eslint-disable-line eqeqeq
 
       const basketItemInstance = BasketItemModel.build(basketItem)
       try {
@@ -65,9 +68,13 @@ export function quantityCheckBeforeBasketItemAddition () {
 export function quantityCheckBeforeBasketItemUpdate () {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const item = await BasketItemModel.findOne({ where: { id: req.params.id } })
       const user = security.authenticatedUsers.from(req)
       challengeUtils.solveIf(challenges.basketManipulateChallenge, () => { return user && req.body.BasketId && user.bid != req.body.BasketId }) // eslint-disable-line eqeqeq
+      if (user?.bid == null) {
+        res.status(401).json({ status: 'error', message: 'Unauthorized' })
+        return
+      }
+      const item = await BasketItemModel.findOne({ where: { id: req.params.id, BasketId: user.bid } })
       if (req.body.quantity) {
         if (item == null) {
           throw new Error('No such item found!')
@@ -79,6 +86,38 @@ export function quantityCheckBeforeBasketItemUpdate () {
     } catch (error) {
       next(error)
     }
+  }
+}
+
+interface FinaleContext {
+  criteria: Record<string, unknown>
+  instance: unknown
+  continue: unknown
+  skip: unknown
+  error: (status: number, message: string) => void
+}
+
+export function listSessionBasketItems () {
+  return async (req: Request, res: Response, context: FinaleContext) => {
+    const bid = security.authenticatedUsers.from(req)?.bid
+    if (bid == null) {
+      context.error(401, 'Unauthorized')
+      return
+    }
+    context.instance = await BasketItemModel.findAll({ where: { BasketId: bid } })
+    return context.skip
+  }
+}
+
+export function restrictFetchToSessionBasket () {
+  return (req: Request, res: Response, context: FinaleContext) => {
+    const bid = security.authenticatedUsers.from(req)?.bid
+    if (bid == null) {
+      context.error(401, 'Unauthorized')
+      return
+    }
+    context.criteria = { BasketId: bid }
+    return context.continue
   }
 }
 
