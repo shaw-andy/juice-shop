@@ -8,6 +8,7 @@ import z85 from 'z85'
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import * as security from '../../lib/insecurity'
+import * as utils from '../../lib/utils'
 import type { UserModel } from '@juice-shop/models/user'
 import type { Request } from 'express'
 
@@ -34,22 +35,22 @@ void describe('insecurity', () => {
   })
 
   void describe('generateCoupon', () => {
-    void it('returns base85-encoded month, year and discount as coupon code', () => {
-      const coupon = security.generateCoupon(20, new Date('1980-01-02'))
-      assert.equal(coupon, 'n<MiifFb4l')
-      assert.equal(z85.decode(coupon).toString(), 'JAN80-20')
+    void it('returns a random 10 character alphanumeric coupon code', () => {
+      const coupon = security.generateCoupon(10)
+      assert.match(coupon, /^[A-Za-z0-9]{10}$/)
+      assert.notEqual(coupon, security.generateCoupon(10))
     })
 
-    void it('uses current month and year if not specified', () => {
-      const coupon = security.generateCoupon(20)
-      assert.equal(coupon, security.generateCoupon(20, new Date()))
+    void it('does not encode month, year or discount into coupon code', () => {
+      const coupon = security.generateCoupon(10, new Date('1980-01-02'))
+      assert.doesNotMatch(z85.decode(coupon)?.toString() ?? '', /JAN80/)
     })
 
-    void it('does not encode day of month or time into coupon code', () => {
-      const coupon = security.generateCoupon(10, new Date('December 01, 1999'))
-      assert.equal(coupon, security.generateCoupon(10, new Date('December 01, 1999 01:00:00')))
-      assert.equal(coupon, security.generateCoupon(10, new Date('December 02, 1999')))
-      assert.equal(coupon, security.generateCoupon(10, new Date('December 31, 1999 23:59:59')))
+    void it('refuses discounts outside the allowed range', () => {
+      assert.throws(() => security.generateCoupon(0))
+      assert.throws(() => security.generateCoupon(security.maxCouponDiscount + 1))
+      assert.throws(() => security.generateCoupon(99))
+      assert.throws(() => security.generateCoupon(5.5))
     })
   })
 
@@ -64,21 +65,21 @@ void describe('insecurity', () => {
       assert.equal(security.discountFromCoupon('___'), undefined)
     })
 
-    void it('returns undefined for coupon code not according to expected pattern', () => {
+    void it('returns undefined for coupon code that was not issued by the server', () => {
       assert.equal(security.discountFromCoupon(z85.encode('Test')), undefined)
-      assert.equal(security.discountFromCoupon(z85.encode('XXX00-10')), undefined)
-      assert.equal(security.discountFromCoupon(z85.encode('DEC18-999')), undefined)
-      assert.equal(security.discountFromCoupon(z85.encode('DEC18-1')), undefined)
-      assert.equal(security.discountFromCoupon(z85.encode('DEC2018-10')), undefined)
+      assert.equal(security.discountFromCoupon(z85.encode('SEP14-50')), undefined)
+      assert.equal(security.discountFromCoupon(z85.encode(utils.toMMMYY(new Date()) + '-99')), undefined)
+      assert.equal(security.discountFromCoupon(z85.encode(utils.toMMMYY(new Date()) + '-10')), undefined)
+      assert.equal(security.discountFromCoupon('constructor'), undefined)
     })
 
     void it('returns undefined for expired coupon code', () => {
-      assert.equal(security.discountFromCoupon(z85.encode('SEP14-50')), undefined)
+      assert.equal(security.discountFromCoupon(security.generateCoupon(10, new Date('September 14, 2014'))), undefined)
     })
 
-    void it('returns discount from valid coupon code', () => {
+    void it('returns discount from issued coupon code', () => {
       assert.equal(security.discountFromCoupon(security.generateCoupon(10)), 10)
-      assert.equal(security.discountFromCoupon(security.generateCoupon(99)), 99)
+      assert.equal(security.discountFromCoupon(security.generateCoupon(security.maxCouponDiscount)), security.maxCouponDiscount)
     })
   })
 

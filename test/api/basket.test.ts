@@ -19,8 +19,7 @@ let app: Express
 let authHeader: { Authorization: string, 'content-type': string }
 
 const validCoupon = security.generateCoupon(15)
-const outdatedCoupon = security.generateCoupon(20, new Date(2001, 0, 1))
-const forgedCoupon = security.generateCoupon(99)
+const outdatedCoupon = security.generateCoupon(10, new Date(2001, 0, 1))
 
 before(
   async () => {
@@ -152,13 +151,13 @@ void describe('/rest/basket/:id/checkout', () => {
     assert.ok(res.body.orderConfirmation !== undefined)
   })
 
-  void it('POST placing an order for a basket with 99% discount is possible', async () => {
+  void it('POST placing an order for a basket with an issued coupon is possible', async () => {
     const couponRes = await request(app)
-      .put('/rest/basket/2/coupon/' + encodeURIComponent(forgedCoupon))
+      .put('/rest/basket/2/coupon/' + encodeURIComponent(validCoupon))
       .set(authHeader)
     assert.equal(couponRes.status, 200)
     assert.ok(couponRes.headers['content-type']?.includes('application/json'))
-    assert.equal(couponRes.body.discount, 99)
+    assert.equal(couponRes.body.discount, 15)
 
     const res = await request(app).post('/rest/basket/2/checkout').set(authHeader)
     assert.equal(res.status, 200)
