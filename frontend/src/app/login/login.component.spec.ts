@@ -253,7 +253,7 @@ describe('LoginComponent', () => {
             expect(component.redirectUri).toBe('http://localhost:4200')
         })
 
-        it('should use the proxy URI when an authorized redirect defines one', () => {
+        it('should keep its own origin as redirect URI when an authorized redirect defines a proxy', () => {
             configurationService.getApplicationConfiguration.mockReturnValue(of({
                 application: {
                     googleOauth: {
@@ -265,7 +265,8 @@ describe('LoginComponent', () => {
                 }
             }))
             component.ngOnInit()
-            expect(component.redirectUri).toBe('http://proxy.local')
+            expect(component.oauthUnavailable).toBe(false)
+            expect(component.redirectUri).toBe('http://localhost:4200')
         })
 
         it('should flag OAuth as unavailable when redirect URI is not authorized', () => {
@@ -332,9 +333,9 @@ describe('LoginComponent', () => {
             component.redirectUri = 'http://localhost:4200'
             component.googleLogin()
             expect(windowRefService.nativeWindow.location.replace).toHaveBeenCalled()
-            const call = windowRefService.nativeWindow.location.replace.mock.calls[0][0] as string
-            expect(call).toContain('client_id=cid')
-            expect(call).toContain('redirect_uri=http://localhost:4200')
+            const call = new URL(windowRefService.nativeWindow.location.replace.mock.calls[0][0] as string)
+            expect(call.searchParams.get('client_id')).toBe('cid')
+            expect(call.searchParams.get('redirect_uri')).toBe('http://localhost:4200')
         })
     })
 })
