@@ -144,7 +144,7 @@ void describe('/rest/basket/:id/checkout', () => {
     const itemRes = await request(app)
       .post('/api/BasketItems')
       .set(authHeader)
-      .send({ BasketId: 2, ProductId: 10, quantity: -100 })
+      .send({ BasketId: 2, ProductId: 13, quantity: -100 })
     assert.equal(itemRes.status, 200)
 
     const res = await request(app).post('/rest/basket/3/checkout').set(authHeader)

@@ -190,7 +190,7 @@ void describe('/api/BasketItems/:id', () => {
     const createRes = await request(app)
       .post('/api/BasketItems')
       .set(authHeader)
-      .send({ BasketId: 2, ProductId: 12, quantity: 12 })
+      .send({ BasketId: 2, ProductId: 13, quantity: 12 })
     assert.equal(createRes.status, 200)
 
     const res = await request(app)
@@ -219,7 +219,7 @@ void describe('/api/BasketItems/:id', () => {
     const createRes = await request(app)
       .post('/api/BasketItems')
       .set(authHeader)
-      .send({ BasketId: 2, ProductId: 10, quantity: 10 })
+      .send({ BasketId: 2, ProductId: 14, quantity: 10 })
     assert.equal(createRes.status, 200)
 
     const res = await request(app)
