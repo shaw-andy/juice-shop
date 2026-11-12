@@ -4,6 +4,7 @@
  */
 import { type Request, type Response, type NextFunction } from 'express'
 import config from 'config'
+import { QueryTypes } from 'sequelize'
 
 import * as challengeUtils from '../lib/challengeUtils'
 import { challenges, users } from '../data/datacache'
@@ -31,7 +32,8 @@ export function login () {
 
   return (req: Request, res: Response, next: NextFunction) => {
     verifyPreLoginChallenges(req) // vuln-code-snippet hide-line
-    models.sequelize.query(`SELECT * FROM Users WHERE email = '${req.body.email || ''}' AND password = '${security.hash(req.body.password || '')}' AND deletedAt IS NULL`, { model: UserModel, plain: true }) // vuln-code-snippet vuln-line loginAdminChallenge loginBenderChallenge loginJimChallenge
+    passwordDigestFor(req.body.email, req.body.password || '').then(async (passwordDigest) => await models.sequelize.query(`SELECT * FROM Users WHERE email = '${req.body.email || ''}' AND password = '${passwordDigest}' AND deletedAt IS NULL`, { model: UserModel, plain: true })) // vuln-code-snippet vuln-line loginAdminChallenge loginBenderChallenge loginJimChallenge
+      .then(async (authenticatedUser) => await upgradeLegacyPasswordDigest(authenticatedUser, req.body.password)) // vuln-code-snippet hide-line
       .then((authenticatedUser) => { // vuln-code-snippet neutral-line loginAdminChallenge loginBenderChallenge loginJimChallenge
         const user = utils.queryResultToJson(authenticatedUser)
         if (user.data?.id && user.data.totpSecret !== '') {
@@ -54,6 +56,22 @@ export function login () {
       })
   }
   // vuln-code-snippet end loginAdminChallenge loginBenderChallenge loginJimChallenge
+
+  async function passwordDigestFor (email: unknown, password: unknown) {
+    const candidate = typeof email === 'string' ? await UserModel.findOne({ where: { email }, attributes: ['password'] }) : null
+    return security.passwordDigest(String(password), candidate?.password)
+  }
+
+  async function upgradeLegacyPasswordDigest (user: UserModel | null, password: unknown) {
+    if (user?.id && typeof password === 'string' && security.isLegacyPasswordDigest(user.password) && security.verifyPassword(password, user.password)) {
+      const upgradedDigest = security.hashPassword(password)
+      const upgraded = await models.sequelize.query('UPDATE Users SET password = ? WHERE id = ? AND password = ?', { replacements: [upgradedDigest, user.id, user.password], type: QueryTypes.BULKUPDATE })
+      if (upgraded === 1) {
+        user.setDataValue('password', upgradedDigest)
+      }
+    }
+    return user
+  }
 
   function verifyPreLoginChallenges (req: Request) {
     challengeUtils.solveIf(challenges.weakPasswordChallenge, () => { return req.body.email === 'admin@' + config.get<string>('application.domain') && req.body.password === 'admin123' })
