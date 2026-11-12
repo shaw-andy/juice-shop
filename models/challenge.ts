@@ -148,6 +148,7 @@ InferCreationAttributes<Challenge>
   declare tutorialOrder: CreationOptional<number> | null
   declare tags: string | undefined
   declare solved: CreationOptional<boolean>
+  declare solvedByUserId: CreationOptional<number> | null
   declare codingChallengeStatus: CreationOptional<number>
   declare hasCodingChallenge: boolean
 }
@@ -171,6 +172,7 @@ const ChallengeModelInit = (sequelize: Sequelize) => {
       difficulty: DataTypes.INTEGER,
       mitigationUrl: DataTypes.STRING,
       solved: DataTypes.BOOLEAN,
+      solvedByUserId: DataTypes.INTEGER,
       disabledEnv: DataTypes.STRING,
       tutorialOrder: DataTypes.NUMBER,
       codingChallengeStatus: DataTypes.NUMBER,
@@ -178,7 +180,14 @@ const ChallengeModelInit = (sequelize: Sequelize) => {
     },
     {
       tableName: 'Challenges',
-      sequelize
+      sequelize,
+      hooks: {
+        beforeSave: (challenge: Challenge) => {
+          if (!challenge.solved) {
+            challenge.solvedByUserId = null
+          }
+        }
+      }
     }
   )
 }

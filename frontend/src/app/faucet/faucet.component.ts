@@ -8,6 +8,7 @@ import {
   nftABI
 } from '../../assets/public/ContractABIs'
 import { getDefaultProvider, ethers, type BigNumber } from 'ethers'
+import { firstValueFrom } from 'rxjs'
 import {
   createClient,
   connect,
@@ -287,26 +288,28 @@ export class FaucetComponent implements OnInit {
           this.nftMintText = translatedString
         })
         setTimeout(() => {
-          this.keysService.verifyNFTWallet(this.metamaskAddress).subscribe({
-            next:
-            (response) => {
-              if (response.success) {
-                this.successResponse = response.status
-                this.mintButtonDisabled = true
-              }
-            },
-            error: (error) => {
-              console.error(error)
-              this.successResponse = false
-            }
-          }
-          )
+          void this.verifyMintedWallet(signer)
         }, 3500)
       }
 
       console.log('NFT minted successfully!')
     } catch (error) {
       console.error('Error minting NFT:', error)
+    }
+  }
+
+  async verifyMintedWallet (signer: ethers.Signer) {
+    try {
+      const claim = await firstValueFrom(this.keysService.requestNFTClaimNonce(this.metamaskAddress))
+      const signature = await signer.signMessage(claim.message)
+      const response = await firstValueFrom(this.keysService.verifyNFTWallet(this.metamaskAddress, claim.nonce, signature))
+      if (response.success) {
+        this.successResponse = response.status
+        this.mintButtonDisabled = true
+      }
+    } catch (error) {
+      console.error(error)
+      this.successResponse = false
     }
   }
 
