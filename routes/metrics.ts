@@ -70,11 +70,36 @@ export function observeRequestMetricsMiddleware () {
   }
 }
 
+// The multipart Content-Type is client-controlled, so only a fixed set of values may become label values
+const knownFileTypes = new Set([
+  'application/pdf',
+  'application/xml',
+  'text/xml',
+  'application/zip',
+  'application/x-zip-compressed',
+  'application/yaml',
+  'application/x-yaml',
+  'text/yaml',
+  'text/x-yaml',
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/gif',
+  'image/svg+xml',
+  'image/webp'
+])
+
+export function fileTypeLabel (mimetype: unknown) {
+  const type = typeof mimetype === 'string' ? mimetype.toLowerCase() : ''
+  return knownFileTypes.has(type) ? type : 'other'
+}
+
 export function observeFileUploadMetricsMiddleware () {
   return ({ file }: Request, res: Response, next: NextFunction) => {
     onFinished(res, () => {
       if (file != null) {
-        res.statusCode < 400 ? fileUploadsCountMetric.labels(file.mimetype).inc() : fileUploadErrorsMetric.labels(file.mimetype).inc()
+        const fileType = fileTypeLabel(file.mimetype)
+        res.statusCode < 400 ? fileUploadsCountMetric.labels(fileType).inc() : fileUploadErrorsMetric.labels(fileType).inc()
       }
     })
     next()

@@ -224,7 +224,7 @@ export function chat () {
               const role = decoded?.data?.role
               return req.cookies.show_tool_calls === 'true' && role !== roles.admin
             })
-            metricToolCalls.labels({ tool: event.toolName }).inc()
+            metricToolCalls.labels({ tool: Object.prototype.hasOwnProperty.call(chatTools, event.toolName) ? event.toolName : 'other' }).inc()
             res.write(`data: ${JSON.stringify({
               choices: [{
                 delta: {
