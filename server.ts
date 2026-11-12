@@ -81,6 +81,7 @@ import { dataExport } from './routes/dataExport'
 import { chat } from './routes/chat'
 import { retrieveBasket } from './routes/basket'
 import { searchProducts } from './routes/search'
+import { createProduct } from './routes/createProduct'
 import { trackOrder } from './routes/trackOrder'
 import { saveLoginIp } from './routes/saveLoginIp'
 import { serveKeyFiles } from './routes/keyServer'
@@ -494,6 +495,9 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   )
   /* Verifying DB related challenges can be postponed until the next request for challenges is coming via finale */
   app.use(verify.databaseRelatedChallenges())
+
+  /* Products: Create the stock row in the same transaction as the product */
+  app.post('/api/Products', utils.asyncHandler(createProduct(seq)))
 
   // vuln-code-snippet start registerAdminChallenge
   /* Generated API endpoints */
