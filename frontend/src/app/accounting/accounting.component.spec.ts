@@ -14,7 +14,7 @@ import { MatGridListModule } from '@angular/material/grid-list'
 import { MatCardModule } from '@angular/material/card'
 import { MatTableModule } from '@angular/material/table'
 import { MatPaginatorModule } from '@angular/material/paginator'
-import { of } from 'rxjs'
+import { of, Subject } from 'rxjs'
 import { QuantityService } from '../Services/quantity.service'
 import { MatFormFieldModule } from '@angular/material/form-field'
 import { throwError } from 'rxjs/internal/observable/throwError'
@@ -370,6 +370,63 @@ describe('AccountingComponent', () => {
         it('should render two paginators, one for each table', () => {
             const compiled: HTMLElement = fixture.nativeElement
             expect(compiled.querySelectorAll('mat-paginator').length).toBe(2)
+        })
+
+        it('should keep the inventory table usable when a product has no quantity row', () => {
+            const f = renderWithData(
+                [],
+                [
+                    { id: 7, name: 'Stocked Juice', price: 1.99 },
+                    { id: 8, name: 'Unstocked Juice', price: 3.5 }
+                ],
+                [{ id: 99, ProductId: 7, quantity: 42 }]
+            )
+            const inventory = (f.nativeElement as HTMLElement).querySelector('.inventory-table') as HTMLElement
+            expect(inventory).toBeTruthy()
+
+            const rows = Array.from(inventory.querySelectorAll('mat-row'))
+            const stocked = rows.find((row) => row.textContent?.includes('Stocked Juice'))
+            expect(stocked).toBeTruthy()
+            const stockedInputs = stocked?.querySelectorAll('input[matInput]') as NodeListOf<HTMLInputElement>
+            expect(stockedInputs[1].value).toBe('42')
+            const stockedQuantityButton = stocked?.querySelectorAll('button[mat-icon-button]')[1] as HTMLButtonElement
+            stockedQuantityButton.click()
+            expect(quantityService.put).toHaveBeenCalledWith(99, { quantity: '42' })
+
+            const unstocked = rows.find((row) => row.textContent?.includes('Unstocked Juice'))
+            if (unstocked) {
+                const callsBefore = quantityService.put.mock.calls.length
+                const buttons = Array.from(unstocked.querySelectorAll('button[mat-icon-button]')) as HTMLButtonElement[]
+                for (const button of buttons) {
+                    expect(() => { button.click() }).not.toThrow()
+                }
+                for (const call of quantityService.put.mock.calls.slice(callsBefore)) {
+                    expect(typeof call[0]).toBe('number')
+                    expect(Number.isFinite(call[0])).toBe(true)
+                }
+            }
+        })
+
+        it('should keep the inventory table usable when products arrive before quantity rows', () => {
+            const products = new Subject<any[]>()
+            const quantities = new Subject<any[]>()
+            productService.search.mockReturnValue(products)
+            quantityService.getAll.mockReturnValue(quantities)
+            orderHistoryService.getAll.mockReturnValue(of([]))
+            const f = TestBed.createComponent(AccountingComponent)
+            f.componentInstance.ngAfterViewInit()
+
+            products.next([{ id: 7, name: 'Stocked Juice', price: 1.99 }])
+            expect(() => { f.detectChanges() }).not.toThrow()
+            expect((f.nativeElement as HTMLElement).querySelector('.inventory-table')).toBeTruthy()
+
+            quantities.next([{ id: 99, ProductId: 7, quantity: 42 }])
+            expect(() => { f.detectChanges() }).not.toThrow()
+            expect((f.nativeElement as HTMLElement).querySelector('.inventory-table')?.textContent).toContain('Stocked Juice')
+            const inventory = (f.nativeElement as HTMLElement).querySelector('.inventory-table') as HTMLElement
+            const stocked = Array.from(inventory.querySelectorAll('mat-row')).find((row) => row.textContent?.includes('Stocked Juice'))
+            const stockedInputs = stocked?.querySelectorAll('input[matInput]') as NodeListOf<HTMLInputElement>
+            expect(stockedInputs[1].value).toBe('42')
         })
     })
 })
