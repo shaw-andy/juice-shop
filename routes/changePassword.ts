@@ -41,6 +41,11 @@ export function changePassword () {
       return
     }
 
+    if (security.isPasswordDerivedFromEmail(loggedInUser.data.email, newPasswordInString)) {
+      res.status(401).send(res.__('Password must not be derived from the email address.'))
+      return
+    }
+
     try {
       const user = await UserModel.findByPk(loggedInUser.data.id)
       if (!user) {

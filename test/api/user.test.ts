@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 import request from 'supertest'
 import type { Express } from 'express'
 import { createTestApp } from './helpers/setup'
-import { login } from './helpers/auth'
+import { loginWithGoogle } from './helpers/auth'
 import { challenges } from '../../data/datacache'
 import * as security from '../../lib/insecurity'
 import * as utils from '../../lib/utils'
@@ -235,10 +235,7 @@ void describe('/api/Users/:id', () => {
 
 void describe('/rest/user/whoami', () => {
   void it('GET own user id and email on who-am-i request', async () => {
-    const { token } = await login(app, {
-      email: 'bjoern.kimminich@gmail.com',
-      password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI='
-    })
+    const { token } = await loginWithGoogle(app, 'bjoern.kimminich@gmail.com')
     const res = await request(app)
       .get('/rest/user/whoami')
       .set({ Cookie: `token=${token}` })
@@ -284,10 +281,7 @@ void describe('/rest/user/whoami', () => {
   })
 
   void it('GET who-am-i with fields parameter returns only requested fields', async () => {
-    const { token } = await login(app, {
-      email: 'bjoern.kimminich@gmail.com',
-      password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI='
-    })
+    const { token } = await loginWithGoogle(app, 'bjoern.kimminich@gmail.com')
     const res = await request(app)
       .get('/rest/user/whoami?fields=id,email')
       .set({ Cookie: `token=${token}` })
@@ -299,10 +293,7 @@ void describe('/rest/user/whoami', () => {
   })
 
   void it('GET who-am-i with fields parameter does not return password by default', async () => {
-    const { token } = await login(app, {
-      email: 'bjoern.kimminich@gmail.com',
-      password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI='
-    })
+    const { token } = await loginWithGoogle(app, 'bjoern.kimminich@gmail.com')
     const res = await request(app)
       .get('/rest/user/whoami?fields=id,email')
       .set({ Cookie: `token=${token}` })
@@ -313,10 +304,7 @@ void describe('/rest/user/whoami', () => {
   })
 
   void it('GET who-am-i with fields parameter can be tricked into returning password', async () => {
-    const { token } = await login(app, {
-      email: 'bjoern.kimminich@gmail.com',
-      password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI='
-    })
+    const { token } = await loginWithGoogle(app, 'bjoern.kimminich@gmail.com')
     const res = await request(app)
       .get('/rest/user/whoami?fields=id,email,password')
       .set({ Cookie: `token=${token}` })

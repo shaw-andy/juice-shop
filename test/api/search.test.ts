@@ -110,7 +110,7 @@ void describe('/rest/products/search', () => {
     assert.ok(benderMatch, 'Expected bender user in UNION SELECT results')
 
     const bjoernMatch = res.body.data.find((item: any) =>
-      item.id === 4 && item.price === 'bjoern.kimminich@gmail.com' && item.deluxePrice === security.hash('bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI=')
+      item.id === 4 && item.price === 'bjoern.kimminich@gmail.com'
     )
     assert.ok(bjoernMatch, 'Expected bjoern user in UNION SELECT results')
 

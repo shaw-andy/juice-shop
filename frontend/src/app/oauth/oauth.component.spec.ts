@@ -85,23 +85,29 @@ describe('OAuthComponent', () => {
         expect(sessionStorage.getItem('bid')).toBeNull()
     })
 
-    it('will create regular user account with base64 encoded reversed email as password', () => {
-        userService.oauthLogin.mockReturnValue(of({ email: 'test@test.com' }))
+    it('hands the Google access token to the server and stores the session it returns', () => {
+        userService.oauthLogin.mockReturnValue(of({ token: 'serverToken', bid: 42 }))
         component.ngOnInit()
-        expect(userService.save).toHaveBeenCalledWith({ email: 'test@test.com', password: 'bW9jLnRzZXRAdHNldA==', passwordRepeat: 'bW9jLnRzZXRAdHNldA==' })
+        expect(userService.oauthLogin).toHaveBeenCalledWith('TEST')
+        expect(localStorage.getItem('token')).toBe('serverToken')
+        expect(sessionStorage.getItem('bid')).toBe('42')
+        expect(userService.isLoggedIn.next).toHaveBeenCalledWith(true)
+        localStorage.removeItem('token')
+        sessionStorage.removeItem('bid')
     })
 
-    it('logs in user even after failed account creation as account might already have existed from previous OAuth login', () => {
-        userService.oauthLogin.mockReturnValue(of({ email: 'test@test.com' }))
-        userService.save.mockReturnValue(throwError({ error: 'Account already exists' }))
+    it('neither registers nor logs in with a password of its own', () => {
+        userService.oauthLogin.mockReturnValue(of({ token: 'serverToken', bid: 42 }))
         component.ngOnInit()
-        expect(userService.login).toHaveBeenCalledWith({ email: 'test@test.com', password: 'bW9jLnRzZXRAdHNldA==', oauth: true })
+        expect(userService.save).not.toHaveBeenCalled()
+        expect(userService.login).not.toHaveBeenCalled()
+        localStorage.removeItem('token')
+        sessionStorage.removeItem('bid')
     })
 
-    it('removes authentication token and basket id on failed subsequent regular login attempt', () => {
+    it('removes authentication token and basket id when the server returns no session', () => {
         vi.spyOn(console, 'log').mockImplementation(() => {})
-        userService.login.mockReturnValue(throwError({ error: 'Error' }))
-        component.login({ email: '' })
+        component.login({})
         expect(localStorage.getItem('token')).toBeNull()
         expect(sessionStorage.getItem('bid')).toBeNull()
     })

@@ -66,6 +66,7 @@ import datacreator from './data/datacreator'
 import locales from './data/static/locales.json'
 
 import { login } from './routes/login'
+import { oauthLogin } from './routes/oauthLogin'
 import * as verify from './routes/verify'
 import * as address from './routes/address'
 import * as metrics from './routes/metrics'
@@ -430,6 +431,10 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
         req.body.email = req.body.email.trim()
         req.body.password = req.body.password.trim()
         req.body.passwordRepeat = req.body.passwordRepeat.trim()
+        if (security.isPasswordDerivedFromEmail(req.body.email, req.body.password)) {
+          res.status(400).send(res.__('Password must not be derived from the email address.'))
+          return
+        }
       } else {
         res.status(400).send(res.__('Invalid email/password cannot be empty'))
       }
@@ -613,6 +618,7 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
 
   /* Custom Restful API */
   app.post('/rest/user/login', login())
+  app.post('/rest/user/oauth', utils.asyncHandler(oauthLogin()))
   app.get('/rest/user/change-password', utils.asyncHandler(changePassword()))
   app.post('/rest/user/reset-password', utils.asyncHandler(resetPassword()))
   app.get('/rest/user/security-question', utils.asyncHandler(securityQuestion()))

@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 import request from 'supertest'
 import type { Express } from 'express'
 import { createTestApp } from './helpers/setup'
-import { login } from './helpers/auth'
+import { loginWithGoogle } from './helpers/auth'
 import { challenges } from '../../data/datacache'
 import * as security from '../../lib/insecurity'
 import * as utils from '../../lib/utils'
@@ -112,10 +112,7 @@ void describe('/api/Feedbacks', () => {
   })
 
   void it('POST feedback is associated with current user', async () => {
-    const { token } = await login(app, {
-      email: 'bjoern.kimminich@gmail.com',
-      password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI='
-    })
+    const { token } = await loginWithGoogle(app, 'bjoern.kimminich@gmail.com')
 
     const captchaRes = await request(app)
       .get('/rest/captcha')
@@ -138,10 +135,7 @@ void describe('/api/Feedbacks', () => {
   })
 
   void it('POST feedback is associated with any passed user ID', async () => {
-    const { token } = await login(app, {
-      email: 'bjoern.kimminich@gmail.com',
-      password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI='
-    })
+    const { token } = await loginWithGoogle(app, 'bjoern.kimminich@gmail.com')
 
     const captchaRes = await request(app)
       .get('/rest/captcha')

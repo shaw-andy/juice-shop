@@ -650,20 +650,6 @@
   tutorial:
     order: 13
 -
-  name: 'Login Bjoern'
-  category: 'Broken Authentication'
-  tags:
-    - Code Analysis
-  description: 'Log in with Bjoern''s Gmail account <i>without</i> previously changing his password, applying SQL Injection, or hacking his Google account.'
-  difficulty: 4
-  hints:
-    - 'The security flaw behind this challenge is 100% OWASP Juice Shop''s fault and 0% Google''s.'
-    - 'One way to light up this challenge in green on the score board, is to be Bjoern Kimminich. In that case, just log in with your Google account to automatically solve this challenge! Congratulations!'
-    - 'Most likely you are not Bjoern Kimminich, so instead you might want to take detailed look into how the OAuth login with Google is implemented.'
-    - 'It could bring you some insight to register with your own Google account and analyze closely what happens behind the scenes.'
-  mitigationUrl: 'https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html'
-  key: oauthUserPasswordChallenge
--
   name: 'Login Jim'
   category: 'Injection'
   tags:

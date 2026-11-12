@@ -133,16 +133,6 @@ describe('/#/login', () => {
     })
   })
 
-  describe('challenge "oauthUserPasswordChallenge"', () => {
-    it('should be able to log in as bjoern.kimminich@gmail.com with base64-encoded email as password', () => {
-      cy.get('#email').type('bjoern.kimminich@gmail.com')
-      cy.get('#password').type('bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI=')
-      cy.get('#loginButton').click()
-
-      cy.expectChallengeSolved({ challenge: 'Login Bjoern' })
-    })
-  })
-
   describe('challenge "ghostLoginChallenge"', () => {
     it('should be able to log in as chris.pike@juice-sh.op by using "\' or deletedAt IS NOT NULL --"', () => {
       cy.get('#email').type("' or deletedAt IS NOT NULL--")

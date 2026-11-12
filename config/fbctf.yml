@@ -128,9 +128,6 @@ ctf:
     continueCodeChallenge:
       name: Malaysia
       code: MY
-    oauthUserPasswordChallenge:
-      name: South Sudan
-      code: SS
     loginSupportChallenge:
       name: Croatia
       code: HR
