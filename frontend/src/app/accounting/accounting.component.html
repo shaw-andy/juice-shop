@@ -94,12 +94,17 @@
           <ng-container matColumnDef="Quantity">
             <mat-header-cell *matHeaderCellDef translate="LABEL_QUANTITY"></mat-header-cell>
             <mat-cell *matCellDef="let element">
-              <mat-form-field class="input-field">
-                <input #quanitity matInput type="number" value="{{ quantityMap[element.id].quantity }}">
-                <button mat-icon-button (click)="modifyQuantity(quantityMap[element.id].id, quanitity.value)" matSuffix>
-                  <i class="fas fa-check"></i>
-                </button>
-              </mat-form-field>
+              @let stock = quantityMap?.[element.id];
+              @if (stock) {
+                <mat-form-field class="input-field">
+                  <input #quanitity matInput type="number" value="{{ stock.quantity }}">
+                  <button mat-icon-button (click)="modifyQuantity(stock.id, quanitity.value)" matSuffix>
+                    <i class="fas fa-check"></i>
+                  </button>
+                </mat-form-field>
+              } @else {
+                <span>-</span>
+              }
             </mat-cell>
           </ng-container>
 
