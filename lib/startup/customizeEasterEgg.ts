@@ -5,6 +5,7 @@
 
 import config from 'config'
 import * as utils from '../utils'
+import { easterEggPath } from '../../routes/easterEgg'
 // @ts-expect-error FIXME due to non-existing type definitions for replace
 import replace from 'replace'
 
@@ -14,7 +15,7 @@ const customizeEasterEgg = async () => {
     if (utils.isUrl(overlay)) {
       const overlayPath = overlay
       overlay = utils.extractFilename(overlay)
-      await utils.downloadToFile(overlayPath, 'frontend/dist/frontend/assets/private/' + overlay)
+      await utils.downloadToFile(overlayPath, 'frontend/dist/private/' + overlay)
     }
     replaceImagePath(overlay)
   }
@@ -24,11 +25,11 @@ const customizeEasterEgg = async () => {
 }
 
 const replaceImagePath = (overlay: string) => {
-  const textureDeclaration = 'orangeTexture = THREE.ImageUtils.loadTexture("/assets/private/' + overlay + '");'
+  const textureDeclaration = 'orangeTexture = THREE.ImageUtils.loadTexture("' + easterEggPath + '/' + overlay + '");'
   replace({
     regex: /orangeTexture = .*;/,
     replacement: textureDeclaration,
-    paths: ['frontend/dist/frontend/assets/private/threejs-demo.html'],
+    paths: ['frontend/dist/private/threejs-demo.html'],
     recursive: false,
     silent: true
   })
@@ -39,7 +40,7 @@ const replaceThreeJsTitleTag = () => {
   replace({
     regex: /<title>.*<\/title>/,
     replacement: threeJsTitleTag,
-    paths: ['frontend/dist/frontend/assets/private/threejs-demo.html'],
+    paths: ['frontend/dist/private/threejs-demo.html'],
     recursive: false,
     silent: true
   })
