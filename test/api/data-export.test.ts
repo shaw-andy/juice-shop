@@ -12,6 +12,8 @@ import path from 'node:path'
 import { createTestApp } from './helpers/setup'
 import { login } from './helpers/auth'
 import { MemoryModel } from '../../models/memory'
+import { ImageCaptchaModel } from '../../models/imageCaptcha'
+import { UserModel } from '../../models/user'
 import * as db from '../../data/mongodb'
 
 let app: Express
@@ -49,7 +51,7 @@ void describe('/rest/user/data-export', () => {
     assert.equal(res.status, 401)
   })
 
-  void it('Export data with empty JSON body but valid token still succeeds without CAPTCHA', async () => {
+  void it('Export data with empty JSON body but valid token is rejected without CAPTCHA', async () => {
     const { token } = await login(app, { email: 'bjoern.kimminich@gmail.com', password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI=' })
     const authHeader = { Authorization: 'Bearer ' + token, 'content-type': 'application/json' }
 
@@ -58,8 +60,8 @@ void describe('/rest/user/data-export', () => {
       .set(authHeader)
       .send({})
 
-    assert.equal(res.status, 200)
-    assert.equal(res.body.confirmation, 'Your data export will open in a new Browser window.')
+    assert.equal(res.status, 401)
+    assert.equal(res.body.userData, undefined)
   })
 
   void it('CAPTCHA cannot be requested without authentication', async () => {
@@ -69,7 +71,7 @@ void describe('/rest/user/data-export', () => {
     assert.equal(res.status, 401)
   })
 
-  void it('Export data without use of CAPTCHA', async () => {
+  void it('Export data without use of CAPTCHA is rejected', async () => {
     const { token } = await login(app, { email: 'bjoern.kimminich@gmail.com', password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI=' })
     const authHeader = { Authorization: 'Bearer ' + token, 'content-type': 'application/json' }
 
@@ -78,12 +80,9 @@ void describe('/rest/user/data-export', () => {
       .set(authHeader)
       .send({ format: '1' })
 
-    assert.equal(res.status, 200)
-    assert.ok(res.headers['content-type']?.includes('application/json'))
-    assert.equal(res.body.confirmation, 'Your data export will open in a new Browser window.')
-    const parsedData = JSON.parse(res.body.userData)
-    assert.equal(parsedData.username, 'bkimminich')
-    assert.equal(parsedData.email, 'bjoern.kimminich@gmail.com')
+    assert.equal(res.status, 401)
+    assert.ok(res.text.includes('Wrong answer to CAPTCHA. Please try again.'))
+    assert.equal(res.body.userData, undefined)
   })
 
   void it('Export data when CAPTCHA requested need right answer', async () => {
@@ -116,11 +115,12 @@ void describe('/rest/user/data-export', () => {
 
     assert.equal(captchaRes.status, 200)
     assert.ok(captchaRes.headers['content-type']?.includes('application/json'))
+    assert.equal(captchaRes.body.answer, undefined)
 
     const res = await request(app)
       .post('/rest/user/data-export')
       .set(authHeader)
-      .send({ answer: captchaRes.body.answer, format: 1 })
+      .send({ answer: await storedCaptchaAnswer('bjoern.kimminich@gmail.com'), format: 1 })
 
     assert.equal(res.status, 200)
     assert.ok(res.headers['content-type']?.includes('application/json'))
@@ -128,88 +128,6 @@ void describe('/rest/user/data-export', () => {
     const parsedData = JSON.parse(res.body.userData)
     assert.equal(parsedData.username, 'bkimminich')
     assert.equal(parsedData.email, 'bjoern.kimminich@gmail.com')
-  })
-
-  void it('Export data including orders without use of CAPTCHA', async () => {
-    const { token } = await login(app, { email: 'amy@' + config.get<string>('application.domain'), password: 'K1f.....................' })
-    const authHeader = { Authorization: 'Bearer ' + token, 'content-type': 'application/json' }
-
-    await request(app)
-      .post('/rest/basket/4/checkout')
-      .set(authHeader)
-
-    const res = await request(app)
-      .post('/rest/user/data-export')
-      .set(authHeader)
-      .send({ format: '1' })
-
-    assert.equal(res.status, 200)
-    assert.ok(res.headers['content-type']?.includes('application/json'))
-    assert.equal(res.body.confirmation, 'Your data export will open in a new Browser window.')
-    const parsedData = JSON.parse(res.body.userData)
-    assert.equal(parsedData.username, '')
-    assert.equal(parsedData.email, 'amy@' + config.get<string>('application.domain'))
-    assert.equal(parsedData.orders[0].totalPrice, 9.98)
-    assert.equal(parsedData.orders[0].bonus, 0)
-    assert.equal(parsedData.orders[0].products[0].quantity, 2)
-    assert.equal(parsedData.orders[0].products[0].name, 'Raspberry Juice (1000ml)')
-    assert.equal(parsedData.orders[0].products[0].price, 4.99)
-    assert.equal(parsedData.orders[0].products[0].total, 9.98)
-    assert.equal(parsedData.orders[0].products[0].bonus, 0)
-  })
-
-  void it('Export data including reviews without use of CAPTCHA', async () => {
-    const { token } = await login(app, { email: 'jim@' + config.get<string>('application.domain'), password: 'ncc-1701' })
-    const authHeader = { Authorization: 'Bearer ' + token, 'content-type': 'application/json' }
-
-    const res = await request(app)
-      .post('/rest/user/data-export')
-      .set(authHeader)
-      .send({ format: '1' })
-
-    assert.equal(res.status, 200)
-    assert.ok(res.headers['content-type']?.includes('application/json'))
-    assert.equal(res.body.confirmation, 'Your data export will open in a new Browser window.')
-    const parsedData = JSON.parse(res.body.userData)
-    assert.equal(parsedData.username, '')
-    assert.equal(parsedData.email, 'jim@' + config.get<string>('application.domain'))
-    assert.equal(parsedData.reviews[0].message, 'Looks so much better on my uniform than the boring Starfleet symbol.')
-    assert.equal(parsedData.reviews[0].author, 'jim@' + config.get<string>('application.domain'))
-    assert.equal(parsedData.reviews[0].productId, 20)
-    assert.equal(parsedData.reviews[0].likesCount, 0)
-    assert.equal(parsedData.reviews[0].likedBy[0], undefined)
-    assert.equal(parsedData.reviews[1].message, 'Fresh out of a replicator.')
-    assert.equal(parsedData.reviews[1].author, 'jim@' + config.get<string>('application.domain'))
-    assert.equal(parsedData.reviews[1].productId, 22)
-    assert.equal(parsedData.reviews[1].likesCount, 0)
-    assert.equal(parsedData.reviews[1].likedBy[0], undefined)
-  })
-
-  void it('Export data including memories without use of CAPTCHA', async () => {
-    const { token } = await login(app, { email: 'jim@' + config.get<string>('application.domain'), password: 'ncc-1701' })
-    const authHeader = { Authorization: 'Bearer ' + token, 'content-type': 'application/json' }
-
-    const file = path.resolve(__dirname, '../files/validProfileImage.jpg')
-
-    await request(app)
-      .post('/rest/memories')
-      .set('Authorization', 'Bearer ' + token)
-      .attach('image', file, 'Valid Image')
-      .field('caption', 'Valid Image')
-
-    const res = await request(app)
-      .post('/rest/user/data-export')
-      .set(authHeader)
-      .send({ format: '1' })
-
-    assert.equal(res.status, 200)
-    assert.ok(res.headers['content-type']?.includes('application/json'))
-    assert.equal(res.body.confirmation, 'Your data export will open in a new Browser window.')
-    const parsedData = JSON.parse(res.body.userData)
-    assert.equal(parsedData.username, '')
-    assert.equal(parsedData.email, 'jim@' + config.get<string>('application.domain'))
-    assert.equal(parsedData.memories[0].caption, 'Valid Image')
-    assert.ok(parsedData.memories[0].imageUrl.includes('assets/public/images/uploads/valid-image'))
   })
 
   void it('Export data including orders with use of CAPTCHA', async () => {
@@ -230,7 +148,7 @@ void describe('/rest/user/data-export', () => {
     const res = await request(app)
       .post('/rest/user/data-export')
       .set(authHeader)
-      .send({ answer: captchaRes.body.answer, format: 1 })
+      .send({ answer: await storedCaptchaAnswer('amy@' + config.get<string>('application.domain')), format: 1 })
 
     assert.equal(res.status, 200)
     assert.ok(res.headers['content-type']?.includes('application/json'))
@@ -261,7 +179,7 @@ void describe('/rest/user/data-export', () => {
     const res = await request(app)
       .post('/rest/user/data-export')
       .set(authHeader)
-      .send({ answer: captchaRes.body.answer, format: 1 })
+      .send({ answer: await storedCaptchaAnswer('jim@' + config.get<string>('application.domain')), format: 1 })
 
     assert.equal(res.status, 200)
     assert.ok(res.headers['content-type']?.includes('application/json'))
@@ -303,7 +221,7 @@ void describe('/rest/user/data-export', () => {
     const res = await request(app)
       .post('/rest/user/data-export')
       .set(authHeader)
-      .send({ answer: captchaRes.body.answer, format: 1 })
+      .send({ answer: await storedCaptchaAnswer('jim@' + config.get<string>('application.domain')), format: 1 })
 
     assert.equal(res.status, 200)
     assert.ok(res.headers['content-type']?.includes('application/json'))
@@ -329,10 +247,11 @@ void describe('/rest/user/data-export', () => {
         return originalFindAll.call(this, options)
       })
 
+      const answer = await requestCaptchaAnswer(authHeader, adminEmail)
       const res = await request(app)
         .post('/rest/user/data-export')
         .set(authHeader)
-        .send({ format: '1' })
+        .send({ answer, format: '1' })
 
       assert.equal(res.status, 500)
       assert.match(res.text, /Memory error/)
@@ -344,10 +263,11 @@ void describe('/rest/user/data-export', () => {
       const authHeader = { Authorization: 'Bearer ' + token, 'content-type': 'application/json' }
       t.mock.method(db.ordersCollection, 'find', async () => { throw new Error('Orders error') })
 
+      const answer = await requestCaptchaAnswer(authHeader, adminEmail)
       const res = await request(app)
         .post('/rest/user/data-export')
         .set(authHeader)
-        .send({ format: '1' })
+        .send({ answer, format: '1' })
 
       assert.equal(res.status, 500)
       assert.match(res.text, /Error retrieving orders/)
@@ -359,13 +279,30 @@ void describe('/rest/user/data-export', () => {
       const authHeader = { Authorization: 'Bearer ' + token, 'content-type': 'application/json' }
       t.mock.method(db.reviewsCollection, 'find', async () => { throw new Error('Reviews error') })
 
+      const answer = await requestCaptchaAnswer(authHeader, adminEmail)
       const res = await request(app)
         .post('/rest/user/data-export')
         .set(authHeader)
-        .send({ format: '1' })
+        .send({ answer, format: '1' })
 
       assert.equal(res.status, 500)
       assert.match(res.text, /Error retrieving reviews/)
     })
   })
 })
+
+async function storedCaptchaAnswer (email: string) {
+  const user = await UserModel.findOne({ where: { email } })
+  assert.ok(user)
+  const captcha = await ImageCaptchaModel.findOne({ where: { UserId: user.id }, order: [['createdAt', 'DESC']] })
+  assert.ok(captcha)
+  return captcha.answer
+}
+
+async function requestCaptchaAnswer (authHeader: Record<string, string>, email: string) {
+  const captchaRes = await request(app)
+    .get('/rest/image-captcha')
+    .set(authHeader)
+  assert.equal(captchaRes.status, 200)
+  return await storedCaptchaAnswer(email)
+}

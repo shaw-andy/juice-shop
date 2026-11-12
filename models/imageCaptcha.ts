@@ -20,6 +20,7 @@ InferCreationAttributes<ImageCaptcha>
   declare image: string
   declare answer: string
   declare UserId: number
+  declare used: CreationOptional<boolean>
   declare createdAt: CreationOptional<Date>
 }
 
@@ -34,6 +35,11 @@ const ImageCaptchaModelInit = (sequelize: Sequelize) => {
       image: DataTypes.STRING,
       answer: DataTypes.STRING,
       UserId: { type: DataTypes.INTEGER },
+      used: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+      },
       createdAt: DataTypes.DATE
     },
     {

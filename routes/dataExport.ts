@@ -16,7 +16,7 @@ export function dataExport () {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       const loggedInUser = security.authenticatedUsers.get(req.headers?.authorization?.replace('Bearer ', ''))
-      if (loggedInUser?.data?.email && loggedInUser.data.id) {
+      if (loggedInUser?.data?.email && loggedInUser.data.id && loggedInUser.data.id === res.locals?.imageCaptchaUserId) {
         const username = loggedInUser.data.username
         const email = loggedInUser.data.email
         const updatedEmail = email.replace(/[aeiou]/gi, '*')
