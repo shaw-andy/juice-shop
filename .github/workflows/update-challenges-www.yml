@@ -24,8 +24,10 @@ jobs:
       with:
         path: juice-shop
     - name: Update challenges.yml
+      env:
+        REF_NAME: ${{ github.ref_name }}
       run: |
-        if [ "${{ github.ref_name }}" = "master" ]; then
+        if [ "$REF_NAME" = "master" ]; then
           DEST_FILE="_data/challenges.yml"
         else
           DEST_FILE="_data/challenges_dev.yml"
@@ -33,8 +35,10 @@ jobs:
         rm -f $DEST_FILE
         cp juice-shop/data/static/challenges.yml $DEST_FILE
     - name: Update snippets
+      env:
+        REF_NAME: ${{ github.ref_name }}
       run: |
-        if [ "${{ github.ref_name }}" = "master" ]; then
+        if [ "$REF_NAME" = "master" ]; then
           DEST_FILE="_data/snippets.json"
         else
           DEST_FILE="_data/snippets_dev.json"
