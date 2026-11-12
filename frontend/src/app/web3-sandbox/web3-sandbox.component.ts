@@ -40,6 +40,39 @@ const compilerReleases = {
   '0.2.2': 'soljson-v0.2.2+commit.ef92f566.js',
   '0.1.7': 'soljson-v0.1.7+commit.b4e666cc.js'
 }
+// Base64 SHA-256 of each build's `sha256` in https://binaries.soliditylang.org/bin/list.json.
+// A compiler without an entry here cannot be loaded.
+const compilerIntegrity: Record<string, string> = {
+  'soljson-v0.8.21+commit.d9974bed.js': 'sha256-Rb6jUrQdBAOeGUOZYt3vHT4QzyvJUm/ro58sx548Whc=',
+  'soljson-v0.8.9+commit.e5eed63a.js': 'sha256-WyX5h6rjKgJ1/cbBvjbMR88SYCSgTa/Y5L45odHRQiw=',
+  'soljson-v0.7.6+commit.7338295f.js': 'sha256-uU5p37BWs+JggPgFq0O2aK+8CscL8SS/tzkez8AXKtI=',
+  'soljson-v0.6.12+commit.27d51765.js': 'sha256-PhlWxVDKSOKJBEx8C9iSQDCBtLXhfnfOcHyBXObEIo8=',
+  'soljson-v0.5.17+commit.d19bba13.js': 'sha256-2sG8dWAkfT5pvOmJH36yIYpqjQEG2c203o4D7eRUYVM=',
+  'soljson-v0.4.26+commit.4563c3fc.js': 'sha256-NXrbSbt0yeq6oDTbKPlrQQXe8rBSx3lduOMK2aNMxVE=',
+  'soljson-v0.3.6+commit.3fc68da5.js': 'sha256-5gkqkDmLhRn+KtfFggdLgG42Xr1V/IbX0tXCdRNzI3M=',
+  'soljson-v0.2.2+commit.ef92f566.js': 'sha256-BPXjw4aDOloOFeIE3shZokmcjX2mm4lUTkdcJQBMRgI=',
+  'soljson-v0.1.7+commit.b4e666cc.js': 'sha256-QaDL049vuVftN0hogHj25hhtmi6LZwbemmPb9lxi/9M='
+}
+
+// solidity-browser-compiler runs importScripts() on the URL it is given, so it must only ever
+// receive a blob: URL holding bytes that already passed the integrity check, never a remote URL.
+async function loadVerifiedCompiler (filename: string): Promise<string> {
+  const integrity = compilerIntegrity[filename]
+  if (!integrity) {
+    throw new Error(`No pinned integrity hash for compiler ${filename}`)
+  }
+  const response = await fetch(`https://binaries.soliditylang.org/bin/${filename}`, {
+    integrity,
+    credentials: 'omit',
+    referrerPolicy: 'no-referrer'
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to download compiler ${filename}: ${response.status}`)
+  }
+  const verified = new Blob([await response.arrayBuffer()], { type: 'text/javascript' })
+  return URL.createObjectURL(verified)
+}
+
 @Component({
   changeDetection: ChangeDetectionStrategy.Eager,
   selector: 'app-web3-sandbox',
@@ -119,11 +152,13 @@ contract HelloWorld {
         return
       }
 
-      const compilerInput = {
-        version: `https://binaries.soliditylang.org/bin/${selectedVersion}`,
-        contractBody: code
+      const compilerUrl = await loadVerifiedCompiler(selectedVersion)
+      let output
+      try {
+        output = await solidityCompiler({ version: compilerUrl, contractBody: code })
+      } finally {
+        URL.revokeObjectURL(compilerUrl)
       }
-      const output = await solidityCompiler(compilerInput)
       if (output.errors && output.errors.length > 0 && !output.contracts) {
         this.compiledContracts = null
         console.log(output.errors)
