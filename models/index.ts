@@ -72,6 +72,15 @@ function setSequelize (seq: Sequelize) {
   sequelize = seq
 }
 
+let transactionQueue: Promise<unknown> = Promise.resolve()
+
+// Sequelize's SQLite dialect shares one connection for an in-memory database, where overlapping transactions fail, so they are run one at a time.
+async function exclusiveTransaction<T> (work: (transaction: Transaction) => Promise<T>): Promise<T> {
+  const result = transactionQueue.then(async () => await sequelize.transaction(work))
+  transactionQueue = result.catch(() => {})
+  return await result
+}
+
 initModels(sequelize)
 
-export { sequelize, createSequelize, initModels, setSequelize }
+export { sequelize, createSequelize, initModels, setSequelize, exclusiveTransaction }
