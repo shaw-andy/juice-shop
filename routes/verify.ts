@@ -5,9 +5,7 @@
 
 import { type NextFunction, type Request, type Response } from 'express'
 import { Op } from 'sequelize'
-import jwt from 'jsonwebtoken'
 import config from 'config'
-import jws from 'jws'
 
 import { challenges, products, retrieveBlueprintChallengeFile } from '../data/datacache'
 import type { Product as ProductConfig } from '../lib/config.schema'
@@ -84,14 +82,8 @@ export const errorHandlingChallenge = () => (err: unknown, req: Request, { statu
 }
 
 export const jwtChallenges = () => (req: Request, res: Response, next: NextFunction) => {
-  if (challengeUtils.notSolved(challenges.jwtUnsignedChallenge)) {
-    jwtChallenge(challenges.jwtUnsignedChallenge, req, 'none', /jwtn3d@/)
-  }
-  if (utils.isChallengeEnabled(challenges.jwtForgedChallenge) && challengeUtils.notSolved(challenges.jwtForgedChallenge)) {
-    jwtChallenge(challenges.jwtForgedChallenge, req, 'HS256', /rsa_lord@/)
-  }
   if (challengeUtils.notSolved(challenges.iacLeakedKeyChallenge)) {
-    jwtChallenge(challenges.iacLeakedKeyChallenge, req, 'RS256', /cloud-admin@/)
+    jwtChallenge(challenges.iacLeakedKeyChallenge, req, /cloud-admin@/)
   }
   next()
 }
@@ -113,28 +105,11 @@ export const serverSideChallenges = () => (req: Request, res: Response, next: Ne
   next()
 }
 
-function jwtChallenge (challenge: Challenge, req: Request, algorithm: string, email: string | RegExp) {
-  const token = utils.jwtFrom(req)
-  if (token) {
-    const decoded = jws.decode(token) ? jwt.decode(token) : null
-
-    if (decoded === null || typeof decoded === 'string') {
-      return
-    }
-
-    jwt.verify(token, security.publicKey, (err: jwt.VerifyErrors | null) => {
-      if (err === null) {
-        challengeUtils.solveIf(challenge, () => {
-          return hasAlgorithm(token, algorithm) && hasEmail(decoded as { data: { email: string } }, email)
-        })
-      }
-    })
+function jwtChallenge (challenge: Challenge, req: Request, email: string | RegExp) {
+  const decoded = security.verifiedPayload(utils.jwtFrom(req))
+  if (decoded !== undefined) {
+    challengeUtils.solveIf(challenge, () => hasEmail(decoded, email))
   }
-}
-
-function hasAlgorithm (token: string, algorithm: string) {
-  const header = JSON.parse(Buffer.from(token.split('.')[0], 'base64').toString())
-  return token && header && header.alg === algorithm
 }
 
 function hasEmail (token: { data: { email: string } }, email: string | RegExp) {
