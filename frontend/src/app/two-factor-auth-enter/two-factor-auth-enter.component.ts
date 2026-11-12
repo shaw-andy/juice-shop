@@ -51,6 +51,7 @@ export class TwoFactorAuthEnterComponent {
 
     this.twoFactorAuthService.verify(fields.token).subscribe({
       next: (authentication) => {
+        localStorage.removeItem('totp_tmp_token')
         localStorage.setItem('token', authentication.token)
         const expires = new Date()
         expires.setHours(expires.getHours() + 8)

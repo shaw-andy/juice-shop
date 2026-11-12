@@ -17,11 +17,12 @@ export async function verify (req: Request, res: Response) {
   const { tmpToken, totpToken } = req.body
 
   try {
-    const { userId, type } = security.verify(tmpToken) && security.decode(tmpToken)
+    const payload = security.verifyIssuedToken(tmpToken)
 
-    if (type !== 'password_valid_needs_second_factor_token') {
+    if (payload?.type !== 'password_valid_needs_second_factor_token' || typeof payload.jti !== 'string') {
       throw new Error('Invalid token type')
     }
+    const { userId } = payload
 
     const user = await UserModel.findByPk(userId)
     if (user == null) {
@@ -34,6 +35,9 @@ export async function verify (req: Request, res: Response) {
 
     if (!isValid) {
       return res.status(401).send()
+    }
+    if (!security.issuedAfterPasswordChange(user.id, payload.iat) || !security.redeemOnce({ jti: payload.jti, iat: payload.iat })) {
+      throw new Error('Token is no longer valid')
     }
     challengeUtils.solveIf(challenges.twoFactorAuthUnsafeSecretStorageChallenge, () => { return user.email === 'wurstbrot@' + config.get<string>('application.domain') })
 
@@ -112,7 +116,7 @@ export async function setup (req: Request, res: Response) {
       throw new Error('User has 2fa already setup')
     }
 
-    const { secret, type } = security.verify(setupToken) && security.decode(setupToken)
+    const { secret, type } = security.verifyIssuedToken(setupToken) ?? {}
     if (type !== 'totp_setup_secret') {
       throw new Error('SetupToken is of wrong type')
     }
