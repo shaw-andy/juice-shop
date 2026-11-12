@@ -74,6 +74,7 @@ import { placeOrder } from './routes/order'
 import { b2bOrder } from './routes/b2bOrder'
 import * as delivery from './routes/delivery'
 import * as recycles from './routes/recycles'
+import * as hints from './routes/hints'
 import * as twoFactorAuth from './routes/2fa'
 import { applyCoupon } from './routes/coupon'
 import dataErasure from './routes/dataErasure'
@@ -472,6 +473,8 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.get('/api/Deliverys', utils.asyncHandler(delivery.getDeliveryMethods()))
   app.get('/api/Deliverys/:id', utils.asyncHandler(delivery.getDeliveryMethod()))
   // vuln-code-snippet end changeProductChallenge
+  /* Hints: Logged-in users can unlock the next locked hint of a challenge */
+  app.put('/api/Hints/:id', security.isAuthorized(), utils.asyncHandler(hints.unlockHint()))
 
   /* Verify the 2FA Token */
   app.post('/rest/2fa/verify',
@@ -571,11 +574,24 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
       })
     }
 
-    // translate hints on-the-fly
+    // translate unlocked hints on-the-fly and withhold the text of locked ones
     if (name === 'Hint') {
-      resource.list.fetch.after((req: Request, res: Response, context: { instance: string | any[], continue: any }) => {
-        for (let i = 0; i < context.instance.length; i++) {
-          context.instance[i].text = req.__(context.instance[i].text)
+      resource.list.fetch.before((req: Request, res: Response, context: { continue: any, error: any }) => {
+        // searching, filtering or sorting by text would reveal locked hint text through which rows match
+        delete req.query.q
+        delete req.query.text
+        if (String(req.query.sort ?? '').split(',').some(column => column.replace(/^-/, '') === 'text')) {
+          return context.error(400, 'Sorting not allowed on given attributes', ['text'])
+        }
+        return context.continue
+      })
+      resource.list.fetch.after((req: Request, res: Response, context: { instance: any[], continue: any }) => {
+        for (const hint of context.instance) {
+          if (hint.unlocked) {
+            hint.text = req.__(hint.text)
+          } else {
+            hint.setDataValue('text', undefined)
+          }
         }
         return context.continue
       })
