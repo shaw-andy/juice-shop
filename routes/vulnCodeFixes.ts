@@ -13,35 +13,30 @@ interface codeFix {
   correct: number
 }
 
-type cache = Record<string, codeFix>
+let CodeFixes: Map<string, codeFix> | null = null
 
-const CodeFixes: cache = {}
-
-export const readFixes = (key: string) => {
-  if (CodeFixes[key]) {
-    return CodeFixes[key]
-  }
-  const files = fs.readdirSync(FixesDir)
-  const fixes: string[] = []
-  let correct: number = -1
-  for (const file of files) {
-    if (file.startsWith(`${key}_`)) {
-      const fix = fs.readFileSync(`${FixesDir}/${file}`).toString()
-      const metadata = file.split('_')
-      const number = metadata[1]
-      fixes.push(fix)
-      if (metadata.length === 3) {
-        correct = parseInt(number, 10)
-        correct--
-      }
+const loadFixes = () => {
+  const fixesByKey = new Map<string, codeFix>()
+  for (const file of fs.readdirSync(FixesDir)) {
+    const metadata = file.split('_')
+    if (metadata.length < 2) continue
+    const key = metadata[0]
+    let entry = fixesByKey.get(key)
+    if (entry === undefined) {
+      entry = { fixes: [], correct: -1 }
+      fixesByKey.set(key, entry)
+    }
+    entry.fixes.push(fs.readFileSync(`${FixesDir}/${file}`).toString())
+    if (metadata.length === 3) {
+      entry.correct = parseInt(metadata[1], 10) - 1
     }
   }
+  return fixesByKey
+}
 
-  CodeFixes[key] = {
-    fixes,
-    correct
-  }
-  return CodeFixes[key]
+export const readFixes = (key: string): codeFix => {
+  CodeFixes ??= loadFixes()
+  return CodeFixes.get(key) ?? { fixes: [], correct: -1 }
 }
 
 interface FixesRequestParams {
