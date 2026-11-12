@@ -8,14 +8,19 @@ import assert from 'node:assert/strict'
 import request from 'supertest'
 import type { Express } from 'express'
 import { createTestApp } from './helpers/setup'
+import { login, register } from './helpers/auth'
 import * as security from '../../lib/insecurity'
 
 let app: Express
-const authHeader = { Authorization: 'Bearer ' + security.authorize(), 'content-type': 'application/json' }
+let authHeader: Record<string, string>
 
 before(async () => {
   const result = await createTestApp()
   app = result.app
+  const credentials = { email: 'complaint-tester@example.test', password: 'placeholder-password' }
+  await register(app, credentials)
+  const { token } = await login(app, credentials)
+  authHeader = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' }
 }, { timeout: 60000 })
 
 void describe('/api/Complaints', () => {
@@ -31,6 +36,14 @@ void describe('/api/Complaints', () => {
     assert.equal(typeof res.body.data.id, 'number')
     assert.equal(typeof res.body.data.createdAt, 'string')
     assert.equal(typeof res.body.data.updatedAt, 'string')
+  })
+
+  void it('POST new complaint is rejected for a token without a user', async () => {
+    const res = await request(app)
+      .post('/api/Complaints')
+      .set({ Authorization: 'Bearer ' + security.authorize(), 'content-type': 'application/json' })
+      .send({ message: 'Anonymous complaint' })
+    assert.equal(res.status, 401)
   })
 
   void it('GET all complaints is forbidden via public API', async () => {
