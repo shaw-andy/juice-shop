@@ -4,6 +4,8 @@
  */
 
 import { type Request, type Response, type NextFunction } from 'express'
+import { Op, ValidationError, type WhereOptions } from 'sequelize'
+import { type ValidationOptions } from 'sequelize/types/instance-validator'
 import { BasketItemModel } from '../models/basketitem'
 import { QuantityModel } from '../models/quantity'
 import * as challengeUtils from '../lib/challengeUtils'
@@ -51,6 +53,51 @@ export function addBasketItem () {
       } catch (error) {
         next(error)
       }
+    }
+  }
+}
+
+export function updateBasketItem () {
+  return async (req: Request, res: Response) => {
+    const user = security.authenticatedUsers.from(req)
+    const ownedOrUnassigned: WhereOptions = { id: req.params.id, BasketId: { [Op.or]: [user?.bid ?? null, null] } }
+    const item = await BasketItemModel.findOne({ where: ownedOrUnassigned })
+    if (item == null) {
+      res.status(404).json({ status: 'error', data: 'No such item found in your basket.' })
+      return
+    }
+    const authorizedBasketId = item.BasketId ?? null
+
+    item.set(Object.fromEntries(['ProductId', 'BasketId', 'quantity'].filter((key) => key in req.body).map((key) => [key, req.body[key]])))
+    try {
+      // makeKeyNonUpdatable only enforces its constraint when options.validate is set, as save() does
+      await item.validate({ validate: true } as ValidationOptions)
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        res.status(400).json({ message: error.message, errors: error.errors.map(({ path, message }) => ({ field: path, message })) })
+        return
+      }
+      throw error
+    }
+
+    const changes = Object.fromEntries((item.changed() || []).map((key) => [key, item.get(key)]))
+    const [updated] = await BasketItemModel.update(changes, { where: { id: item.id, BasketId: authorizedBasketId } })
+    if (updated === 0) {
+      res.status(404).json({ status: 'error', data: 'No such item found in your basket.' })
+      return
+    }
+    res.json({ status: 'success', data: item })
+  }
+}
+
+export function deleteBasketItem () {
+  return async (req: Request, res: Response) => {
+    const user = security.authenticatedUsers.from(req)
+    const deleted = user?.bid != null ? await BasketItemModel.destroy({ where: { id: req.params.id, BasketId: user.bid } }) : 0
+    if (deleted) {
+      res.json({ status: 'success', data: {} })
+    } else {
+      res.status(404).json({ status: 'error', data: 'No such item found in your basket.' })
     }
   }
 }
