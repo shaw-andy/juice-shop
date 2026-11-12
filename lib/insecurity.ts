@@ -167,6 +167,26 @@ export const isDeluxe = (req: Request) => {
   return decodedToken?.data?.role === roles.deluxe && decodedToken?.data?.deluxeToken && decodedToken?.data?.deluxeToken === deluxeToken(decodedToken?.data?.email)
 }
 
+// Only accepts RS256 signatures, unlike verify() which trusts the token's own alg header
+export const verifiedSessionFrom = (req: Request): UserModel | undefined => {
+  const parts = utils.jwtFrom(req)?.split('.')
+  if (parts?.length !== 3) return undefined
+  const [encodedHeader, encodedPayload, signature] = parts
+  try {
+    const header = JSON.parse(Buffer.from(encodedHeader, 'base64url').toString())
+    if (header?.alg !== 'RS256') return undefined
+    const valid = crypto.verify('RSA-SHA256', Buffer.from(`${encodedHeader}.${encodedPayload}`), publicKey, Buffer.from(signature, 'base64url'))
+    if (!valid) return undefined
+    const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString())
+    if (typeof payload?.exp === 'number' && Date.now() / 1000 >= payload.exp) return undefined
+    return payload?.data ?? undefined
+  } catch {
+    return undefined
+  }
+}
+
+export const isAdmin = (req: Request) => verifiedSessionFrom(req)?.role === roles.admin
+
 export const isCustomer = (req: Request) => {
   const decodedToken = verify(utils.jwtFrom(req)) && decode(utils.jwtFrom(req))
   return decodedToken?.data?.role === roles.customer

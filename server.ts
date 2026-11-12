@@ -500,7 +500,7 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   finale.initialize({ app, sequelize: seq })
 
   const autoModels = [
-    { name: 'User', exclude: ['password', 'totpSecret'], model: UserModel },
+    { name: 'User', exclude: ['password', 'totpSecret', 'deluxeToken'], model: UserModel },
     { name: 'Product', exclude: [], model: ProductModel },
     { name: 'Feedback', exclude: [], model: FeedbackModel },
     { name: 'BasketItem', exclude: [], model: BasketItemModel },
@@ -535,6 +535,19 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
       }) // vuln-code-snippet neutral-line registerAdminChallenge
     } // vuln-code-snippet neutral-line registerAdminChallenge
     // vuln-code-snippet end registerAdminChallenge
+
+    if (name === 'User') {
+      resource.list.auth((req: Request, res: Response, context: { continue: any, error: any }) => {
+        return security.isAdmin(req) ? context.continue : context.error(403, 'Forbidden')
+      })
+      resource.read.fetch.after((req: Request, res: Response, context: { instance: { id: number }, continue: any, error: any }) => {
+        const session = security.verifiedSessionFrom(req)
+        if (session?.role === security.roles.admin || (session?.id !== undefined && session.id === context.instance.id)) {
+          return context.continue
+        }
+        return context.error(403, 'Forbidden')
+      })
+    }
 
     // translate challenge descriptions on-the-fly
     if (name === 'Challenge') {
