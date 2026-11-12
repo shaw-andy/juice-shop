@@ -132,7 +132,8 @@ export class AdministrationComponent implements OnInit {
   }
 
   times (numberOfTimes: number) {
-    return Array(numberOfTimes).fill('★')
+    const stars = Math.min(Math.max(Math.trunc(Number(numberOfTimes)) || 0, 0), 5)
+    return Array(stars).fill('★')
   }
 
   doesUserHaveAnActiveSession (user: { email: string, lastLoginTime: number }) {
