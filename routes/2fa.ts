@@ -17,11 +17,11 @@ export async function verify (req: Request, res: Response) {
   const { tmpToken, totpToken } = req.body
 
   try {
-    const { userId, type } = security.verify(tmpToken) && security.decode(tmpToken)
-
-    if (type !== 'password_valid_needs_second_factor_token') {
-      throw new Error('Invalid token type')
+    const claims = security.verifyInterim(tmpToken, 'password_valid_needs_second_factor_token')
+    if (claims === undefined) {
+      throw new Error('Invalid token')
     }
+    const { userId } = claims
 
     const user = await UserModel.findByPk(userId)
     if (user == null) {
@@ -70,7 +70,7 @@ export async function status (req: Request, res: Response) {
         setup: false,
         secret,
         email: user.email,
-        setupToken: security.authorize({
+        setupToken: security.authorizeInterim({
           secret,
           type: 'totp_setup_secret'
         })
@@ -112,10 +112,11 @@ export async function setup (req: Request, res: Response) {
       throw new Error('User has 2fa already setup')
     }
 
-    const { secret, type } = security.verify(setupToken) && security.decode(setupToken)
-    if (type !== 'totp_setup_secret') {
-      throw new Error('SetupToken is of wrong type')
+    const setupClaims = security.verifyInterim(setupToken, 'totp_setup_secret')
+    if (setupClaims === undefined) {
+      throw new Error('SetupToken is invalid or of wrong type')
     }
+    const { secret } = setupClaims
     if (!verifySync({ secret, token: initialToken, epochTolerance: 30 }).valid) {
       throw new Error('Initial token doesnt match the secret from the setupToken')
     }

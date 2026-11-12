@@ -55,6 +55,36 @@ export const authorize = (user = {}) => jwt.sign(user, privateKey, { expiresIn: 
 export const verify = (token: string) => token ? (jws.verify as ((token: string, secret: string) => boolean))(token, publicKey) : false
 export const decode = (token: string) => { return jws.decode(token)?.payload }
 
+// Intermediate proofs (e.g. password checked, second factor still pending) must never be accepted where a
+// session token is expected, so they are signed with a separate key that only verifyInterim() trusts.
+const interimTokenSecret = crypto.randomBytes(64)
+const interimTokenLifetimeSeconds = 6 * 60 * 60
+const interimTokenSignature = (headerAndPayload: string) => crypto.createHmac('sha256', interimTokenSecret).update(headerAndPayload).digest()
+
+export const authorizeInterim = (claims: { type: string } & Record<string, unknown>) => {
+  const iat = Math.floor(Date.now() / 1000)
+  const header = Buffer.from(JSON.stringify({ typ: 'JWT', alg: 'HS256' })).toString('base64url')
+  const payload = Buffer.from(JSON.stringify({ ...claims, iat, exp: iat + interimTokenLifetimeSeconds })).toString('base64url')
+  return `${header}.${payload}.${interimTokenSignature(`${header}.${payload}`).toString('base64url')}`
+}
+
+export const verifyInterim = (token: unknown, type: string): Record<string, any> | undefined => {
+  if (typeof token !== 'string') return undefined
+  const parts = token.split('.')
+  if (parts.length !== 3) return undefined
+  const [header, payload, signature] = parts
+  const expected = interimTokenSignature(`${header}.${payload}`)
+  const actual = Buffer.from(signature, 'base64url')
+  if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) return undefined
+  try {
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
+    if (claims?.type !== type || typeof claims.exp !== 'number' || claims.exp <= Date.now() / 1000) return undefined
+    return claims
+  } catch {
+    return undefined
+  }
+}
+
 export const sanitizeHtml = (html: string) => sanitizeHtmlLib(html)
 export const sanitizeLegacy = (input = '') => input.replace(/<(?:\w+)\W+?[\w]/gi, '')
 export const sanitizeFilename = (filename: string) => sanitizeFilenameLib(filename)
