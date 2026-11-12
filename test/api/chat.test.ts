@@ -9,7 +9,7 @@ import request from 'supertest'
 import type { Express } from 'express'
 import * as http from 'http'
 import { createTestApp } from './helpers/setup'
-import { login } from './helpers/auth'
+import { login, register } from './helpers/auth'
 
 const MOCK_LLM_PORT = 43210
 
@@ -406,5 +406,241 @@ void describe('/rest/chat', { timeout: 120000 }, () => {
       if (parsed.choices[0].finish_reason) continue
       assert.ok(parsed.choices[0].delta)
     }
+  })
+})
+
+const MAX_CHAT_MESSAGES = 10
+const MAX_CHAT_MESSAGE_CHARS = 2000
+const MAX_CHAT_REQUESTS_PER_CALLER = 5
+
+interface ObservedModelRequest {
+  messages?: Array<{ role?: string, content?: unknown }>
+  tools?: Array<{ function?: { name?: string } }>
+}
+
+function recordModelRequest (body: string, seen: ObservedModelRequest[]): void {
+  try {
+    seen.push(JSON.parse(body) as ObservedModelRequest)
+  } catch {
+    seen.push({ messages: [{ role: 'unparsed', content: body.slice(0, 200) }] })
+  }
+}
+
+function toolResultSnippets (seen: ObservedModelRequest[]): string[] {
+  const snippets: string[] = []
+  for (const requestBody of seen) {
+    for (const message of requestBody.messages ?? []) {
+      if (message.role === 'tool' && typeof message.content === 'string') {
+        snippets.push(message.content.slice(0, 160))
+      }
+    }
+  }
+  return snippets.slice(-4)
+}
+
+function userContents (seen: ObservedModelRequest[]): string[] {
+  const contents: string[] = []
+  for (const requestBody of seen) {
+    for (const message of requestBody.messages ?? []) {
+      if (message.role === 'user' && typeof message.content === 'string') {
+        contents.push(message.content)
+      }
+    }
+  }
+  return contents
+}
+
+void describe('POST /rest/chat refuses before invoking the model', { timeout: 120000 }, () => {
+  const password = 'placeholder'
+
+  void it('does not wait on the model for a request with no session', { timeout: 15000 }, async () => {
+    const seen: ObservedModelRequest[] = []
+    onLlmRequest = (_req, body, res) => {
+      recordModelRequest(body, seen)
+      setTimeout(() => {
+        sendSSE(res, [contentChunk('late'), finishChunk()])
+      }, 1500)
+    }
+
+    const started = Date.now()
+    const res = await request(app)
+      .post('/rest/chat')
+      .set({ 'content-type': 'application/json' })
+      .send({ messages: [{ role: 'user', content: 'anonymous-wait' }] })
+    const elapsed = Date.now() - started
+
+    assert.deepEqual(
+      { status: res.status, modelCalls: seen.length, elapsedUnderOneSecond: elapsed < 1000 },
+      { status: 401, modelCalls: 0, elapsedUnderOneSecond: true }
+    )
+  })
+
+  void it('does not invoke the model for a bearer token that is not a session', { timeout: 15000 }, async () => {
+    const seen: ObservedModelRequest[] = []
+    onLlmRequest = (_req, body, res) => {
+      recordModelRequest(body, seen)
+      sendSSE(res, [contentChunk('nope'), finishChunk()])
+    }
+
+    const res = await request(app)
+      .post('/rest/chat')
+      .set({ 'content-type': 'application/json', Authorization: 'Bearer placeholder-token' })
+      .send({ messages: [{ role: 'user', content: 'invalid-session' }] })
+
+    assert.deepEqual(
+      { status: res.status, modelCalls: seen.length },
+      { status: 401, modelCalls: 0 }
+    )
+  })
+
+  void it('does not run repeated catalog and order tool steps without a session', { timeout: 20000 }, async () => {
+    const seen: ObservedModelRequest[] = []
+    let step = 0
+    onLlmRequest = (_req, body, res) => {
+      recordModelRequest(body, seen)
+      step++
+      if (step > 12) {
+        sendSSE(res, [contentChunk('stop'), finishChunk()])
+        return
+      }
+      const toolName = ['searchProducts', 'getOrderById', 'getProductReviews', 'generateCoupon'][(step - 1) % 4]
+      const args = toolName === 'searchProducts'
+        ? '{"query":"juice"}'
+        : toolName === 'getOrderById'
+          ? '{"orderId":"abcd-0123456789abcdef"}'
+          : toolName === 'getProductReviews'
+            ? '{"id":"1"}'
+            : '{"discount":5}'
+      sendSSE(res, [
+        toolCallChunk(`call_${step}`, toolName, args),
+        finishChunk('tool_calls')
+      ])
+    }
+
+    const res = await request(app)
+      .post('/rest/chat')
+      .set({ 'content-type': 'application/json' })
+      .send({ messages: [{ role: 'user', content: 'Look up juice and my order' }] })
+
+    assert.deepEqual(
+      {
+        status: res.status,
+        modelCalls: seen.length,
+        toolsOffered: (seen[0]?.tools ?? []).map(tool => tool.function?.name),
+        toolResults: toolResultSnippets(seen)
+      },
+      { status: 401, modelCalls: 0, toolsOffered: [], toolResults: [] }
+    )
+  })
+
+  void it('rejects more than 10 messages for a signed-in caller before the model', { timeout: 15000 }, async () => {
+    const email = 'chat-too-many@juice-sh.op'
+    await register(app, { email, password })
+    const { token } = await login(app, { email, password })
+    const seen: ObservedModelRequest[] = []
+    onLlmRequest = (_req, body, res) => {
+      recordModelRequest(body, seen)
+      sendSSE(res, [contentChunk('ok'), finishChunk()])
+    }
+    const messages = Array.from({ length: MAX_CHAT_MESSAGES + 1 }, (_unused, index) => ({
+      role: 'user',
+      content: `message-${index}`
+    }))
+
+    const res = await request(app)
+      .post('/rest/chat')
+      .set({ 'content-type': 'application/json', Authorization: 'Bearer ' + token })
+      .send({ messages })
+
+    assert.deepEqual(
+      { status: res.status, modelCalls: seen.length },
+      { status: 400, modelCalls: 0 }
+    )
+  })
+
+  void it('rejects a message longer than 2000 characters before the model', { timeout: 15000 }, async () => {
+    const email = 'chat-too-long@juice-sh.op'
+    await register(app, { email, password })
+    const { token } = await login(app, { email, password })
+    const seen: ObservedModelRequest[] = []
+    onLlmRequest = (_req, body, res) => {
+      recordModelRequest(body, seen)
+      sendSSE(res, [contentChunk('ok'), finishChunk()])
+    }
+
+    const res = await request(app)
+      .post('/rest/chat')
+      .set({ 'content-type': 'application/json', Authorization: 'Bearer ' + token })
+      .send({ messages: [{ role: 'user', content: 'x'.repeat(MAX_CHAT_MESSAGE_CHARS + 1) }] })
+
+    assert.deepEqual(
+      { status: res.status, modelCalls: seen.length },
+      { status: 400, modelCalls: 0 }
+    )
+  })
+
+  void it('caps model calls at 5 per signed-in caller and does not share or reset that cap', { timeout: 20000 }, async () => {
+    const emailA = 'chat-limit-a@juice-sh.op'
+    const emailB = 'chat-limit-b@juice-sh.op'
+    await register(app, { email: emailA, password })
+    await register(app, { email: emailB, password })
+    const callerA = await login(app, { email: emailA, password })
+    const callerB = await login(app, { email: emailB, password })
+    const seen: ObservedModelRequest[] = []
+    onLlmRequest = (_req, body, res) => {
+      recordModelRequest(body, seen)
+      sendSSE(res, [contentChunk('ok'), finishChunk()])
+    }
+
+    const burst = await Promise.all(Array.from({ length: MAX_CHAT_REQUESTS_PER_CALLER + 3 }, (_unused, index) => {
+      return request(app)
+        .post('/rest/chat')
+        .set({ 'content-type': 'application/json', Authorization: 'Bearer ' + callerA.token })
+        .send({ messages: [{ role: 'user', content: `caller-a-${index}` }], userId: `rotated-${index}` })
+    }))
+    const statuses = burst.map(res => res.status).sort((left, right) => left - right)
+
+    const bypass = await request(app)
+      .post('/rest/chat')
+      .set({
+        'content-type': 'application/json',
+        Authorization: 'Bearer ' + callerA.token,
+        'X-Forwarded-For': '203.0.113.10'
+      })
+      .send({ messages: [{ role: 'user', content: 'caller-a-bypass' }], userId: 'someone-else' })
+
+    const otherCaller = await request(app)
+      .post('/rest/chat')
+      .set({
+        'content-type': 'application/json',
+        Authorization: 'Bearer ' + callerB.token,
+        'X-Forwarded-For': '203.0.113.10'
+      })
+      .send({ messages: [{ role: 'user', content: 'caller-b-allowed' }], userId: emailA })
+
+    const contents = userContents(seen)
+    const callerAReached = contents.filter(content => /^caller-a-\d+$/.test(content)).sort()
+    assert.deepEqual(
+      {
+        statuses,
+        bypassStatus: bypass.status,
+        otherCallerStatus: otherCaller.status,
+        modelCalls: seen.length,
+        callerAReached: callerAReached.length,
+        bypassReachedModel: contents.includes('caller-a-bypass'),
+        callerBContents: contents.filter(content => content.startsWith('caller-b-')),
+        callerAReachedAreUnique: new Set(callerAReached).size
+      },
+      {
+        statuses: [200, 200, 200, 200, 200, 429, 429, 429],
+        bypassStatus: 429,
+        otherCallerStatus: 200,
+        modelCalls: MAX_CHAT_REQUESTS_PER_CALLER + 1,
+        callerAReached: MAX_CHAT_REQUESTS_PER_CALLER,
+        bypassReachedModel: false,
+        callerBContents: ['caller-b-allowed'],
+        callerAReachedAreUnique: MAX_CHAT_REQUESTS_PER_CALLER
+      }
+    )
   })
 })
