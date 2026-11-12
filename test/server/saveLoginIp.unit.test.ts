@@ -44,6 +44,29 @@ void describe('saveLoginIp', () => {
     assert.equal(updateMock.mock.calls[0].arguments[0].lastLoginIp, '1.1.1.1')
   })
 
+  void it('should fall back to the remote address if true-client-ip header is not an IP address', async () => {
+    mock.method(security.authenticatedUsers, 'from', () => ({ data: { id: 1 } }))
+    req.headers['true-client-ip'] = '<img src="x" onerror="alert(1)">'
+    req.socket.remoteAddress = '::ffff:10.0.0.1'
+    const update = mock.fn(async (data: any) => data)
+    mock.method(UserModel, 'findByPk', async () => ({ update }))
+
+    await saveLoginIp()(req, res, next)
+
+    assert.equal(update.mock.calls[0].arguments[0].lastLoginIp, '10.0.0.1')
+  })
+
+  void it('should not store a remote address that is not an IP address', async () => {
+    mock.method(security.authenticatedUsers, 'from', () => ({ data: { id: 1 } }))
+    req.socket.remoteAddress = '<script>alert(1)</script>'
+    const update = mock.fn(async (data: any) => data)
+    mock.method(UserModel, 'findByPk', async () => ({ update }))
+
+    await saveLoginIp()(req, res, next)
+
+    assert.equal(update.mock.calls[0].arguments[0].lastLoginIp, '0.0.0.0')
+  })
+
   void it('should call next with error if update fails', async () => {
     mock.method(security.authenticatedUsers, 'from', () => ({ data: { id: 1 } }))
     const error = new Error('Update failed')
