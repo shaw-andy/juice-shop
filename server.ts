@@ -37,7 +37,7 @@ import { UserModel } from './models/user'
 import { CardModel } from './models/card'
 import { HintModel } from './models/hint'
 import { WalletModel } from './models/wallet'
-import { ProductModel } from './models/product'
+import { ProductModel, isValidPrice } from './models/product'
 import { RecycleModel } from './models/recycle'
 import { AddressModel } from './models/address'
 import { QuantityModel } from './models/quantity'
@@ -599,6 +599,16 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
         context.instance.description = req.__(context.instance.description)
         return context.continue
       })
+      const rejectInvalidPrices = (req: Request, res: Response, context: { error: any, continue: any }) => {
+        for (const field of ['price', 'deluxePrice']) {
+          if (req.body?.[field] !== undefined && !isValidPrice(req.body[field])) {
+            return context.error(400, `${field} must be a number not below zero`)
+          }
+        }
+        return context.continue
+      }
+      resource.create.write.before(rejectInvalidPrices)
+      resource.update.write.before(rejectInvalidPrices)
     }
 
     // fix the api difference between finale (fka epilogue) and previously used sequlize-restful
