@@ -43,7 +43,7 @@ export function likeProductReviews () {
       try {
         const updatedReview: Review = await db.reviewsCollection.findOne({ _id: id })
         const updatedLikedBy = updatedReview.likedBy
-        // Concurrent likes all pass the check above during the sleep, so the array written back is bounded here
+        // Concurrent likes can all pass the check above during the sleep, so the array written back is bounded here
         if (updatedLikedBy.length >= MAX_LIKES_PER_REVIEW) {
           return res.status(403).json({ error: 'Not allowed' })
         }
