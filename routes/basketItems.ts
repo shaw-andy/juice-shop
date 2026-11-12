@@ -44,6 +44,12 @@ export function addBasketItem () {
       }
       challengeUtils.solveIf(challenges.basketManipulateChallenge, () => { return user && basketItem.BasketId && basketItem.BasketId !== 'undefined' && user.bid != basketItem.BasketId }) // eslint-disable-line eqeqeq
 
+      // quantityCheck validated req.body.quantity, so refuse to store any other value from the raw body
+      if (!isValidQuantity(basketItem.quantity) || basketItem.quantity !== req.body.quantity) {
+        res.status(400).json({ error: invalidQuantityMessage })
+        return
+      }
+
       const basketItemInstance = BasketItemModel.build(basketItem)
       try {
         const addedBasketItem = await basketItemInstance.save()
@@ -68,7 +74,7 @@ export function quantityCheckBeforeBasketItemUpdate () {
       const item = await BasketItemModel.findOne({ where: { id: req.params.id } })
       const user = security.authenticatedUsers.from(req)
       challengeUtils.solveIf(challenges.basketManipulateChallenge, () => { return user && req.body.BasketId && user.bid != req.body.BasketId }) // eslint-disable-line eqeqeq
-      if (req.body.quantity) {
+      if (req.body.quantity !== undefined) {
         if (item == null) {
           throw new Error('No such item found!')
         }
@@ -82,7 +88,17 @@ export function quantityCheckBeforeBasketItemUpdate () {
   }
 }
 
+const invalidQuantityMessage = 'Quantity must be a whole number of at least 1.'
+
+export function isValidQuantity (quantity: unknown): quantity is number {
+  return Number.isInteger(quantity) && (quantity as number) >= 1
+}
+
 async function quantityCheck (req: Request, res: Response, next: NextFunction, id: number, quantity: number) {
+  if (!isValidQuantity(quantity)) {
+    res.status(400).json({ error: invalidQuantityMessage })
+    return
+  }
   const product = await QuantityModel.findOne({ where: { ProductId: id } })
   if (product == null) {
     throw new Error('No such product found!')
