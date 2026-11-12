@@ -54,6 +54,7 @@ import logger from './lib/logger'
 import * as utils from './lib/utils'
 import * as antiCheat from './lib/antiCheat'
 import * as security from './lib/insecurity'
+import { combinedFormatWithoutPasswords } from './lib/accessLog'
 import validateConfig from './lib/startup/validateConfig'
 import cleanupFtpFolder from './lib/startup/cleanupFtpFolder'
 import customizeEasterEgg from './lib/startup/customizeEasterEgg' // vuln-code-snippet hide-line
@@ -354,7 +355,7 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
     verbose: false,
     max_logs: '2d'
   })
-  app.use(morgan('combined', { stream: accessLogStream }))
+  app.use(morgan(combinedFormatWithoutPasswords, { stream: accessLogStream }))
 
   // vuln-code-snippet start resetPasswordMortyChallenge
   /* Rate limiting */
@@ -614,6 +615,7 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   /* Custom Restful API */
   app.post('/rest/user/login', login())
   app.get('/rest/user/change-password', utils.asyncHandler(changePassword()))
+  app.post('/rest/user/change-password', utils.asyncHandler(changePassword()))
   app.post('/rest/user/reset-password', utils.asyncHandler(resetPassword()))
   app.get('/rest/user/security-question', utils.asyncHandler(securityQuestion()))
   app.get('/rest/user/whoami', utils.asyncHandler(retrieveLoggedInUser()))

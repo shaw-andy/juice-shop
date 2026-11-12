@@ -9,7 +9,7 @@ import request from 'supertest'
 import type { Express } from 'express'
 import config from 'config'
 import { createTestApp } from './helpers/setup'
-import { login } from './helpers/auth'
+import { login, register } from './helpers/auth'
 
 let app: Express
 
@@ -87,6 +87,42 @@ void describe('/rest/user/change-password', () => {
     assert.ok(res.headers['content-type']?.includes('text/html'))
     assert.ok(res.text.includes('<h1>' + config.get<string>('application.name') + ' (Express'))
     assert.ok(res.text.includes('Error: Blocked illegal activity'))
+  })
+
+  void it('POST password change for newly created user with passwords in the request body', async () => {
+    await register(app, { email: 'placeholder-post-change@be.rt', password: 'PLACEHOLDER_CURRENT' })
+    const { token } = await login(app, { email: 'placeholder-post-change@be.rt', password: 'PLACEHOLDER_CURRENT' })
+
+    const res = await request(app)
+      .post('/rest/user/change-password')
+      .set({ Authorization: 'Bearer ' + token, 'content-type': 'application/json' })
+      .send({ current: 'PLACEHOLDER_CURRENT', new: 'PLACEHOLDER_NEW', repeat: 'PLACEHOLDER_NEW' })
+
+    assert.equal(res.status, 200)
+    assert.ok((await login(app, { email: 'placeholder-post-change@be.rt', password: 'PLACEHOLDER_NEW' })).token)
+  })
+
+  void it('POST password change ignores passwords passed in the query string', async () => {
+    const res = await request(app)
+      .post('/rest/user/change-password?new=PLACEHOLDER_NEW&repeat=PLACEHOLDER_NEW')
+      .set({ 'content-type': 'application/json' })
+      .send({})
+
+    assert.equal(res.status, 401)
+    assert.ok(res.text.includes('Password cannot be empty'))
+  })
+
+  void it('POST password change with passing wrong current password', async () => {
+    await register(app, { email: 'placeholder-post-wrong@be.rt', password: 'PLACEHOLDER_CURRENT' })
+    const { token } = await login(app, { email: 'placeholder-post-wrong@be.rt', password: 'PLACEHOLDER_CURRENT' })
+
+    const res = await request(app)
+      .post('/rest/user/change-password')
+      .set({ Authorization: 'Bearer ' + token, 'content-type': 'application/json' })
+      .send({ current: 'PLACEHOLDER_WRONG', new: 'PLACEHOLDER_NEW', repeat: 'PLACEHOLDER_NEW' })
+
+    assert.equal(res.status, 401)
+    assert.ok(res.text.includes('Current password is not correct'))
   })
 
   void it('GET password change for Bender without current password using GET request', async () => {
