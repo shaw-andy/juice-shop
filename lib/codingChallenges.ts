@@ -1,8 +1,12 @@
+import { constants as fsConstants } from 'node:fs'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { safeLoad } from 'js-yaml'
 import logger from './logger'
 
 export const SNIPPET_PATHS = Object.freeze(['./server.ts', './routes', './lib', './data', './data/static/web3-snippets', './frontend/src/app', './models', './infrastructure'])
+
+const CODEFIXES_DIR = path.resolve('data/static/codefixes')
 
 interface FileMatch {
   path: string
@@ -109,4 +113,42 @@ export async function getCodeChallenges (): Promise<Map<string, CachedCodeChalle
     }
   }
   return _internalCodeChallenges
+}
+
+export interface CodingChallengeInfo {
+  hints?: unknown
+  fixes?: unknown
+}
+
+// The codefixes directory is reachable by the arbitrary file write challenge, so the info file is
+// read through a single no-follow handle and parsed with the safe schema only.
+export async function getCodingChallengeInfo (challengeKey: unknown): Promise<CodingChallengeInfo | null> {
+  if (typeof challengeKey !== 'string' || !(await getCodeChallenges()).has(challengeKey)) {
+    return null
+  }
+  const infoPath = path.join(CODEFIXES_DIR, `${challengeKey}.info.yml`)
+  if (path.dirname(infoPath) !== CODEFIXES_DIR) {
+    return null
+  }
+  let content: string
+  try {
+    const handle = await fs.open(infoPath, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0))
+    try {
+      if (!(await handle.stat()).isFile()) {
+        return null
+      }
+      content = await handle.readFile('utf8')
+    } finally {
+      await handle.close()
+    }
+  } catch {
+    return null
+  }
+  try {
+    const info = safeLoad(content)
+    return info !== null && typeof info === 'object' ? info : null
+  } catch (error) {
+    logger.warn(`Info file for coding challenge ${challengeKey} could not be parsed: ${(error as Error).message}`)
+    return null
+  }
 }

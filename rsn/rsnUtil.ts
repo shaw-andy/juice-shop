@@ -132,7 +132,7 @@ function loadChallengeInfo (challengeName: string): ChallengeInfo | null {
   const infoPath = `${fixesPath}/${challengeName}.info.yml`
   if (!fs.existsSync(infoPath)) return null
   const content = fs.readFileSync(infoPath, 'utf-8')
-  return yaml.load(content) as ChallengeInfo
+  return yaml.safeLoad(content) as ChallengeInfo
 }
 
 function getFixExplanation (file: string, info: ChallengeInfo | null): string | null {
