@@ -14,7 +14,6 @@ import { of, throwError } from 'rxjs'
 import { ConfigurationService } from '../Services/configuration.service'
 import { FeedbackService } from '../Services/feedback.service'
 import { Gallery } from 'ng-gallery'
-import { DomSanitizer } from '@angular/platform-browser'
 import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http'
 
 import { AboutComponent } from './about.component'
@@ -27,7 +26,6 @@ describe('AboutComponent', () => {
     let feedbackService
     let gallery
     let galleryRef
-    let sanitizer
 
     beforeEach(async () => {
         configurationService = {
@@ -52,10 +50,6 @@ describe('AboutComponent', () => {
         gallery = {
             ref: vi.fn().mockName("Gallery.ref").mockReturnValue(galleryRef)
         }
-        sanitizer = {
-            bypassSecurityTrustHtml: vi.fn().mockName("DomSanitizer.bypassSecurityTrustHtml").mockImplementation((value: string) => value)
-        }
-
         TestBed.configureTestingModule({
             schemas: [NO_ERRORS_SCHEMA],
             imports: [MatCardModule,
@@ -66,7 +60,6 @@ describe('AboutComponent', () => {
                 { provide: TranslateService, useValue: translateService },
                 { provide: FeedbackService, useValue: feedbackService },
                 { provide: Gallery, useValue: gallery },
-                { provide: DomSanitizer, useValue: sanitizer },
                 provideHttpClient(withInterceptorsFromDi()),
                 provideHttpClientTesting()
             ]
@@ -168,19 +161,26 @@ describe('AboutComponent', () => {
         expect(component.galleryRef).toBe(galleryRef)
     })
 
-    it('should add an image to the gallery for each feedback with formatted comment and stars', () => {
+    it('should add an image to the gallery for each feedback with comment and stars', () => {
         feedbackService.find.mockReturnValue(of([{ comment: 'Great!', rating: 3 }]))
 
         component.populateSlideshowFromFeedbacks()
 
-        expect(sanitizer.bypassSecurityTrustHtml).toHaveBeenCalledTimes(1)
-        const sanitizedHtml = sanitizer.bypassSecurityTrustHtml.mock.calls[0][0]
-        expect(sanitizedHtml).toContain('<p class="feedback-comment">Great!</p>')
-        expect(sanitizedHtml).toContain('feedback-stars')
-        expect((sanitizedHtml.match(/fas fa-star/g) ?? []).length).toBe(3)
-        expect((sanitizedHtml.match(/far fa-star/g) ?? []).length).toBe(2)
         expect(galleryRef.addImage).toHaveBeenCalledTimes(1)
         expect(galleryRef.addImage.mock.calls[0][0].src).toBe('assets/public/images/carousel/1.jpg')
+        expect(galleryRef.addImage.mock.calls[0][0].args).toEqual({
+            comment: 'Great!',
+            stars: [true, true, true, false, false]
+        })
+    })
+
+    it('should pass feedback comments to the gallery unmodified so they are rendered as text', () => {
+        const comment = '<iframe src="javascript:alert(`xss`)">'
+        feedbackService.find.mockReturnValue(of([{ comment, rating: 1 }]))
+
+        component.populateSlideshowFromFeedbacks()
+
+        expect(galleryRef.addImage.mock.calls[0][0].args.comment).toBe(comment)
     })
 
     it('should cycle through the available carousel images when there are more feedbacks than images', () => {

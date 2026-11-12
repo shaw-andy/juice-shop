@@ -42,39 +42,6 @@ describe('/#/contact', () => {
     })
   })
 
-  describe('challenge "persistedXssFeedbackChallenge"', () => {
-    beforeEach(() => {
-      cy.login({ email: 'admin', password: 'admin123' })
-      cy.visit('/#/contact')
-      solveNextCaptcha()
-    })
-
-    // Cypress alert bug
-    // The challenge also passes but its just that cypress freezes and is unable to perform any action
-    xit('should be possible to trick the sanitization with a masked XSS attack', () => {
-      cy.task('isDocker').then((isDocker) => {
-        if (!isDocker) {
-          cy.get('#rating').type('{rightarrow}{rightarrow}{rightarrow}')
-          cy.get('#comment').type(
-            '<<script>Foo</script>iframe src="javascript:alert(`xss`)">'
-          )
-          cy.get('#submitButton').should('not.be.disabled').click()
-
-          cy.visit('/#/about')
-          cy.on('window:alert', (t) => {
-            expect(t).to.equal('xss')
-          })
-
-          cy.visit('/#/administration')
-          cy.on('window:alert', (t) => {
-            expect(t).to.equal('xss')
-          })
-          cy.expectChallengeSolved({ challenge: 'Server-side XSS Protection' })
-        }
-      })
-    })
-  })
-
   describe('challenge "knownVulnerableComponentChallenge"', () => {
     it('should be possible to post known vulnerable component(s) as feedback', () => {
       cy.get('#rating').type('{rightarrow}{rightarrow}{rightarrow}')
