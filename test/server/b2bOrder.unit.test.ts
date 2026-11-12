@@ -23,44 +23,69 @@ void describe('b2bOrder', () => {
       then () { }
     })
     challenges.rceChallenge = { solved: false, save } as unknown as Challenge
+    challenges.rceOccupyChallenge = { solved: false, save } as unknown as Challenge
   })
 
-  void it('infinite loop payload does not succeed but solves "rceChallenge"', { skip: true }, () => {
+  void it('infinite loop payload is rejected without being evaluated', () => {
     req.body.orderLinesData = '(function dos() { while(true); })()'
 
     b2bOrder()(req, res, next)
 
-    assert.equal(challenges.rceChallenge.solved, true)
+    assert.equal(res.status.mock.calls[0].arguments[0], 400)
+    assert.equal(next.mock.calls.length, 1)
+    assert.equal(res.json.mock.calls.length, 0)
+    assert.equal(challenges.rceChallenge.solved, false)
   })
 
-  void it('timeout after 2 seconds solves "rceOccupyChallenge"', { skip: true }, () => {
+  void it('nested regular expression payload is rejected without being evaluated', () => {
     req.body.orderLinesData = '/((a+)+)b/.test("aaaaaaaaaaaaaaaaaaaaaaaaaaaaa")'
+    const started = Date.now()
 
     b2bOrder()(req, res, next)
 
-    assert.equal(challenges.rceOccupyChallenge.solved, true)
+    assert.ok(Date.now() - started < 1000)
+    assert.equal(res.status.mock.calls[0].arguments[0], 400)
+    assert.equal(challenges.rceOccupyChallenge.solved, false)
   })
 
-  void it('deserializing JSON as documented in Swagger should not solve "rceChallenge"', () => {
+  void it('non-string order lines are rejected', () => {
+    req.body.orderLinesData = ['/((a+)+)b/.test("aaaaaaaaaaaaaaaaaaaaaaaaaaaaa")']
+
+    b2bOrder()(req, res, next)
+
+    assert.equal(res.status.mock.calls[0].arguments[0], 400)
+    assert.equal(res.json.mock.calls.length, 0)
+  })
+
+  void it('JSON as documented in Swagger is accepted', () => {
     req.body.orderLinesData = '{"productId": 12,"quantity": 10000,"customerReference": ["PO0000001.2", "SM20180105|042"],"couponCode": "pes[Bh.u*t"}'
 
     b2bOrder()(req, res, next)
 
-    assert.equal(challenges.rceChallenge.solved, false)
+    assert.equal(res.json.mock.calls.length, 1)
+    assert.equal(next.mock.calls.length, 0)
   })
 
-  void it('deserializing arbitrary JSON should not solve "rceChallenge"', () => {
+  void it('arbitrary JSON is accepted', () => {
     req.body.orderLinesData = '{"hello": "world", "foo": 42, "bar": [false, true]}'
 
     b2bOrder()(req, res, next)
-    assert.equal(challenges.rceChallenge.solved, false)
+
+    assert.equal(res.json.mock.calls.length, 1)
   })
 
-  void it('deserializing broken JSON should not solve "rceChallenge"', () => {
+  void it('missing order lines are accepted', () => {
+    b2bOrder()(req, res, next)
+
+    assert.equal(res.json.mock.calls.length, 1)
+  })
+
+  void it('broken JSON is rejected', () => {
     req.body.orderLinesData = '{ "productId: 28'
 
     b2bOrder()(req, res, next)
 
-    assert.equal(challenges.rceChallenge.solved, false)
+    assert.equal(res.status.mock.calls[0].arguments[0], 400)
+    assert.equal(res.json.mock.calls.length, 0)
   })
 })
