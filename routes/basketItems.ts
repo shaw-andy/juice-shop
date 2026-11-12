@@ -4,6 +4,8 @@
  */
 
 import { type Request, type Response, type NextFunction } from 'express'
+import { ValidationError } from 'sequelize'
+import { type ValidationOptions } from 'sequelize/types/instance-validator'
 import { BasketItemModel } from '../models/basketitem'
 import { QuantityModel } from '../models/quantity'
 import * as challengeUtils from '../lib/challengeUtils'
@@ -62,27 +64,81 @@ export function quantityCheckBeforeBasketItemAddition () {
     })
   }
 }
-export function quantityCheckBeforeBasketItemUpdate () {
-  return async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const item = await BasketItemModel.findOne({ where: { id: req.params.id } })
-      const user = security.authenticatedUsers.from(req)
-      challengeUtils.solveIf(challenges.basketManipulateChallenge, () => { return user && req.body.BasketId && user.bid != req.body.BasketId }) // eslint-disable-line eqeqeq
-      if (req.body.quantity) {
-        if (item == null) {
-          throw new Error('No such item found!')
-        }
-        void quantityCheck(req, res, next, item.ProductId, req.body.quantity)
-      } else {
-        next()
-      }
-    } catch (error) {
-      next(error)
+export function updateBasketItem () {
+  return async (req: Request, res: Response) => {
+    const user = security.authenticatedUsers.from(req)
+    const item = await BasketItemModel.findOne({ where: { id: req.params.id } })
+    challengeUtils.solveIf(challenges.basketManipulateChallenge, () => { return user && req.body.BasketId && user.bid != req.body.BasketId }) // eslint-disable-line eqeqeq
+    if (item == null) {
+      throw new Error('No such item found!')
     }
+    if (!belongsToSessionBasket(item, user?.bid)) {
+      return res.status(401).json({ error: 'Invalid BasketId' })
+    }
+    const authorizedBasketId = item.BasketId
+
+    for (const field of ['ProductId', 'BasketId', 'quantity'] as const) {
+      if (req.body[field] !== undefined) {
+        item.set(field, req.body[field])
+      }
+    }
+    try {
+      await item.validate({ validate: true } as ValidationOptions)
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return res.status(400).json({ message: error.message, errors: error.errors.map(({ path, message }) => ({ field: path, message })) })
+      }
+      throw error
+    }
+
+    const quantity = req.body.quantity
+    if (quantity !== undefined) {
+      const quantityError = await quantityErrorFor(req, res, item.ProductId, quantity)
+      if (quantityError) {
+        return res.status(400).json({ error: quantityError })
+      }
+      // The row can change between the read above and this write, so only write it if it is still in the authorized basket
+      const [updatedRows] = await BasketItemModel.update({ quantity }, { where: { id: item.id, BasketId: authorizedBasketId } })
+      if (updatedRows === 0) {
+        return res.status(401).json({ error: 'Invalid BasketId' })
+      }
+    }
+    res.json({ status: 'success', data: item })
   }
 }
 
+export function deleteBasketItem () {
+  return async (req: Request, res: Response) => {
+    const user = security.authenticatedUsers.from(req)
+    const item = await BasketItemModel.findOne({ where: { id: req.params.id } })
+    if (item == null) {
+      return res.status(404).json({ message: 'Not Found', errors: [] })
+    }
+    if (!belongsToSessionBasket(item, user?.bid)) {
+      return res.status(401).json({ error: 'Invalid BasketId' })
+    }
+    const deletedRows = await BasketItemModel.destroy({ where: { id: item.id, BasketId: item.BasketId } })
+    if (deletedRows === 0) {
+      return res.status(401).json({ error: 'Invalid BasketId' })
+    }
+    res.json({ status: 'success', data: {} })
+  }
+}
+
+function belongsToSessionBasket (item: BasketItemModel, sessionBasketId?: number) {
+  return sessionBasketId != null && item.BasketId != null && Number(item.BasketId) === Number(sessionBasketId)
+}
+
 async function quantityCheck (req: Request, res: Response, next: NextFunction, id: number, quantity: number) {
+  const quantityError = await quantityErrorFor(req, res, id, quantity)
+  if (quantityError) {
+    res.status(400).json({ error: quantityError })
+  } else {
+    next()
+  }
+}
+
+async function quantityErrorFor (req: Request, res: Response, id: number, quantity: number) {
   const product = await QuantityModel.findOne({ where: { ProductId: id } })
   if (product == null) {
     throw new Error('No such product found!')
@@ -91,11 +147,9 @@ async function quantityCheck (req: Request, res: Response, next: NextFunction, i
   // is product limited per user and order, except if user is deluxe?
   if (!product.limitPerUser || (product.limitPerUser && product.limitPerUser >= quantity) || security.isDeluxe(req)) {
     if (product.quantity >= quantity) { // enough in stock?
-      next()
-    } else {
-      res.status(400).json({ error: res.__('We are out of stock! Sorry for the inconvenience.') })
+      return null
     }
-  } else {
-    res.status(400).json({ error: res.__('You can order only up to {{quantity}} items of this product.', { quantity: product.limitPerUser.toString() }) })
+    return res.__('We are out of stock! Sorry for the inconvenience.')
   }
+  return res.__('You can order only up to {{quantity}} items of this product.', { quantity: product.limitPerUser.toString() })
 }
