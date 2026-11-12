@@ -312,7 +312,7 @@ void describe('/rest/user/whoami', () => {
     assert.equal(typeof res.body.user.email, 'string')
   })
 
-  void it('GET who-am-i with fields parameter can be tricked into returning password', async () => {
+  void it('GET who-am-i with fields parameter does not return password', async () => {
     const { token } = await login(app, {
       email: 'bjoern.kimminich@gmail.com',
       password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI='
@@ -324,6 +324,6 @@ void describe('/rest/user/whoami', () => {
     assert.ok(res.headers['content-type']?.includes('application/json'))
     assert.equal(typeof res.body.user.id, 'number')
     assert.equal(typeof res.body.user.email, 'string')
-    assert.equal(typeof res.body.user.password, 'string')
+    assert.equal(res.body.user.password, undefined)
   })
 })

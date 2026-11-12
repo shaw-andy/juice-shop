@@ -30,7 +30,7 @@ export function saveLoginIp () {
       try {
         const user = await UserModel.findByPk(loggedInUser.data.id)
         const updatedUser = await user?.update({ lastLoginIp: lastLoginIp?.toString() })
-        res.json(updatedUser)
+        res.json(updatedUser != null ? security.withoutCredentials(updatedUser) : updatedUser)
       } catch (error) {
         next(error)
       }

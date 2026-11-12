@@ -43,7 +43,7 @@ export function resetPassword () {
         if (user) {
           const updatedUser = await user.update({ password: newPassword })
           verifySecurityAnswerChallenges(updatedUser, answer)
-          res.json({ user: updatedUser })
+          res.json({ user: security.withoutCredentials(updatedUser) })
         }
       } else {
         res.status(401).send(res.__('Wrong answer to security question.'))
