@@ -536,6 +536,16 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
     } // vuln-code-snippet neutral-line registerAdminChallenge
     // vuln-code-snippet end registerAdminChallenge
 
+    // only administrators may delete feedback
+    if (name === 'Feedback') {
+      resource.delete.auth((req: Request, res: Response, context: { error: any, continue: any }) => {
+        if (!security.isAdmin(req)) {
+          return context.error(403, 'Malicious activity detected')
+        }
+        return context.continue
+      })
+    }
+
     // translate challenge descriptions on-the-fly
     if (name === 'Challenge') {
       resource.list.fetch.after((req: Request, res: Response, context: { instance: string | any[], continue: any }) => {

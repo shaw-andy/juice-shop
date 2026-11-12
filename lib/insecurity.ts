@@ -172,6 +172,11 @@ export const isCustomer = (req: Request) => {
   return decodedToken?.data?.role === roles.customer
 }
 
+export const isAdmin = (req: Request) => {
+  const decodedToken = verify(utils.jwtFrom(req)) && decode(utils.jwtFrom(req))
+  return decodedToken?.data?.role === roles.admin
+}
+
 export const appendUserId = () => {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
