@@ -5,7 +5,6 @@
 
 import { type Request, type Response, type NextFunction } from 'express'
 import { WalletModel } from '../models/wallet'
-import { CardModel } from '../models/card'
 
 export function getWalletBalance () {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -18,19 +17,9 @@ export function getWalletBalance () {
   }
 }
 
+// Saved cards are never charged, so there is no collected payment a top-up could be credited from.
 export function addWalletBalance () {
-  return async (req: Request, res: Response, next: NextFunction) => {
-    const cardId = req.body.paymentId
-    const card = cardId ? await CardModel.findOne({ where: { id: cardId, UserId: req.body.UserId } }) : null
-    if (card != null) {
-      try {
-        await WalletModel.increment({ balance: req.body.balance }, { where: { UserId: req.body.UserId } })
-        res.status(200).json({ status: 'success', data: req.body.balance })
-      } catch {
-        res.status(404).json({ status: 'error' })
-      }
-    } else {
-      res.status(402).json({ status: 'error', message: 'Payment not accepted.' })
-    }
+  return (req: Request, res: Response, next: NextFunction) => {
+    res.status(402).json({ status: 'error', message: 'Payment not accepted.' })
   }
 }
