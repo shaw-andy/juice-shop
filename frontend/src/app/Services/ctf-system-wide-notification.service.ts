@@ -4,7 +4,7 @@
  */
 
 import { Injectable, inject } from '@angular/core'
-import { HttpClient } from '@angular/common/http'
+import { HttpBackend, HttpClient } from '@angular/common/http'
 import { type Observable } from 'rxjs'
 
 export interface SystemWideNotificationResponse {
@@ -17,7 +17,8 @@ export interface SystemWideNotificationResponse {
   providedIn: 'root'
 })
 export class CtfSystemWideNotificationService {
-  private readonly http = inject(HttpClient)
+  // The notification URL is operator-configured and usually external, so it must bypass the interceptors that attach the shop session.
+  private readonly http = new HttpClient(inject(HttpBackend))
 
   fetchNotification (url: string): Observable<SystemWideNotificationResponse> {
     return this.http.get<SystemWideNotificationResponse>(url)
