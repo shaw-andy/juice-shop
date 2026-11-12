@@ -35,6 +35,24 @@ export function placeOrder () {
     BasketModel.findOne({ where: { id }, include: [{ model: ProductModel, paranoid: false, as: 'Products' }] })
       .then(async (basket: BasketModel | null) => {
         if (basket != null) {
+          const orderedQuantities = new Map<number, number>()
+          for (const { BasketItem } of basket.Products ?? []) {
+            if (BasketItem != null) {
+              orderedQuantities.set(BasketItem.ProductId, (orderedQuantities.get(BasketItem.ProductId) ?? 0) + Number(BasketItem.quantity))
+            }
+          }
+          const remainingStock = new Map<number, number>()
+          for (const [productId, orderedQuantity] of orderedQuantities) {
+            const quantityRow = await QuantityModel.findOne({ where: { ProductId: productId } })
+            if (quantityRow == null) continue
+            // negated comparison so that a non-numeric total is refused as well
+            if (quantityRow.limitPerUser && !security.isDeluxe(req) && !(orderedQuantity <= quantityRow.limitPerUser)) {
+              res.status(400).json({ error: req.__('You can order only up to {{quantity}} items of this product.', { quantity: quantityRow.limitPerUser.toString() }) })
+              return
+            }
+            remainingStock.set(productId, quantityRow.quantity)
+          }
+
           const customer = security.authenticatedUsers.from(req)
           const email = customer ? customer.data ? customer.data.email : '' : ''
           const orderId = security.hash(email).slice(0, 4) + '-' + utils.randomHexString(16)
@@ -75,9 +93,10 @@ export function placeOrder () {
             if (BasketItem != null) {
               challengeUtils.solveIf(challenges.christmasSpecialChallenge, () => { return BasketItem.ProductId === products.christmasSpecial.id })
               try {
-                const quantityRow = await QuantityModel.findOne({ where: { ProductId: BasketItem.ProductId } })
-                if (quantityRow) {
-                  const newQuantity = quantityRow.quantity - BasketItem.quantity
+                const stock = remainingStock.get(BasketItem.ProductId)
+                if (stock !== undefined) {
+                  const newQuantity = stock - BasketItem.quantity
+                  remainingStock.set(BasketItem.ProductId, newQuantity)
                   await QuantityModel.update({ quantity: newQuantity }, { where: { ProductId: BasketItem.ProductId } })
                 }
               } catch (error: unknown) {

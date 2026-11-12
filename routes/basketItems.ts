@@ -16,20 +16,25 @@ interface RequestWithRawBody extends Request {
   rawBody: string
 }
 
+interface CheckedBasketItem {
+  ProductId: number
+  quantity: number
+}
+
 export function addBasketItem () {
   return async (req: Request, res: Response, next: NextFunction) => {
+    const checked: CheckedBasketItem | undefined = res.locals.checkedBasketItem
+    if (checked == null) {
+      next(new Error('Basket item has not passed the quantity check'))
+      return
+    }
+
     const result = utils.parseJsonCustom((req as RequestWithRawBody).rawBody)
-    const productIds = []
     const basketIds = []
-    const quantities = []
 
     for (let i = 0; i < result.length; i++) {
-      if (result[i].key === 'ProductId') {
-        productIds.push(result[i].value)
-      } else if (result[i].key === 'BasketId') {
+      if (result[i].key === 'BasketId') {
         basketIds.push(result[i].value)
-      } else if (result[i].key === 'quantity') {
-        quantities.push(result[i].value)
       }
     }
 
@@ -38,9 +43,9 @@ export function addBasketItem () {
       res.status(401).send('{\'error\' : \'Invalid BasketId\'}')
     } else {
       const basketItem = {
-        ProductId: productIds[productIds.length - 1],
+        ProductId: checked.ProductId,
         BasketId: basketIds[basketIds.length - 1],
-        quantity: quantities[quantities.length - 1]
+        quantity: checked.quantity
       }
       challengeUtils.solveIf(challenges.basketManipulateChallenge, () => { return user && basketItem.BasketId && basketItem.BasketId !== 'undefined' && user.bid != basketItem.BasketId }) // eslint-disable-line eqeqeq
 
@@ -57,7 +62,12 @@ export function addBasketItem () {
 
 export function quantityCheckBeforeBasketItemAddition () {
   return (req: Request, res: Response, next: NextFunction) => {
-    void quantityCheck(req, res, next, req.body.ProductId, req.body.quantity).catch((error: Error) => {
+    const { ProductId, quantity } = req.body
+    const recordCheckedItem = () => {
+      res.locals.checkedBasketItem = { ProductId, quantity }
+      next()
+    }
+    void quantityCheck(req, res, recordCheckedItem, ProductId, quantity).catch((error: Error) => {
       next(error)
     })
   }
