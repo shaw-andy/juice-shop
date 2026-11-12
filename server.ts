@@ -536,6 +536,15 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
     } // vuln-code-snippet neutral-line registerAdminChallenge
     // vuln-code-snippet end registerAdminChallenge
 
+    // finale merges req.body into context.attributes without overwriting keys that are already set
+    if (name === 'User') {
+      resource.create.write.before((req: Request, res: Response, context: { attributes: Record<string, unknown>, continue: any }) => {
+        context.attributes.role = security.roles.customer
+        context.attributes.deluxeToken = ''
+        return context.continue
+      })
+    }
+
     // translate challenge descriptions on-the-fly
     if (name === 'Challenge') {
       resource.list.fetch.after((req: Request, res: Response, context: { instance: string | any[], continue: any }) => {
