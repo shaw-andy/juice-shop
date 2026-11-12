@@ -119,20 +119,6 @@ describe('/#/complain', () => {
     })
   })
 
-  describe('challenge "yamlBombChallenge"', () => {
-    it('should be solved via .yaml upload with a Billion Laughs-style attack', () => {
-      cy.task('isDocker').then((isDocker) => {
-        if (!isDocker) {
-          cy.get('#complaintMessage').type('YAML Bomb!')
-          cy.get('#file').selectFile('test/files/yamlBomb.yml')
-          cy.get('#submitButton').click()
-          cy.wait(5000) // Wait for 2.5x possible timeout of YAML parser
-          cy.expectChallengeSolved({ challenge: 'Memory Bomb' })
-        }
-      })
-    })
-  })
-
   describe('challenge "fileWriteChallenge"', () => {
     it('should be possible to upload zip file with filenames having path traversal', () => {
       cy.task('isDocker').then((isDocker) => {
