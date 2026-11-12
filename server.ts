@@ -101,7 +101,7 @@ import { captchas, verifyCaptcha } from './routes/captcha'
 import * as restoreProgress from './routes/restoreProgress'
 import { checkKeys, nftUnlocked } from './routes/checkKeys'
 import { retrieveLoggedInUser } from './routes/currentUser'
-import authenticatedUsers from './routes/authenticatedUsers'
+import authenticatedUsers, { restrictToAdministrator, restrictToAdministratorOrSelf } from './routes/authenticatedUsers'
 import { securityQuestion } from './routes/securityQuestion'
 import { servePremiumContent } from './routes/premiumReward'
 import { contractExploitListener } from './routes/web3Wallet'
@@ -472,6 +472,8 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.get('/api/Deliverys', utils.asyncHandler(delivery.getDeliveryMethods()))
   app.get('/api/Deliverys/:id', utils.asyncHandler(delivery.getDeliveryMethod()))
   // vuln-code-snippet end changeProductChallenge
+  app.get('/api/Users', restrictToAdministrator())
+  app.get('/api/Users/:id', restrictToAdministratorOrSelf())
 
   /* Verify the 2FA Token */
   app.post('/rest/2fa/verify',
