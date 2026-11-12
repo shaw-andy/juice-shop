@@ -90,7 +90,7 @@ void describe('/api/Feedbacks', () => {
     assert.equal(res.body.data.UserId, 3)
   })
 
-  void it('POST feedback in a non-existing users name as anonymous user fails with constraint error', async () => {
+  void it('POST feedback in a non-existing users name as anonymous user fails without exposing the constraint error', async () => {
     const captchaRes = await request(app)
       .get('/rest/captcha')
     assert.equal(captchaRes.status, 200)
@@ -108,7 +108,8 @@ void describe('/api/Feedbacks', () => {
       })
     assert.equal(res.status, 500)
     assert.ok(res.headers['content-type']?.includes('application/json'))
-    assert.ok(res.body.errors.includes('SQLITE_CONSTRAINT: FOREIGN KEY constraint failed'))
+    assert.equal(res.body.message, 'internal error')
+    assert.equal(res.text.includes('SQLITE_CONSTRAINT'), false)
   })
 
   void it('POST feedback is associated with current user', async () => {

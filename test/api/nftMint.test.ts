@@ -40,8 +40,7 @@ void describe('Web3 NFT Minting', () => {
         .get('/rest/web3/nftMintListen')
 
       if (res.status === 500) {
-        assert.ok(res.headers['content-type']?.includes('application/json'))
-        assert.match(res.body, /URL/i)
+        assert.doesNotMatch(res.text, /URL/i)
       } else {
         assert.equal(res.status, 200)
         assert.equal(res.body.success, true)
@@ -113,8 +112,7 @@ void describe('Web3 NFT Minting', () => {
         .send({ walletAddress: testAddress })
 
       assert.equal(res.status, 500)
-      assert.ok(res.headers['content-type']?.includes('application/json'))
-      assert.equal(res.body, 'Mocked error')
+      assert.equal(res.text.includes('Mocked error'), false)
 
       mock.restoreAll()
     })

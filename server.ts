@@ -12,6 +12,7 @@ import multer from 'multer'
 import helmet from 'helmet'
 import http from 'node:http'
 import path from 'node:path'
+import { inspect } from 'node:util'
 import express from 'express'
 import colors from 'colors/safe'
 import serveIndex from 'serve-index'
@@ -532,6 +533,18 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
       }) // vuln-code-snippet neutral-line registerAdminChallenge
     } // vuln-code-snippet neutral-line registerAdminChallenge
     // vuln-code-snippet end registerAdminChallenge
+
+    for (const controller of Object.values<any>(resource.controllers)) {
+      const sendError = controller.error.bind(controller)
+      controller.error = (req: Request, res: Response, err: { status: number, message: string, cause?: Error }) => {
+        if (err.status >= 500) {
+          logger.warn(`Unhandled error: ${inspect(err.cause ?? err)}`)
+          sendError(req, res, { status: err.status, message: 'internal error' })
+        } else {
+          sendError(req, res, err)
+        }
+      }
+    }
 
     // translate challenge descriptions on-the-fly
     if (name === 'Challenge') {

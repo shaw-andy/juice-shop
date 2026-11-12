@@ -1,10 +1,9 @@
-import { type Request, type Response } from 'express'
+import { type NextFunction, type Request, type Response } from 'express'
 import * as challengeUtils from '../lib/challengeUtils'
-import * as utils from '../lib/utils'
 import { challenges } from '../data/datacache'
 
 export function checkKeys () {
-  return async (req: Request, res: Response) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { HDNodeWallet } = await import('ethers')
       const mnemonic = 'purpose betray marriage blame crunch monitor spin slide donate sport lift clutch'
@@ -27,16 +26,16 @@ export function checkKeys () {
         }
       }
     } catch (error) {
-      res.status(500).json(utils.getErrorMessage(error))
+      next(error)
     }
   }
 }
 export function nftUnlocked () {
-  return (req: Request, res: Response) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     try {
       res.status(200).json({ status: challenges.nftUnlockChallenge.solved })
     } catch (error) {
-      res.status(500).json(utils.getErrorMessage(error))
+      next(error)
     }
   }
 }
