@@ -1,0 +1,12 @@
+{
+  "name": "juice-shop-packaging-tools",
+  "private": true,
+  "description": "Pinned build, SBOM and archiving tools for packaging OWASP Juice Shop. Install with: npm ci --prefix scripts",
+  "license": "MIT",
+  "dependencies": {
+    "@cyclonedx/cyclonedx-npm": "4.2.1",
+    "archiver": "8.0.0",
+    "glob": "10.5.0",
+    "typescript": "6.0.3"
+  }
+}

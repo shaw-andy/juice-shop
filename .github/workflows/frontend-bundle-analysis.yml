@@ -37,11 +37,11 @@ jobs:
           npm run bundle-visualizer
 
       - name: "Install Playwright for screenshot"
-        run: npm install playwright
+        run: npm install --no-save --ignore-scripts playwright@1.65.0
 
       - name: "Take screenshot of bundle report"
         run: |
-          npx playwright install chromium
+          npx --no playwright install chromium
           node -e "
             const { chromium } = require('playwright');
             (async () => {
