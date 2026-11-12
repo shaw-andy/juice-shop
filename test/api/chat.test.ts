@@ -3,13 +3,19 @@
  * SPDX-License-Identifier: MIT
  */
 
+import crypto from 'node:crypto'
 import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import request from 'supertest'
 import type { Express } from 'express'
 import * as http from 'http'
+import jws from 'jws'
 import { createTestApp } from './helpers/setup'
 import { login } from './helpers/auth'
+import { UserModel } from '../../models/user'
+import { ordersCollection } from '../../data/mongodb'
+import * as security from '../../lib/insecurity'
+import * as chat from '../../routes/chat'
 
 const MOCK_LLM_PORT = 43210
 
@@ -58,6 +64,92 @@ function finishChunk (reason: string = 'stop'): object {
     model: 'test-model',
     choices: [{ index: 0, delta: {}, finish_reason: reason }]
   }
+}
+
+const ORDER_PRODUCT = 'OrderLookupMarkerProduct'
+const ORDER_ADDRESS_ID = 4815162342
+const ORDER_TOTAL = 64.25
+const ORDER_DELIVERY_PRICE = 2.75
+const ORDER_ETA = 'eta-order-lookup'
+
+function maskedCustomerEmail (email: string): string {
+  return email.replace(/[aeiou]/gi, '*')
+}
+
+function bearerToken (payload: { data: { id: number } }, algorithm: 'HS256' | 'none'): string {
+  return jws.sign({
+    header: { alg: algorithm, typ: 'JWT' },
+    payload,
+    secret: crypto.randomBytes(32)
+  })
+}
+
+interface OrderLookupProbe {
+  status: number
+  body: string
+  systemPrompt?: string
+  toolResults: string[]
+}
+
+function orderMarkers (): string[] {
+  return [ORDER_PRODUCT, String(ORDER_ADDRESS_ID), String(ORDER_TOTAL), String(ORDER_DELIVERY_PRICE), ORDER_ETA]
+}
+
+function assertOrderHidden (probe: OrderLookupProbe, username: string): void {
+  const disclosed = [probe.body, probe.systemPrompt ?? '', ...probe.toolResults].join('\n')
+  for (const marker of orderMarkers()) {
+    assert.equal(disclosed.includes(marker), false, `order detail ${marker} was disclosed`)
+  }
+  assert.equal(disclosed.includes(username), false, 'unverified token was treated as the customer')
+}
+
+function assertOrderVisible (probe: OrderLookupProbe): void {
+  const disclosed = probe.toolResults.join('\n')
+  for (const marker of orderMarkers()) {
+    assert.equal(disclosed.includes(marker), true, `order detail ${marker} was not returned to the owner`)
+  }
+}
+
+function armOrderLookup (orderId: string, beforeToolCall?: () => void): { probe: () => { systemPrompt?: string, toolResults: string[] } } {
+  const toolResults: string[] = []
+  let systemPrompt: string | undefined
+  let callCount = 0
+  onLlmRequest = (_req, body, res) => {
+    callCount++
+    const parsed = JSON.parse(body)
+    if (callCount === 1) {
+      systemPrompt = parsed.messages?.[0]?.content
+      beforeToolCall?.()
+      sendSSE(res, [
+        toolCallChunk('call_order_lookup', 'getOrderById', JSON.stringify({ orderId })),
+        finishChunk('tool_calls')
+      ])
+      return
+    }
+    const toolMsg = parsed.messages.find((message: { role: string }) => message.role === 'tool')
+    const content = typeof toolMsg?.content === 'string' ? toolMsg.content : JSON.stringify(toolMsg?.content ?? '')
+    toolResults.push(content)
+    sendSSE(res, [contentChunk(content), finishChunk()])
+  }
+  return { probe: () => ({ systemPrompt, toolResults }) }
+}
+
+async function insertCustomerOrder (email: string, orderId: string): Promise<void> {
+  await ordersCollection.insert({
+    orderId,
+    email: maskedCustomerEmail(email),
+    addressId: ORDER_ADDRESS_ID,
+    totalPrice: ORDER_TOTAL,
+    deliveryPrice: ORDER_DELIVERY_PRICE,
+    eta: ORDER_ETA,
+    delivered: false,
+    products: [{ name: ORDER_PRODUCT, price: ORDER_TOTAL, total: ORDER_TOTAL, quantity: 1 }]
+  })
+}
+
+async function createCustomer (email: string, username: string): Promise<{ id: number, email: string, username: string }> {
+  const user = await UserModel.create({ email, username, role: 'customer' })
+  return { id: user.id, email: user.email, username: user.username ?? username }
 }
 
 function sendSSE (res: http.ServerResponse, chunks: object[]): void {
@@ -407,4 +499,127 @@ void describe('/rest/chat', { timeout: 120000 }, () => {
       assert.ok(parsed.choices[0].delta)
     }
   })
+
+  void describe('getOrderById customer identity', { concurrency: false }, () => {
+    const victimEmail = 'victim.order.lookup@example.test'
+    const victimUsername = 'victim-order-lookup'
+    const otherEmail = 'other.customer.lookup@example.test'
+    const otherUsername = 'other-customer-lookup'
+    const victimOrderId = 'c0de-orderlookupvictim1'
+    let victimId = 0
+    let otherId = 0
+
+    before(async () => {
+      const victim = await createCustomer(victimEmail, victimUsername)
+      const other = await createCustomer(otherEmail, otherUsername)
+      victimId = victim.id
+      otherId = other.id
+      await insertCustomerOrder(victimEmail, victimOrderId)
+    })
+
+    void it('POST does not disclose an order when the bearer token signature is not the server signature', { timeout: 15000 }, async () => {
+      const token = bearerToken({ data: { id: victimId } }, 'HS256')
+      assert.equal(security.verify(token), false)
+      const captured = armOrderLookup(victimOrderId)
+      const res = await request(app)
+        .post('/rest/chat')
+        .set({ 'content-type': 'application/json', Authorization: 'Bearer ' + token })
+        .send({ messages: [{ role: 'user', content: 'Look up order ' + victimOrderId }] })
+      const capturedProbe = captured.probe()
+      assertOrderHidden({
+        status: res.status,
+        body: res.text,
+        systemPrompt: capturedProbe.systemPrompt,
+        toolResults: capturedProbe.toolResults
+      }, victimUsername)
+    })
+
+    void it('POST does not disclose an order when the bearer token is unsigned', { timeout: 15000 }, async () => {
+      const token = bearerToken({ data: { id: victimId } }, 'none')
+      const captured = armOrderLookup(victimOrderId)
+      const res = await request(app)
+        .post('/rest/chat')
+        .set({ 'content-type': 'application/json', Authorization: 'Bearer ' + token })
+        .send({ messages: [{ role: 'user', content: 'Look up order ' + victimOrderId }] })
+      const capturedProbe = captured.probe()
+      assertOrderHidden({
+        status: res.status,
+        body: res.text,
+        systemPrompt: capturedProbe.systemPrompt,
+        toolResults: capturedProbe.toolResults
+      }, victimUsername)
+    })
+
+    void it('POST does not disclose an order when a later read of the same header is an unverified user id', { timeout: 15000 }, async () => {
+      const authorized = security.authorize({ data: { id: otherId } })
+      const unverified = bearerToken({ data: { id: victimId } }, 'HS256')
+      assert.equal(security.verify(unverified), false)
+      let useUnverified = false
+      const captured = armOrderLookup(victimOrderId, () => { useUnverified = true })
+      const response = await invokeChat(() => useUnverified ? unverified : authorized)
+      const capturedProbe = captured.probe()
+      assertOrderHidden({
+        status: response.status,
+        body: response.body,
+        systemPrompt: capturedProbe.systemPrompt,
+        toolResults: capturedProbe.toolResults
+      }, victimUsername)
+    })
+
+    void it('POST returns the order when the bearer token is signed for that customer', { timeout: 15000 }, async () => {
+      const token = security.authorize({ data: { id: victimId } })
+      const captured = armOrderLookup(victimOrderId)
+      const res = await request(app)
+        .post('/rest/chat')
+        .set({ 'content-type': 'application/json', Authorization: 'Bearer ' + token })
+        .send({ messages: [{ role: 'user', content: 'Look up order ' + victimOrderId }] })
+      assertOrderVisible({
+        status: res.status,
+        body: res.text,
+        systemPrompt: captured.probe().systemPrompt,
+        toolResults: captured.probe().toolResults
+      })
+    })
+
+    void it('POST does not return an order signed in as a different customer', { timeout: 15000 }, async () => {
+      const token = security.authorize({ data: { id: otherId } })
+      const captured = armOrderLookup(victimOrderId)
+      const res = await request(app)
+        .post('/rest/chat')
+        .set({ 'content-type': 'application/json', Authorization: 'Bearer ' + token })
+        .send({ messages: [{ role: 'user', content: 'Look up order ' + victimOrderId }] })
+      const disclosed = captured.probe().toolResults.join('\n') + res.text
+      for (const marker of orderMarkers()) {
+        assert.equal(disclosed.includes(marker), false, `order detail ${marker} was disclosed to another customer`)
+      }
+      assert.equal(captured.probe().toolResults.some(result => result.includes('Order does not belong')), true)
+    })
+  })
 })
+
+async function invokeChat (token: () => string): Promise<{ status: number, body: string }> {
+  let status = 200
+  let body = ''
+  const res = {
+    setHeader () { return undefined },
+    flushHeaders () { return undefined },
+    write (chunk: string) { body += chunk; return true },
+    end (chunk?: string) { if (chunk != null) body += chunk },
+    status (code: number) { status = code; return this },
+    json (payload: unknown) { body = JSON.stringify(payload); return this },
+    send (payload?: unknown) {
+      if (payload != null) body = typeof payload === 'string' ? payload : JSON.stringify(payload)
+      return this
+    },
+    cookie () { return this }
+  }
+  const req = {
+    headers: {
+      get authorization () { return 'Bearer ' + token() }
+    },
+    body: { messages: [{ role: 'user', content: 'Look up my order' }] },
+    cookies: {}
+  }
+  await chat.chat()(req as any, res as any)
+  return { status, body }
+}
