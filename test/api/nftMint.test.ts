@@ -7,7 +7,7 @@ import { describe, it, before, mock } from 'node:test'
 import assert from 'node:assert/strict'
 import request from 'supertest'
 import type { Express } from 'express'
-import { Wallet } from 'ethers/wallet'
+import { Wallet, type HDNodeWallet } from 'ethers/wallet'
 import { createTestApp } from './helpers/setup'
 import { login } from './helpers/auth'
 
@@ -16,7 +16,7 @@ let authHeader: Record<string, string>
 
 const skipReason = process.env.ALCHEMY_API_KEY ? undefined : 'ALCHEMY_API_KEY not set'
 
-async function signedClaim (wallet: Wallet) {
+async function signedClaim (wallet: HDNodeWallet) {
   const nonceRes = await request(app)
     .post('/rest/web3/walletNFTNonce')
     .set(authHeader)
