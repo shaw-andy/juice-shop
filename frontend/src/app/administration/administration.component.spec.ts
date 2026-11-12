@@ -106,6 +106,16 @@ describe('AdministrationComponent', () => {
         expect(component.feedbackDataSource.data[1].comment.toString()).toContain('Feedback2')
     })
 
+    it('should render feedback comments as text', () => {
+        feedbackService.find.mockReturnValue(of([{ comment: '<iframe src="javascript:alert(`xss`)"></iframe>' }]))
+        component.findAllFeedbacks()
+        fixture.detectChanges()
+
+        const cell: HTMLElement = fixture.nativeElement.querySelector('mat-cell.mat-column-comment p')
+        expect(cell.textContent).toContain('<iframe src="javascript:alert(`xss`)"></iframe>')
+        expect(fixture.nativeElement.querySelector('iframe')).toBeNull()
+    })
+
     it('should give an error if FeedbackService fails to find all feedbacks', () => {
         vi.spyOn(console, 'log').mockImplementation(() => {})
         feedbackService.find.mockReturnValue(throwError('Error'))
