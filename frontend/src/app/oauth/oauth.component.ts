@@ -9,6 +9,7 @@ import { CookieService } from 'ngy-cookie'
 import { Component, NgZone, type OnInit, inject, ChangeDetectionStrategy } from '@angular/core'
 import { TranslateModule } from '@ngx-translate/core'
 import { MatCardModule } from '@angular/material/card'
+import { consumeOAuthState } from './oauth-state'
 
 @Component({
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -26,7 +27,12 @@ export class OAuthComponent implements OnInit {
 
 
   ngOnInit (): void {
-    this.userService.oauthLogin(this.parseRedirectUrlParams().access_token).subscribe({
+    const params = this.parseRedirectUrlParams()
+    if (!consumeOAuthState(params.state) || !params.access_token) {
+      this.ngZone.run(async () => await this.router.navigate(['/login']))
+      return
+    }
+    this.userService.oauthLogin(params.access_token).subscribe({
       next: (profile: any) => {
         const password = btoa(profile.email.split('').reverse().join(''))
         this.userService.save({ email: profile.email, password, passwordRepeat: password }).subscribe({
