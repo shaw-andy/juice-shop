@@ -32,10 +32,14 @@ interface Product {
 export function placeOrder () {
   return (req: Request, res: Response, next: NextFunction) => {
     const id = req.params.id
-    BasketModel.findOne({ where: { id }, include: [{ model: ProductModel, paranoid: false, as: 'Products' }] })
+    const customer = security.authenticatedUsers.from(req)
+    if (customer?.bid == null || String(customer.bid) !== id) {
+      next(new Error(`Basket with id=${id} does not exist.`))
+      return
+    }
+    BasketModel.findOne({ where: { id: customer.bid }, include: [{ model: ProductModel, paranoid: false, as: 'Products' }] })
       .then(async (basket: BasketModel | null) => {
         if (basket != null) {
-          const customer = security.authenticatedUsers.from(req)
           const email = customer ? customer.data ? customer.data.email : '' : ''
           const orderId = security.hash(email).slice(0, 4) + '-' + utils.randomHexString(16)
           const pdfFile = `order_${orderId}.pdf`
@@ -48,7 +52,7 @@ export function placeOrder () {
             void (async () => {
               try {
                 void basket.update({ coupon: null })
-                await BasketItemModel.destroy({ where: { BasketId: id } })
+                await BasketItemModel.destroy({ where: { BasketId: basket.id } })
                 res.json({ orderConfirmation: orderId })
               } catch (error: unknown) {
                 next(error)

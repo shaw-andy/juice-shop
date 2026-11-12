@@ -473,6 +473,10 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.get('/api/Deliverys/:id', utils.asyncHandler(delivery.getDeliveryMethod()))
   // vuln-code-snippet end changeProductChallenge
 
+  /* BasketItems: Lines can only be changed or removed within the basket of the logged-in user */
+  app.put('/api/BasketItems/:id', utils.asyncHandler(basketItems.updateBasketItem()))
+  app.delete('/api/BasketItems/:id', utils.asyncHandler(basketItems.deleteBasketItem()))
+
   /* Verify the 2FA Token */
   app.post('/rest/2fa/verify',
     rateLimit({ windowMs: 5 * 60 * 1000, max: 100, validate: false }),
