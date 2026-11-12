@@ -1,0 +1,8 @@
+{
+  "name": "juice-shop-heroku-cli",
+  "private": true,
+  "description": "Pinned Heroku CLI for the heroku job in .github/workflows/ci.yml",
+  "dependencies": {
+    "heroku": "11.13.0"
+  }
+}
