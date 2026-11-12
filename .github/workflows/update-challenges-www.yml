@@ -25,7 +25,7 @@ jobs:
         path: juice-shop
     - name: Update challenges.yml
       run: |
-        if [ "${{ github.ref_name }}" = "master" ]; then
+        if [ "$GITHUB_REF_NAME" = "master" ]; then
           DEST_FILE="_data/challenges.yml"
         else
           DEST_FILE="_data/challenges_dev.yml"
@@ -34,7 +34,7 @@ jobs:
         cp juice-shop/data/static/challenges.yml $DEST_FILE
     - name: Update snippets
       run: |
-        if [ "${{ github.ref_name }}" = "master" ]; then
+        if [ "$GITHUB_REF_NAME" = "master" ]; then
           DEST_FILE="_data/snippets.json"
         else
           DEST_FILE="_data/snippets_dev.json"
