@@ -7,7 +7,8 @@ import { challenges } from '../data/datacache'
 import * as utils from '../lib/utils'
 
 const nftAddress = '0x41427790c94E7a592B17ad694eD9c06A02bb9C39'
-const addressesMinted = new Set()
+const maxAddressesMinted = 1000
+const addressesMinted = new Set<string>()
 let isEventListenerCreated = false
 
 export function nftMintListener () {
@@ -24,6 +25,12 @@ export function nftMintListener () {
         void contract.on('NFTMinted', (minter: string) => {
           if (!addressesMinted.has(minter)) {
             addressesMinted.add(minter)
+            if (addressesMinted.size > maxAddressesMinted) {
+              const oldestMinter = addressesMinted.values().next().value
+              if (oldestMinter !== undefined) {
+                addressesMinted.delete(oldestMinter)
+              }
+            }
           }
         })
         isEventListenerCreated = true

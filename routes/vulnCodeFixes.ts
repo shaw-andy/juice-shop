@@ -37,11 +37,11 @@ export const readFixes = (key: string) => {
     }
   }
 
-  CodeFixes[key] = {
-    fixes,
-    correct
+  const fixData = { fixes, correct }
+  if (fixes.length > 0) {
+    CodeFixes[key] = fixData
   }
-  return CodeFixes[key]
+  return fixData
 }
 
 interface FixesRequestParams {
