@@ -4,6 +4,7 @@
  */
 
 import { type Request, type Response, type NextFunction } from 'express'
+import { Op, literal } from 'sequelize'
 
 import * as challengeUtils from '../lib/challengeUtils'
 import { WalletModel } from '../models/wallet'
@@ -22,12 +23,13 @@ export function upgradeToDeluxe () {
         return
       }
       if (req.body.paymentMode === 'wallet') {
-        const wallet = await WalletModel.findOne({ where: { UserId: req.body.UserId } })
-        if ((wallet != null) && wallet.balance < 49) {
+        const [charged] = await WalletModel.update(
+          { balance: literal('balance - 49') },
+          { where: { UserId: req.body.UserId, balance: { [Op.gte]: 49 } } }
+        )
+        if (charged === 0) {
           res.status(400).json({ status: 'error', error: 'Insuffienct funds in Wallet' })
           return
-        } else {
-          await WalletModel.decrement({ balance: 49 }, { where: { UserId: req.body.UserId } })
         }
       }
 
