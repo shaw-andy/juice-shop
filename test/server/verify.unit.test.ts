@@ -243,7 +243,7 @@ void describe('verify', () => {
       void it(`is solved when the link in the O-Saft product goes to ${config.get<string>('challenges.overwriteUrlForProductTamperingChallenge')}`, () => {
         products.osaft.description = `O-Saft, yeah! <a href="${config.get<string>('challenges.overwriteUrlForProductTamperingChallenge')}" target="_blank">More...</a>`
 
-        verify.databaseRelatedChallenges()(req, res, next)
+        void verify.verifyDatabaseRelatedChallenges()
 
         assert.equal(challenges.changeProductChallenge.solved, true)
       })
@@ -251,7 +251,7 @@ void describe('verify', () => {
       void it('is not solved when the link in the O-Saft product is changed to an arbitrary URL', () => {
         products.osaft.description = 'O-Saft, nooo! <a href="http://arbitrary.url" target="_blank">More...</a>'
 
-        verify.databaseRelatedChallenges()(req, res, next)
+        void verify.verifyDatabaseRelatedChallenges()
 
         assert.equal(challenges.changeProductChallenge.solved, false)
       })
@@ -266,7 +266,7 @@ void describe('verify', () => {
         }
         products.osaft.description = `Vanilla O-Saft! <a href="${urlForProductTamperingChallenge}" target="_blank">More...</a>`
 
-        verify.databaseRelatedChallenges()(req, res, next)
+        void verify.verifyDatabaseRelatedChallenges()
 
         assert.equal(challenges.changeProductChallenge.solved, false)
       })
