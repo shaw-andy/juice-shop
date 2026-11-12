@@ -162,6 +162,41 @@ export const isAccounting = () => {
   }
 }
 
+const verifiedRs256Payload = (token?: string) => {
+  const parts = token?.split('.')
+  if (parts?.length !== 3) {
+    return undefined
+  }
+  try {
+    const header = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8'))
+    if (header?.alg !== 'RS256') {
+      return undefined
+    }
+    const signatureValid = crypto.verify('RSA-SHA256', Buffer.from(parts[0] + '.' + parts[1]), publicKey, Buffer.from(parts[2], 'base64url'))
+    if (!signatureValid) {
+      return undefined
+    }
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'))
+    if (typeof payload?.exp === 'number' && payload.exp * 1000 <= Date.now()) {
+      return undefined
+    }
+    return payload
+  } catch {
+    return undefined
+  }
+}
+
+// Pinned to RS256 because verify() accepts whatever algorithm the token header names, including "none"
+export const isAdmin = () => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (verifiedRs256Payload(utils.jwtFrom(req))?.data?.role === roles.admin) {
+      next()
+    } else {
+      res.status(403).json({ error: 'Malicious activity detected' })
+    }
+  }
+}
+
 export const isDeluxe = (req: Request) => {
   const decodedToken = verify(utils.jwtFrom(req)) && decode(utils.jwtFrom(req))
   return decodedToken?.data?.role === roles.deluxe && decodedToken?.data?.deluxeToken && decodedToken?.data?.deluxeToken === deluxeToken(decodedToken?.data?.email)

@@ -23,6 +23,9 @@ export default defineConfig({
         GenerateCoupon (discount: number) {
           return security.generateCoupon(discount)
         },
+        GenerateAdminToken () {
+          return security.authorize({ data: { role: security.roles.admin } })
+        },
         GetBlueprint () {
           for (const product of config.get<ProductConfig[]>('products')) {
             if (product.fileForRetrieveBlueprintChallenge) {
