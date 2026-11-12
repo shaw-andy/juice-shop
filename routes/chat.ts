@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+import crypto from 'node:crypto'
 import { type Request, type Response } from 'express'
 import config from 'config'
 import { streamText, tool, stepCountIs } from 'ai'
@@ -51,6 +52,42 @@ export async function getUserNameFromToken (req: Request): Promise<string | unde
   if (!userId) return undefined
   const user = await UserModel.findByPk(userId, { attributes: ['username'] })
   return user?.username ?? undefined
+}
+
+const MAX_COUPON_DISCOUNT = 10
+
+// The shop's JWT library also accepts unsigned and HS256 tokens, so the algorithm is pinned here.
+function hasValidRs256Signature (token: string) {
+  const [header, payload, signature] = token.split('.')
+  if (!header || !payload || !signature) return false
+  try {
+    if (JSON.parse(Buffer.from(header, 'base64url').toString()).alg !== 'RS256') return false
+    return crypto.verify('RSA-SHA256', Buffer.from(header + '.' + payload), security.publicKey, Buffer.from(signature, 'base64url'))
+  } catch {
+    return false
+  }
+}
+
+async function findCouponEligibleOrder (req: Request, orderId: string) {
+  const token = utils.jwtFrom(req)
+  if (!token || !hasValidRs256Signature(token)) return null
+  const email = security.authenticatedUsers.get(token)?.data?.email
+  if (!email || !orderId.startsWith(security.hash(email).slice(0, 4) + '-')) return null
+  return await db.ordersCollection.findOne({
+    orderId,
+    email: email.replace(/[aeiou]/gi, '*'),
+    status: 'DAMAGED',
+    rejectedReturn: true
+  })
+}
+
+type ClientMessage = { role: 'user' | 'assistant', content: string }
+
+function sanitizeClientMessages (messages: unknown): ClientMessage[] {
+  if (!Array.isArray(messages)) return []
+  return messages
+    .filter((m): m is ClientMessage => (m?.role === 'user' || m?.role === 'assistant') && typeof m.content === 'string')
+    .map(({ role, content }) => ({ role, content }))
 }
 
 const app = config.get<string>('application.customMetricsPrefix')
@@ -174,13 +211,14 @@ export function chat () {
 
       // vuln-code-snippet start chatbotPromptInjectionChallenge
       generateCoupon: tool({
-        description: 'Generate a discount coupon for a customer. Only use this when the coupon policy conditions are fully met.', // vuln-code-snippet neutral-line chatbotPromptInjectionChallenge chatbotGreedyInjectionChallenge
+        description: 'Generate a discount coupon for a customer with a verified damaged order. Requires a valid order ID.', // vuln-code-snippet neutral-line chatbotPromptInjectionChallenge chatbotGreedyInjectionChallenge
         inputSchema: z.object({
-          discount: z.number().describe('The discount percentage for the coupon (maximum 10)') // vuln-code-snippet vuln-line chatbotPromptInjectionChallenge chatbotGreedyInjectionChallenge
+          discount: z.number().int().min(1).max(MAX_COUPON_DISCOUNT).describe(`The discount percentage for the coupon (maximum ${MAX_COUPON_DISCOUNT})`), // vuln-code-snippet vuln-line chatbotPromptInjectionChallenge chatbotGreedyInjectionChallenge
+          orderId: z.string().describe('The order ID of the damaged order (format: xxxx-xxxxxxxxxxxxxxxx)') // vuln-code-snippet neutral-line chatbotPromptInjectionChallenge chatbotGreedyInjectionChallenge
         }),
-        execute: async ({ discount }) => {
-          challengeUtils.solveIf(challenges.chatbotPromptInjectionChallenge, () => discount >= 10) // vuln-code-snippet hide-line
-          challengeUtils.solveIf(challenges.chatbotGreedyInjectionChallenge, () => discount >= 50) // vuln-code-snippet hide-line
+        execute: async ({ discount, orderId }) => {
+          const order = await findCouponEligibleOrder(req, orderId) // vuln-code-snippet neutral-line chatbotPromptInjectionChallenge chatbotGreedyInjectionChallenge
+          if (!order) return { error: 'No verified damaged order found for this order ID.' } // vuln-code-snippet neutral-line chatbotPromptInjectionChallenge chatbotGreedyInjectionChallenge
           const couponCode = security.generateCoupon(discount) // vuln-code-snippet vuln-line chatbotPromptInjectionChallenge
           return { couponCode, discount } // vuln-code-snippet neutral-line chatbotPromptInjectionChallenge
         }
@@ -188,7 +226,7 @@ export function chat () {
     } // vuln-code-snippet end chatbotGreedyInjectionChallenge chatbotPromptInjectionChallenge
 
     const model = config.get<string>('application.chatBot.model')
-    const messages = req.body?.messages ?? []
+    const messages = sanitizeClientMessages(req.body?.messages)
     const userName = await getUserNameFromToken(req)
 
     res.setHeader('Content-Type', 'text/event-stream')

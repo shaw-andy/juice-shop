@@ -10,6 +10,8 @@ import type { Express } from 'express'
 import * as http from 'http'
 import { createTestApp } from './helpers/setup'
 import { login } from './helpers/auth'
+import * as security from '../../lib/insecurity'
+import * as db from '../../data/mongodb'
 
 const MOCK_LLM_PORT = 43210
 
@@ -354,13 +356,16 @@ void describe('/rest/chat', { timeout: 120000 }, () => {
   })
 
   void it('POST handles generateCoupon tool call and includes coupon code in tool response', { timeout: 15000 }, async () => {
+    const { token } = await login(app, { email: 'jim@juice-sh.op', password: 'ncc-1701' })
+    const orderId = security.hash('jim@juice-sh.op').slice(0, 4) + '-0123456789abcdef'
+    await db.ordersCollection.insert({ orderId, email: 'j*m@j**c*-sh.*p', status: 'DAMAGED', rejectedReturn: true, delivered: true, totalPrice: 1, products: [] })
     let toolResult: string | undefined
     let callCount = 0
     onLlmRequest = (_req, body, res) => {
       callCount++
       if (callCount === 1) {
         sendSSE(res, [
-          toolCallChunk('call_cpn', 'generateCoupon', '{"discount":5}'),
+          toolCallChunk('call_cpn', 'generateCoupon', JSON.stringify({ discount: 5, orderId })),
           finishChunk('tool_calls')
         ])
       } else {
@@ -372,7 +377,7 @@ void describe('/rest/chat', { timeout: 120000 }, () => {
 
     const res = await request(app)
       .post('/rest/chat')
-      .set({ 'content-type': 'application/json' })
+      .set({ 'content-type': 'application/json', Authorization: 'Bearer ' + token })
       .send({ messages: [{ role: 'user', content: 'Give me a coupon' }] })
 
     assert.equal(res.status, 200)
