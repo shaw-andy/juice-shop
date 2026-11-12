@@ -4,7 +4,10 @@
  */
 
 import { type Request, type Response, type NextFunction } from 'express'
+import { Op } from 'sequelize'
 import { CaptchaModel } from '../models/captcha'
+
+const maxStoredCaptchas = 1000
 
 export function captchas () {
   return async (req: Request, res: Response) => {
@@ -28,6 +31,7 @@ export function captchas () {
     }
     const captchaInstance = CaptchaModel.build(captcha)
     await captchaInstance.save()
+    await CaptchaModel.destroy({ where: { captchaId: { [Op.lte]: captchaId - maxStoredCaptchas } } })
     res.json(captcha)
   }
 }
