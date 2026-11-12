@@ -5,6 +5,7 @@
 
 import packageJson from '../package.json'
 import fs from 'node:fs'
+import path from 'node:path'
 import logger from './logger'
 import config from 'config'
 import download from 'download'
@@ -103,6 +104,16 @@ export const extractFilename = (url: string) => {
     file = file.substring(0, file.indexOf('?'))
   }
   return file
+}
+
+export const resolveFileInDirectory = (directory: string, file: string): string | undefined => {
+  // Windows trims trailing dots and spaces from the last path segment, turning names like ".. " into ".."
+  if (/^[. ]*$/.test(file) || file.includes('/') || file.includes('\\')) {
+    return undefined
+  }
+  const root = path.resolve(directory)
+  const resolved = path.resolve(root, file)
+  return path.resolve(resolved, '..') === root ? resolved : undefined
 }
 
 export const downloadToFile = async (url: string, dest: string) => {
