@@ -1,0 +1,9 @@
+[profile.default]
+solc_version = "0.8.21"
+auto_detect_solc = false
+src = "test/web3"
+out = "out"
+test = "test/web3"
+cache_path = "cache/forge"
+remappings = ["@openzeppelin/contracts/=test/web3/vendor/openzeppelin/"]
+optimizer = false
