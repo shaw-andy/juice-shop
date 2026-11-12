@@ -36,15 +36,15 @@ export function changePassword () {
       return
     }
 
-    if (currentPassword && security.hash(currentPassword) !== loggedInUser.data.password) {
-      res.status(401).send(res.__('Current password is not correct.'))
-      return
-    }
-
     try {
       const user = await UserModel.findByPk(loggedInUser.data.id)
       if (!user) {
         res.status(404).send(res.__('User not found.'))
+        return
+      }
+
+      if (currentPassword && security.hash(currentPassword) !== user.password) {
+        res.status(401).send(res.__('Current password is not correct.'))
         return
       }
 
