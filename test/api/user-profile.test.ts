@@ -85,7 +85,7 @@ void describe('/profile', () => {
     assert.ok(res.text.includes('Error: Blocked illegal activity'))
   })
 
-  void it('GET user profile renders evaluated SSTI payload for username containing valid expression', async () => {
+  void it('GET user profile renders username containing an expression as text', async () => {
     await request(app)
       .post('/profile')
       .set('Cookie', authHeader.Cookie)
@@ -99,10 +99,11 @@ void describe('/profile', () => {
 
     assert.equal(res.status, 200)
     assert.ok(res.headers['content-type']?.includes('text/html'))
-    assert.ok(res.text.includes('>49<'))
+    assert.ok(!res.text.includes('>49<'))
+    assert.ok(res.text.includes('>#{7*7}<'))
   })
 
-  void it('GET user profile falls back gracefully when SSTI payload throws', async () => {
+  void it('GET user profile renders username containing an invalid expression as text', async () => {
     await request(app)
       .post('/profile')
       .set('Cookie', authHeader.Cookie)
@@ -116,10 +117,10 @@ void describe('/profile', () => {
 
     assert.equal(res.status, 200)
     assert.ok(res.headers['content-type']?.includes('text/html'))
-    assert.ok(res.text.includes('not_a_defined_symbol'))
+    assert.ok(res.text.includes('>#{not_a_defined_symbol}<'))
   })
 
-  void it('GET user profile still evaluates SSTI payload when #{} is NOT at the start of the username', async () => {
+  void it('GET user profile renders username with an expression NOT at the start as text', async () => {
     await request(app)
       .post('/profile')
       .set('Cookie', authHeader.Cookie)
@@ -133,7 +134,8 @@ void describe('/profile', () => {
 
     assert.equal(res.status, 200)
     assert.ok(res.headers['content-type']?.includes('text/html'))
-    assert.ok(res.text.includes('A49'))
+    assert.ok(!res.text.includes('A49'))
+    assert.ok(res.text.includes('>A#{7*7}<'))
   })
 
   void it('GET user profile does NOT evaluate SSTI payload in safe mode', async (t) => {
