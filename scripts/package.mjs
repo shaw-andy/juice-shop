@@ -3,29 +3,26 @@
  * SPDX-License-Identifier: MIT
  */
 
-import { createRequire } from 'node:module'
 import fs from 'node:fs/promises'
 import { createWriteStream } from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import { execSync } from 'node:child_process'
 import { parseArgs } from 'node:util'
 import { glob } from 'glob'
 
-// archiver must be globally installed — Node.js does not search npm's global node_modules by default
-// not great, but the alternative is to include archiver as a prod dependency as all the dev dependency are cleared by npm prune before packaging
-function loadArchiver () {
-  const require = createRequire(import.meta.url)
+// packaging dependencies are pinned in scripts/package-lock.json and resolved from scripts/node_modules,
+// because the application's dev dependencies are pruned before packaging
+async function loadArchiver () {
   try {
-    const globalRoot = execSync('npm root -g', { encoding: 'utf8' }).trim()
-    return require(path.join(globalRoot, 'archiver'))
-  } catch {
-    console.error('archiver is not installed. Run: npm install -g archiver')
+    return await import('archiver')
+  } catch (err) {
+    if (err.code !== 'ERR_MODULE_NOT_FOUND') throw err
+    console.error('archiver is not installed. Run: npm ci --prefix scripts')
     process.exit(1)
   }
 }
 
-const { TarArchive, ZipArchive } = loadArchiver()
+const { TarArchive, ZipArchive } = await loadArchiver()
 
 const { values: args } = parseArgs({
   options: {
