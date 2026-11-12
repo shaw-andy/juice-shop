@@ -256,6 +256,23 @@ void describe('challengeUtils', () => {
       assert.equal(io.emit.mock.calls[0].arguments[0], 'challenge solved')
     })
 
+    void it('should replace an earlier notification for the same challenge instead of adding another', () => {
+      const challenge = {
+        key: 'scoreBoardChallenge',
+        name: 'Score Board',
+        description: 'Find the score board',
+        solved: true
+      } as any
+
+      challengeUtils.sendNotification(challenge, false)
+      challengeUtils.sendNotification(challenge, true)
+      challengeUtils.sendNotification(challenge, true)
+
+      assert.equal(datacache.notifications.length, 1)
+      assert.equal(datacache.notifications[0].key, 'scoreBoardChallenge')
+      assert.equal(datacache.notifications[0].isRestore, true)
+    })
+
     void it('should handle missing fullChallenge', (t) => {
       const challenge = {
         key: 'nonExisting',

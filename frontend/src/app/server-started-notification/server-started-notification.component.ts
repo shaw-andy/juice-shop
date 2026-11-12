@@ -11,6 +11,7 @@ import { SocketIoService } from '../Services/socket-io.service'
 import { MatIconModule } from '@angular/material/icon'
 import { MatButtonModule } from '@angular/material/button'
 import { MatCardModule, MatCardContent } from '@angular/material/card'
+import { ACKNOWLEDGED_NOTIFICATIONS_KEY } from '../challenge-solved-notification/challenge-solved-notification.component'
 
 interface HackingProgress {
   autoRestoreMessage: string | null
@@ -105,6 +106,7 @@ export class ServerStartedNotificationComponent implements OnInit {
     localStorage.removeItem('showDisabledChallenges')
     localStorage.removeItem('showOnlyTutorialChallenges')
     localStorage.removeItem('displayedChallengeCategories')
+    localStorage.removeItem(ACKNOWLEDGED_NOTIFICATIONS_KEY)
     this.hackingProgress.cleared = true
   }
 }
