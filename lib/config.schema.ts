@@ -67,7 +67,7 @@ const EasterEggPlanetSchema = z.object({
 
 const GoogleOauthSchema = z.object({
   clientId: z.string(),
-  authorizedRedirects: z.array(z.object({ uri: z.string(), proxy: z.string().optional() }))
+  authorizedRedirects: z.array(z.object({ uri: z.string() }))
 })
 
 // -- Section schemas --

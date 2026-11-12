@@ -78,10 +78,8 @@ export class LoginComponent implements OnInit {
       next: (config) => {
         if (config?.application?.googleOauth) {
           this.clientId = config.application.googleOauth.clientId
-          const authorizedRedirect = config.application.googleOauth.authorizedRedirects.find(r => r.uri === this.redirectUri)
-          if (authorizedRedirect) {
+          if (config.application.googleOauth.authorizedRedirects.some(r => r.uri === this.redirectUri)) {
             this.oauthUnavailable = false
-            this.redirectUri = authorizedRedirect.proxy ? authorizedRedirect.proxy : authorizedRedirect.uri
           } else {
             this.oauthUnavailable = true
             console.log(this.redirectUri + ' is not an authorized redirect URI for this application.')
@@ -146,6 +144,7 @@ export class LoginComponent implements OnInit {
   }
 
   googleLogin () {
-    this.windowRefService.nativeWindow.location.replace(`${oauthProviderUrl}?client_id=${this.clientId}&response_type=token&scope=email&redirect_uri=${this.redirectUri}`)
+    const params = new URLSearchParams({ client_id: this.clientId, response_type: 'token', scope: 'email', redirect_uri: this.redirectUri })
+    this.windowRefService.nativeWindow.location.replace(`${oauthProviderUrl}?${params.toString()}`)
   }
 }
