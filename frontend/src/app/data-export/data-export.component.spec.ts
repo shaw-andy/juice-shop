@@ -118,4 +118,20 @@ describe('DataExportComponent', () => {
         expect(component.error).toBe('Error')
         expect(component.resetFormError).toHaveBeenCalled()
     })
+
+    it('should fetch a new captcha if exporting data with captcha fails', () => {
+        dataSubjectService.dataExport.mockReturnValue(throwError({ error: 'Error' }))
+        component.presenceOfCaptcha = true
+        imageCaptchaService.getCaptcha.mockClear()
+        component.save()
+        expect(imageCaptchaService.getCaptcha).toHaveBeenCalled()
+    })
+
+    it('should not fetch a captcha if exporting data without captcha fails', () => {
+        dataSubjectService.dataExport.mockReturnValue(throwError({ error: 'Error' }))
+        component.presenceOfCaptcha = false
+        imageCaptchaService.getCaptcha.mockClear()
+        component.save()
+        expect(imageCaptchaService.getCaptcha).not.toHaveBeenCalled()
+    })
 })
