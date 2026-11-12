@@ -31,7 +31,7 @@ interface ResponseWithUser {
 interface IAuthenticatedUsers {
   tokenMap: Record<string, ResponseWithUser>
   idMap: Record<string, string>
-  put: (token: string, user: ResponseWithUser) => void
+  put: (token: string, user: ResponseWithUser) => boolean
   get: (token?: string) => ResponseWithUser | undefined
   tokenOf: (user: UserModel) => string | undefined
   from: (req: Request) => ResponseWithUser | undefined
@@ -49,11 +49,52 @@ export const cutOffPoisonNullByte = (str: string) => {
   return str
 }
 
-export const isAuthorized = () => expressJwt(({ secret: publicKey }) as any)
+// The database is recreated on every start, so credentials changed during this process are tracked in memory only
+const credentialVersions: Record<number, number> = {}
+const passwordHashes: Record<number, string> = {}
+
+const subjectOf = (payload: any) => payload?.data?.id ?? payload?.userId
+
+export const credentialVersionOf = (userId: number) => credentialVersions[userId] ?? 0
+
+export const hasRevokedCredentials = (payload: any) => {
+  const userId = subjectOf(payload)
+  if (userId == null) {
+    return false
+  }
+  if ((payload.credentialVersion ?? 0) !== credentialVersionOf(userId)) {
+    return true
+  }
+  const passwordHash = passwordHashes[userId]
+  return passwordHash !== undefined && payload.data?.password !== undefined && payload.data.password !== passwordHash
+}
+
 export const denyAll = () => expressJwt({ secret: '' + Math.random() } as any)
-export const authorize = (user = {}) => jwt.sign(user, privateKey, { expiresIn: '6h', algorithm: 'RS256' })
-export const verify = (token: string) => token ? (jws.verify as ((token: string, secret: string) => boolean))(token, publicKey) : false
+export const authorize = (user: any = {}, credentialVersion?: number) => {
+  const userId = subjectOf(user)
+  if (userId != null) {
+    user.credentialVersion = credentialVersion ?? credentialVersionOf(userId)
+  }
+  return jwt.sign(user, privateKey, { expiresIn: '6h', algorithm: 'RS256' })
+}
 export const decode = (token: string) => { return jws.decode(token)?.payload }
+export const credentialVersionOfToken = (token: string) => decode(utils.unquote(token))?.credentialVersion ?? 0
+export const verify = (token: string) => token ? (jws.verify as ((token: string, secret: string) => boolean))(token, publicKey) && !hasRevokedCredentials(decode(token)) : false
+
+export const isAuthorized = () => {
+  const checkSignature = expressJwt(({ secret: publicKey }) as any)
+  return (req: Request, res: Response, next: NextFunction) => {
+    checkSignature(req, res, (error?: unknown) => {
+      if (error) {
+        next(error)
+      } else if (hasRevokedCredentials((req as any).user)) {
+        next(Object.assign(new Error('Session was revoked by a password change'), { status: 401 }))
+      } else {
+        next()
+      }
+    })
+  }
+}
 
 export const sanitizeHtml = (html: string) => sanitizeHtmlLib(html)
 export const sanitizeLegacy = (input = '') => input.replace(/<(?:\w+)\W+?[\w]/gi, '')
@@ -71,8 +112,12 @@ export const authenticatedUsers: IAuthenticatedUsers = {
   tokenMap: {},
   idMap: {},
   put: function (token: string, user: ResponseWithUser) {
+    if (hasRevokedCredentials(decode(token))) {
+      return false
+    }
     this.tokenMap[token] = user
     this.idMap[user.data.id] = token
+    return true
   },
   get: function (token?: string) {
     return token ? this.tokenMap[utils.unquote(token)] : undefined
@@ -88,6 +133,22 @@ export const authenticatedUsers: IAuthenticatedUsers = {
     const token = utils.jwtFrom(req)
     this.put(token, user)
   }
+}
+
+export const setPassword = async (user: UserModel, password: string) => {
+  await user.update({ password })
+  credentialVersions[user.id] = credentialVersionOf(user.id) + 1
+  passwordHashes[user.id] = user.password
+  for (const [token, session] of Object.entries(authenticatedUsers.tokenMap)) {
+    if (session?.data?.id === user.id && hasRevokedCredentials(decode(token))) {
+      delete authenticatedUsers.tokenMap[token]
+    }
+  }
+  const lastToken = authenticatedUsers.idMap[user.id]
+  if (lastToken && authenticatedUsers.tokenMap[lastToken] === undefined) {
+    delete authenticatedUsers.idMap[user.id]
+  }
+  return user
 }
 
 export const userEmailFrom = ({ headers }: any) => {
@@ -187,8 +248,7 @@ export const updateAuthenticatedUsers = () => (req: Request, res: Response, next
   const token = req.cookies.token || utils.jwtFrom(req)
   if (token && authenticatedUsers.get(token) === undefined) {
     jwt.verify(token, publicKey, (err: Error | null, decoded: any) => {
-      if (err === null && decoded?.data !== undefined) {
-        authenticatedUsers.put(token, decoded)
+      if (err === null && decoded?.data !== undefined && authenticatedUsers.put(token, decoded)) {
         res.cookie('token', token)
       }
     })
