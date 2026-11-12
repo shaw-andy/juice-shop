@@ -25,6 +25,7 @@ import { of } from 'rxjs'
 import { catchError } from 'rxjs/operators'
 
 import { MatCardModule } from '@angular/material/card'
+import { createOAuthState } from '../oauth/oauth-state'
 
 library.add(faKey, faEye, faEyeSlash, faGoogle)
 
@@ -146,6 +147,7 @@ export class LoginComponent implements OnInit {
   }
 
   googleLogin () {
-    this.windowRefService.nativeWindow.location.replace(`${oauthProviderUrl}?client_id=${this.clientId}&response_type=token&scope=email&redirect_uri=${this.redirectUri}`)
+    const state = createOAuthState()
+    this.windowRefService.nativeWindow.location.replace(`${oauthProviderUrl}?client_id=${this.clientId}&response_type=token&scope=email&redirect_uri=${this.redirectUri}&state=${state}`)
   }
 }

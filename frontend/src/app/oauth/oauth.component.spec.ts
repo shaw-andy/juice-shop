@@ -24,6 +24,8 @@ import { UserService } from '../Services/user.service'
 import { CookieModule } from 'ngy-cookie'
 import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http'
 
+const storeExpectedState = () => { sessionStorage.setItem('oauth_state', 'placeholder-state') }
+
 describe('OAuthComponent', () => {
     let component: OAuthComponent
     let fixture: ComponentFixture<OAuthComponent>
@@ -58,7 +60,7 @@ describe('OAuthComponent', () => {
                 MatTooltipModule,
                 OAuthComponent, LoginComponent],
             providers: [
-                { provide: ActivatedRoute, useValue: { snapshot: { data: { params: '?alt=json&access_token=TEST' } } } },
+                { provide: ActivatedRoute, useValue: { snapshot: { data: { params: '?alt=json&access_token=TEST&state=placeholder-state' } } } },
                 { provide: UserService, useValue: userService },
                 provideHttpClient(withInterceptorsFromDi()),
                 provideHttpClientTesting()
@@ -68,6 +70,7 @@ describe('OAuthComponent', () => {
     })
 
     beforeEach(() => {
+        storeExpectedState()
         fixture = TestBed.createComponent(OAuthComponent)
         component = fixture.componentInstance
         fixture.detectChanges()
@@ -80,6 +83,7 @@ describe('OAuthComponent', () => {
     it('removes authentication token and basket id on failed OAuth login attempt', () => {
         vi.spyOn(console, 'log').mockImplementation(() => {})
         userService.oauthLogin.mockReturnValue(throwError({ error: 'Error' }))
+        storeExpectedState()
         component.ngOnInit()
         expect(localStorage.getItem('token')).toBeNull()
         expect(sessionStorage.getItem('bid')).toBeNull()
@@ -87,6 +91,7 @@ describe('OAuthComponent', () => {
 
     it('will create regular user account with base64 encoded reversed email as password', () => {
         userService.oauthLogin.mockReturnValue(of({ email: 'test@test.com' }))
+        storeExpectedState()
         component.ngOnInit()
         expect(userService.save).toHaveBeenCalledWith({ email: 'test@test.com', password: 'bW9jLnRzZXRAdHNldA==', passwordRepeat: 'bW9jLnRzZXRAdHNldA==' })
     })
@@ -94,6 +99,7 @@ describe('OAuthComponent', () => {
     it('logs in user even after failed account creation as account might already have existed from previous OAuth login', () => {
         userService.oauthLogin.mockReturnValue(of({ email: 'test@test.com' }))
         userService.save.mockReturnValue(throwError({ error: 'Account already exists' }))
+        storeExpectedState()
         component.ngOnInit()
         expect(userService.login).toHaveBeenCalledWith({ email: 'test@test.com', password: 'bW9jLnRzZXRAdHNldA==', oauth: true })
     })
