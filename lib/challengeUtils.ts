@@ -68,8 +68,13 @@ export const sendNotification = function (challenge: ChallengeModel, isRestore: 
     isRestore,
     codingChallenge: config.get('challenges.codingChallengesEnabled') !== 'never' && hasCodingChallenge
   }
-  const wasPreviouslyShown = notifications.some(({ key }) => key === challenge.key)
-  notifications.push(notification)
+  const previousIndex = notifications.findIndex(({ key }) => key === challenge.key)
+  const wasPreviouslyShown = previousIndex > -1
+  if (wasPreviouslyShown) {
+    notifications[previousIndex] = notification
+  } else {
+    notifications.push(notification)
+  }
 
   if (globalWithSocketIO.io && (isRestore || !wasPreviouslyShown)) {
     globalWithSocketIO.io.emit('challenge solved', notification)

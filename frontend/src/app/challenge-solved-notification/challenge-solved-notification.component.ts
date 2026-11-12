@@ -18,10 +18,13 @@ import { firstValueFrom } from 'rxjs'
 import { SnackBarHelperService } from '../Services/snack-bar-helper.service'
 import { Router } from '@angular/router'
 
+export const ACKNOWLEDGED_NOTIFICATIONS_KEY = 'acknowledgedChallengeNotifications'
+
 interface ChallengeSolvedMessage {
   challenge: string
   hidden?: any
   isRestore?: any
+  isReplay?: boolean
   flag: any
   key?: any
   codingChallenge?: boolean
@@ -65,6 +68,10 @@ export class ChallengeSolvedNotificationComponent implements OnInit {
     this.ngZone.runOutsideAngular(() => {
       this.io.socket().on('challenge solved', (data: ChallengeSolvedMessage) => {
         if (data?.challenge) {
+          const acknowledged = this.acknowledgedNotifications()
+          if (data.isReplay && acknowledged.includes(data.key)) {
+            return
+          }
           if (!data.hidden) {
             this.showNotification(data)
           }
@@ -76,7 +83,9 @@ export class ChallengeSolvedNotificationComponent implements OnInit {
               })
             }
           }
-          this.io.socket().emit('notification received', data.flag)
+          if (data.key && !acknowledged.includes(data.key)) {
+            localStorage.setItem(ACKNOWLEDGED_NOTIFICATIONS_KEY, JSON.stringify([...acknowledged, data.key]))
+          }
         }
       })
     })
@@ -136,6 +145,15 @@ export class ChallengeSolvedNotificationComponent implements OnInit {
         })
         this.ref.detectChanges()
       })
+  }
+
+  private acknowledgedNotifications (): string[] {
+    try {
+      const stored = JSON.parse(localStorage.getItem(ACKNOWLEDGED_NOTIFICATIONS_KEY) ?? '[]')
+      return Array.isArray(stored) ? stored : []
+    } catch {
+      return []
+    }
   }
 
   saveProgress () {

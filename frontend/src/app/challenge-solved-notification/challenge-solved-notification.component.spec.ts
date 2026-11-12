@@ -15,7 +15,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing'
 import { type ComponentFixture, TestBed } from '@angular/core/testing'
 import { SocketIoService } from '../Services/socket-io.service'
 
-import { ChallengeSolvedNotificationComponent } from './challenge-solved-notification.component'
+import { ACKNOWLEDGED_NOTIFICATIONS_KEY, ChallengeSolvedNotificationComponent } from './challenge-solved-notification.component'
 import { of, throwError } from 'rxjs'
 import { EventEmitter } from '@angular/core'
 import { MatIconModule } from '@angular/material/icon'
@@ -348,6 +348,11 @@ describe('ChallengeSolvedNotificationComponent', () => {
             }
             socketIoService.socket.mockReturnValue(socket)
             challengeService.continueCode.mockReturnValue(of('CODE'))
+            localStorage.removeItem(ACKNOWLEDGED_NOTIFICATIONS_KEY)
+        })
+
+        afterEach(() => {
+            localStorage.removeItem(ACKNOWLEDGED_NOTIFICATIONS_KEY)
         })
 
         it('should ignore socket messages without a challenge field', () => {
@@ -360,14 +365,22 @@ describe('ChallengeSolvedNotificationComponent', () => {
             expect(socket.emit).not.toHaveBeenCalled()
         })
 
-        it('should not show a notification for hidden challenges but still emit and save progress', () => {
+        it('should not show a notification for hidden challenges but still acknowledge it and save progress', () => {
             component.ngOnInit()
             const showSpy = vi.spyOn(component, 'showNotification')
             const saveSpy = vi.spyOn(component, 'saveProgress').mockImplementation(() => { })
             onCallback({ challenge: 'X', hidden: true, isRestore: false, flag: 'F', key: 'k' })
             expect(showSpy).not.toHaveBeenCalled()
             expect(saveSpy).toHaveBeenCalled()
-            expect(socket.emit).toHaveBeenCalledWith('notification received', 'F')
+            expect(JSON.parse(localStorage.getItem(ACKNOWLEDGED_NOTIFICATIONS_KEY))).toEqual(['k'])
+        })
+
+        it('should not tell the server that a notification was received', () => {
+            component.ngOnInit()
+            vi.spyOn(component, 'showNotification').mockImplementation(() => { })
+            vi.spyOn(component, 'saveProgress').mockImplementation(() => { })
+            onCallback({ challenge: 'X', hidden: false, isRestore: false, flag: 'F', key: 'k' })
+            expect(socket.emit).not.toHaveBeenCalled()
         })
 
         it('should not save progress when the challenge is being restored', () => {
@@ -375,7 +388,47 @@ describe('ChallengeSolvedNotificationComponent', () => {
             const saveSpy = vi.spyOn(component, 'saveProgress').mockImplementation(() => { })
             onCallback({ challenge: 'X', hidden: true, isRestore: true, flag: 'F', key: 'k' })
             expect(saveSpy).not.toHaveBeenCalled()
-            expect(socket.emit).toHaveBeenCalledWith('notification received', 'F')
+            expect(JSON.parse(localStorage.getItem(ACKNOWLEDGED_NOTIFICATIONS_KEY))).toEqual(['k'])
+        })
+
+        it('should ignore a replayed notification this browser already acknowledged', () => {
+            localStorage.setItem(ACKNOWLEDGED_NOTIFICATIONS_KEY, JSON.stringify(['k']))
+            component.ngOnInit()
+            const showSpy = vi.spyOn(component, 'showNotification').mockImplementation(() => { })
+            const saveSpy = vi.spyOn(component, 'saveProgress').mockImplementation(() => { })
+            onCallback({ challenge: 'X', hidden: false, isRestore: false, isReplay: true, flag: 'F', key: 'k' })
+            expect(showSpy).not.toHaveBeenCalled()
+            expect(saveSpy).not.toHaveBeenCalled()
+        })
+
+        it('should show a replayed notification this browser has not acknowledged yet', () => {
+            localStorage.setItem(ACKNOWLEDGED_NOTIFICATIONS_KEY, JSON.stringify(['other']))
+            component.ngOnInit()
+            const showSpy = vi.spyOn(component, 'showNotification').mockImplementation(() => { })
+            vi.spyOn(component, 'saveProgress').mockImplementation(() => { })
+            onCallback({ challenge: 'X', hidden: false, isRestore: false, isReplay: true, flag: 'F', key: 'k' })
+            expect(showSpy).toHaveBeenCalled()
+            expect(JSON.parse(localStorage.getItem(ACKNOWLEDGED_NOTIFICATIONS_KEY))).toEqual(['other', 'k'])
+        })
+
+        it('should show a live notification even if this browser acknowledged it before', () => {
+            localStorage.setItem(ACKNOWLEDGED_NOTIFICATIONS_KEY, JSON.stringify(['k']))
+            component.ngOnInit()
+            const showSpy = vi.spyOn(component, 'showNotification').mockImplementation(() => { })
+            vi.spyOn(component, 'saveProgress').mockImplementation(() => { })
+            onCallback({ challenge: 'X', hidden: false, isRestore: true, flag: 'F', key: 'k' })
+            expect(showSpy).toHaveBeenCalled()
+            expect(JSON.parse(localStorage.getItem(ACKNOWLEDGED_NOTIFICATIONS_KEY))).toEqual(['k'])
+        })
+
+        it('should treat unreadable acknowledgement storage as empty', () => {
+            localStorage.setItem(ACKNOWLEDGED_NOTIFICATIONS_KEY, '{not json')
+            component.ngOnInit()
+            const showSpy = vi.spyOn(component, 'showNotification').mockImplementation(() => { })
+            vi.spyOn(component, 'saveProgress').mockImplementation(() => { })
+            onCallback({ challenge: 'X', hidden: false, isRestore: false, isReplay: true, flag: 'F', key: 'k' })
+            expect(showSpy).toHaveBeenCalled()
+            expect(JSON.parse(localStorage.getItem(ACKNOWLEDGED_NOTIFICATIONS_KEY))).toEqual(['k'])
         })
 
         it('should show notification and save progress for a visible, non-restored challenge', () => {
