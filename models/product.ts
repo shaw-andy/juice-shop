@@ -46,10 +46,8 @@ const ProductModelInit = (sequelize: Sequelize) => {
             challengeUtils.solveIf(challenges.restfulXssChallenge, () => {
               return description?.includes('<iframe src="javascript:alert(`xss`)">') ?? false
             })
-          } else {
-            description = security.sanitizeSecure(description)
           }
-          this.setDataValue('description', description)
+          this.setDataValue('description', security.sanitizeSecure(description))
         }
       },
       price: DataTypes.DECIMAL,
