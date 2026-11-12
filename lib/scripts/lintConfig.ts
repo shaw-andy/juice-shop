@@ -19,7 +19,7 @@ const configDir = path.resolve(__dirname, '../../config')
 async function validateFile (file: string): Promise<boolean> {
   let configuration: unknown
   try {
-    configuration = yaml.load(await readFile(file, 'utf8'))
+    configuration = yaml.safeLoad(await readFile(file, 'utf8'))
   } catch (error) {
     console.error(colors.red(`Could not read or parse ${file}: ${error instanceof Error ? error.message : String(error)}`))
     return false

@@ -136,7 +136,7 @@ const errorhandler = require('errorhandler')
 
 const startTime = Date.now()
 
-const swaggerDocument = yaml.load(fs.readFileSync('./swagger.yml', 'utf8'))
+const swaggerDocument = yaml.safeLoad(fs.readFileSync('./swagger.yml', 'utf8')) as Record<string, unknown>
 
 const appName = config.get<string>('application.customMetricsPrefix')
 const startupGauge = new Prometheus.Gauge({
