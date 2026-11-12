@@ -8,7 +8,6 @@ import { provideHttpClientTesting } from '@angular/common/http/testing'
 import { ReactiveFormsModule } from '@angular/forms'
 import { type ComponentFixture, TestBed } from '@angular/core/testing'
 import { ForgotPasswordComponent } from './forgot-password.component'
-import { SecurityQuestionService } from '../Services/security-question.service'
 
 import { MatButtonModule } from '@angular/material/button'
 import { MatInputModule } from '@angular/material/input'
@@ -24,14 +23,9 @@ import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http'
 describe('ForgotPasswordComponent', () => {
     let component: ForgotPasswordComponent
     let fixture: ComponentFixture<ForgotPasswordComponent>
-    let securityQuestionService: any
     let userService: any
 
     beforeEach(async () => {
-        securityQuestionService = {
-            findBy: vi.fn().mockName("SecurityQuestionService.findBy")
-        }
-        securityQuestionService.findBy.mockReturnValue(of({}))
         userService = {
             resetPassword: vi.fn().mockName("UserService.resetPassword")
         }
@@ -49,7 +43,6 @@ describe('ForgotPasswordComponent', () => {
                 MatSlideToggleModule,
                 ForgotPasswordComponent],
             providers: [
-                { provide: SecurityQuestionService, useValue: securityQuestionService },
                 { provide: UserService, useValue: userService },
                 provideHttpClient(withInterceptorsFromDi()),
                 provideHttpClientTesting()
@@ -81,14 +74,12 @@ describe('ForgotPasswordComponent', () => {
     })
 
     it('should be compulsory to answer to the security question', () => {
-        vi.useFakeTimers()
         component.emailControl.setValue('a@a')
-        vi.advanceTimersByTime(component.timeoutDuration)
+        component.updateResetFields()
         component.securityQuestionControl.setValue('')
         expect(component.securityQuestionControl.valid).toBeFalsy()
         component.securityQuestionControl.setValue('Answer')
         expect(component.securityQuestionControl.valid).toBe(true)
-        vi.useRealTimers()
     })
 
     it('should be compulsory to fill the password field', () => {
@@ -97,35 +88,29 @@ describe('ForgotPasswordComponent', () => {
     })
 
     it('should have a password length of at least five characters', () => {
-        vi.useFakeTimers()
         component.emailControl.setValue('a@a')
-        vi.advanceTimersByTime(component.timeoutDuration)
+        component.updateResetFields()
         component.passwordControl.setValue('aaa')
         expect(component.passwordControl.valid).toBeFalsy()
         component.passwordControl.setValue('aaaaa')
         expect(component.passwordControl.valid).toBe(true)
-        vi.useRealTimers()
     })
 
     it('should allow password length of more than twenty characters', () => {
-        vi.useFakeTimers()
         component.emailControl.setValue('a@a')
-        vi.advanceTimersByTime(component.timeoutDuration)
+        component.updateResetFields()
         component.passwordControl.setValue('aaaaaaaaaaaaaaaaaaaaa')
         expect(component.passwordControl.valid).toBe(true)
-        vi.useRealTimers()
     })
 
     it('should be compulsory to repeat the password', () => {
-        vi.useFakeTimers()
         component.emailControl.setValue('a@a')
-        vi.advanceTimersByTime(component.timeoutDuration)
+        component.updateResetFields()
         component.passwordControl.setValue('a')
         component.repeatPasswordControl.setValue('')
         expect(component.repeatPasswordControl.valid).toBeFalsy()
         component.repeatPasswordControl.setValue('a')
         expect(component.repeatPasswordControl.valid).toBe(true)
-        vi.useRealTimers()
     })
 
     it('should reset form on calling resetForm', () => {
@@ -164,36 +149,21 @@ describe('ForgotPasswordComponent', () => {
         expect(component.resetErrorForm).toHaveBeenCalled()
     })
 
-    it('should find the security question of a user with a known email address', () => {
-        vi.useFakeTimers()
-        securityQuestionService.findBy.mockReturnValue(of({ question: 'What is your favorite test tool?' }))
-        component.emailControl.setValue('known@user.test')
-        vi.advanceTimersByTime(component.timeoutDuration)
-        component.findSecurityQuestion()
-        expect(component.securityQuestion).toBe('What is your favorite test tool?')
-        vi.useRealTimers()
-    })
-
-    it('should not find the security question for an email address not bound to a user', () => {
-        securityQuestionService.findBy.mockReturnValue(of({}))
+    it('should enable the reset fields for any valid email address', () => {
         component.emailControl.setValue('unknown@user.test')
-        component.findSecurityQuestion()
-        expect(component.securityQuestion).toBeUndefined()
+        component.updateResetFields()
+        expect(component.securityQuestionControl.enabled).toBe(true)
+        expect(component.passwordControl.enabled).toBe(true)
+        expect(component.repeatPasswordControl.enabled).toBe(true)
     })
 
-    it('should not have a security question when lookup by email address failed', () => {
-        vi.useFakeTimers()
-        securityQuestionService.findBy.mockReturnValue(throwError('Error'))
-        component.emailControl.setValue('some@user.test')
-        vi.advanceTimersByTime(component.timeoutDuration)
-        component.findSecurityQuestion()
-        expect(component.securityQuestion).toBeUndefined()
-        vi.useRealTimers()
-    })
-
-    it('should find not attempt to find security question for empty email address', () => {
+    it('should disable the reset fields for an invalid email address', () => {
+        component.emailControl.setValue('a@a')
+        component.updateResetFields()
         component.emailControl.setValue('')
-        component.findSecurityQuestion()
-        expect(securityQuestionService.findBy).not.toHaveBeenCalled()
+        component.updateResetFields()
+        expect(component.securityQuestionControl.disabled).toBe(true)
+        expect(component.passwordControl.disabled).toBe(true)
+        expect(component.repeatPasswordControl.disabled).toBe(true)
     })
 })

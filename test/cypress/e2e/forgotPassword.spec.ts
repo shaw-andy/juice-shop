@@ -6,7 +6,6 @@ describe('/#/forgot-password', () => {
       }
     })
     cy.visit('/#/forgot-password')
-    cy.intercept('GET', '/rest/user/security-question?email=*').as('securityQuestion')
   })
 
   describe('challenge "resetPasswordJimChallenge"', () => {
@@ -16,7 +15,6 @@ describe('/#/forgot-password', () => {
           cy.get('#email').type(`jim@${appDomain}`)
         }
       )
-      cy.wait('@securityQuestion')
       cy.get('#securityAnswer').should('not.be.disabled').focus().type('Samuel')
       // recordings to properly fix behavior during test
       cy.get('#newPassword').focus().type('I <3 Spock')
@@ -35,7 +33,6 @@ describe('/#/forgot-password', () => {
           cy.get('#email').type(`bender@${appDomain}`)
         }
       )
-      cy.wait('@securityQuestion')
       cy.get('#securityAnswer').should('not.be.disabled').focus().type("Stop'n'Drop")
       // recordings to properly fix behavior during test
       cy.get('#newPassword').focus().type('Brannigan 8=o Leela')
@@ -55,7 +52,6 @@ describe('/#/forgot-password', () => {
             cy.get('#email').type(`bjoern@${appDomain}`)
           }
         )
-        cy.wait('@securityQuestion')
         cy.get('#securityAnswer').should('not.be.disabled').focus().type('West-2082')
         // recordings to properly fix behavior during test
         cy.get('#newPassword').focus().type('monkey birthday ')
@@ -70,7 +66,6 @@ describe('/#/forgot-password', () => {
     describe('challenge "resetPasswordBjoernOwaspChallenge"', () => {
       it('should be able to reset password with his security answer', () => {
         cy.get('#email').type('bjoern@owasp.org')
-        cy.wait('@securityQuestion')
         cy.get('#securityAnswer').should('not.be.disabled').focus().type('Zaya')
         // recordings to properly fix behavior during test
         cy.get('#newPassword').focus().type('kitten lesser pooch')
@@ -90,7 +85,6 @@ describe('/#/forgot-password', () => {
           cy.get('#email').type(`morty@${appDomain}`)
         }
       )
-      cy.wait('@securityQuestion')
       cy.get('#securityAnswer').should('not.be.disabled').focus().type('5N0wb41L')
       // recordings to properly fix behavior during test
       cy.get('#newPassword').focus().type('iBurri3dMySe1f!')
@@ -109,7 +103,6 @@ describe('/#/forgot-password', () => {
           cy.get('#email').type(`uvogin@${appDomain}`)
         }
       )
-      cy.wait('@securityQuestion')
       cy.get('#securityAnswer').should('not.be.disabled').focus().type('Silence of the Lambs')
       // Cypress recordings to properly fix behavior during test
       cy.get('#newPassword').focus().type('ora-ora > muda-muda')

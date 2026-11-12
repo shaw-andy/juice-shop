@@ -102,7 +102,7 @@ import * as restoreProgress from './routes/restoreProgress'
 import { checkKeys, nftUnlocked } from './routes/checkKeys'
 import { retrieveLoggedInUser } from './routes/currentUser'
 import authenticatedUsers from './routes/authenticatedUsers'
-import { securityQuestion } from './routes/securityQuestion'
+import { securityQuestion, securityQuestionRateLimit } from './routes/securityQuestion'
 import { servePremiumContent } from './routes/premiumReward'
 import { contractExploitListener } from './routes/web3Wallet'
 import { updateUserProfile } from './routes/updateUserProfile'
@@ -615,7 +615,7 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.post('/rest/user/login', login())
   app.get('/rest/user/change-password', utils.asyncHandler(changePassword()))
   app.post('/rest/user/reset-password', utils.asyncHandler(resetPassword()))
-  app.get('/rest/user/security-question', utils.asyncHandler(securityQuestion()))
+  app.get('/rest/user/security-question', securityQuestionRateLimit(), securityQuestion())
   app.get('/rest/user/whoami', utils.asyncHandler(retrieveLoggedInUser()))
   app.get('/rest/user/authentication-details', utils.asyncHandler(authenticatedUsers()))
   app.get('/rest/products/search', utils.asyncHandler(searchProducts()))

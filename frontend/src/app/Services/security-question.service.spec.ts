@@ -37,30 +37,4 @@ describe('SecurityQuestionService', () => {
         expect(res).toBe('apiResponse')
         httpMock.verify()
     })
-
-    it('should get security question by user email directly from the rest api', () => {
-        const service = TestBed.inject(SecurityQuestionService)
-        const httpMock = TestBed.inject(HttpTestingController)
-
-        let res: any
-        service.findBy('x@y.z').subscribe((data) => (res = data))
-        const req = httpMock.expectOne('http://localhost:3000/rest/user/security-question?email=x@y.z')
-        req.flush({ question: 'apiResponse' })
-
-        expect(req.request.method).toBe('GET')
-        expect(res).toBe('apiResponse')
-        httpMock.verify()
-    })
-
-    it('should handle error when getting security question by user email', () => {
-        const service = TestBed.inject(SecurityQuestionService)
-        const httpMock = TestBed.inject(HttpTestingController)
-
-        let capturedError: any
-        service.findBy('e@x.ample').subscribe({ next: () => { throw new Error('expected error') }, error: (e) => { capturedError = e } })
-        const req = httpMock.expectOne('http://localhost:3000/rest/user/security-question?email=e@x.ample')
-        req.error(new ErrorEvent('Request failed'), { status: 404, statusText: 'Not Found' })
-        expect(capturedError.status).toBe(404)
-        httpMock.verify()
-    })
 })
