@@ -9,6 +9,8 @@ import { Op } from 'sequelize'
 import { ImageCaptchaModel } from '../models/imageCaptcha'
 import * as security from '../lib/insecurity'
 
+const CAPTCHA_VALIDITY_MS = 300000
+
 export function imageCaptchas () {
   return async (req: Request, res: Response) => {
     try {
@@ -21,14 +23,12 @@ export function imageCaptchas () {
         return
       }
 
-      const imageCaptcha = {
+      await ImageCaptchaModel.create({
         image: captcha.data,
         answer: captcha.text,
         UserId: user.data.id
-      }
-      const imageCaptchaInstance = ImageCaptchaModel.build(imageCaptcha)
-      await imageCaptchaInstance.save()
-      res.json(imageCaptcha)
+      })
+      res.json({ image: captcha.data })
     } catch (error) {
       res.status(400).send(res.__('Unable to create CAPTCHA. Please try again.'))
     }
@@ -38,18 +38,22 @@ export function imageCaptchas () {
 export const verifyImageCaptcha = () => async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = security.authenticatedUsers.from(req)
-    const UserId = user ? user.data ? user.data.id : undefined : undefined
-    const captchas = await ImageCaptchaModel.findAll({
-      limit: 1,
-      where: {
-        UserId,
-        createdAt: {
-          [Op.gt]: new Date(Date.now() - 300000)
-        }
-      },
-      order: [['createdAt', 'DESC']]
+    const UserId = user?.data?.id
+    if (UserId === undefined || UserId === null) {
+      res.status(401).send(res.__('Wrong answer to CAPTCHA. Please try again.'))
+      return
+    }
+    const notExpired = { [Op.gt]: new Date(Date.now() - CAPTCHA_VALIDITY_MS) }
+    const captcha = await ImageCaptchaModel.findOne({
+      where: { UserId, createdAt: notExpired },
+      order: [['createdAt', 'DESC'], ['id', 'DESC']]
     })
-    if (!captchas[0] || req.body.answer === captchas[0].answer) {
+    // The conditional update claims the CAPTCHA for exactly one check, whether its answer is right or wrong
+    const [claimed] = captcha
+      ? await ImageCaptchaModel.update({ used: true }, { where: { id: captcha.id, UserId, used: false, createdAt: notExpired } })
+      : [0]
+    if (captcha && claimed === 1 && typeof req.body.answer === 'string' && req.body.answer === captcha.answer) {
+      res.locals.imageCaptchaUserId = UserId
       next()
     } else {
       res.status(401).send(res.__('Wrong answer to CAPTCHA. Please try again.'))

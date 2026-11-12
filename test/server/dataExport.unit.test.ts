@@ -17,7 +17,7 @@ void describe('dataExport', () => {
 
   beforeEach(() => {
     req = { headers: {}, body: {}, protocol: 'http', get: mock.fn(() => 'localhost'), socket: { remoteAddress: '127.0.0.1' } }
-    res = { status: mock.fn(() => res), send: mock.fn(), json: mock.fn() }
+    res = { status: mock.fn(() => res), send: mock.fn(), json: mock.fn(), locals: { imageCaptchaUserId: 1 } }
     next = mock.fn()
   })
 
@@ -28,6 +28,18 @@ void describe('dataExport', () => {
 
     assert.equal(next.mock.calls.length, 1)
     assert.ok(next.mock.calls[0].arguments[0] instanceof Error)
+    assert.match(next.mock.calls[0].arguments[0].message, /Blocked illegal activity/)
+  })
+
+  void it('should call next with error if the CAPTCHA was verified for a different user', async () => {
+    mock.method(security.authenticatedUsers, 'get', () => ({ data: { id: 2, email: 'test@juice-sh.op', username: 'test' } }))
+    const findAll = mock.method(MemoryModel, 'findAll', async () => [])
+
+    await dataExport()(req, res, next)
+
+    assert.equal(findAll.mock.calls.length, 0)
+    assert.equal(res.send.mock.calls.length, 0)
+    assert.equal(next.mock.calls.length, 1)
     assert.match(next.mock.calls[0].arguments[0].message, /Blocked illegal activity/)
   })
 
