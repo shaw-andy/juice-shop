@@ -4,8 +4,10 @@
  */
 
 import { type Request, type Response, type NextFunction } from 'express'
+import { QueryTypes } from 'sequelize'
 import { BasketItemModel } from '../models/basketitem'
 import { QuantityModel } from '../models/quantity'
+import * as models from '../models/index'
 import * as challengeUtils from '../lib/challengeUtils'
 
 import * as utils from '../lib/utils'
@@ -15,6 +17,10 @@ import * as security from '../lib/insecurity'
 interface RequestWithRawBody extends Request {
   rawBody: string
 }
+
+// Stock not yet held by other basket lines; writes must embed it in their own statement so concurrent requests cannot both pass it.
+const availableUnits = `(SELECT quantity FROM Quantities WHERE ProductId = :ProductId)
+  - (SELECT COALESCE(SUM(CASE WHEN quantity > 0 THEN quantity ELSE 0 END), 0) FROM BasketItems WHERE ProductId = :ProductId AND id IS NOT :id)`
 
 export function addBasketItem () {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -44,9 +50,12 @@ export function addBasketItem () {
       }
       challengeUtils.solveIf(challenges.basketManipulateChallenge, () => { return user && basketItem.BasketId && basketItem.BasketId !== 'undefined' && user.bid != basketItem.BasketId }) // eslint-disable-line eqeqeq
 
-      const basketItemInstance = BasketItemModel.build(basketItem)
       try {
-        const addedBasketItem = await basketItemInstance.save()
+        const addedBasketItem = await reserveNewBasketItem({ ...basketItem, quantity: Number(basketItem.quantity) })
+        if (addedBasketItem == null) {
+          outOfStock(res)
+          return
+        }
         res.json({ status: 'success', data: addedBasketItem })
       } catch (error) {
         next(error)
@@ -56,12 +65,17 @@ export function addBasketItem () {
 }
 
 export function quantityCheckBeforeBasketItemAddition () {
-  return (req: Request, res: Response, next: NextFunction) => {
-    void quantityCheck(req, res, next, req.body.ProductId, req.body.quantity).catch((error: Error) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (await quantityCheck(req, res, req.body.ProductId, req.body.quantity)) {
+        next()
+      }
+    } catch (error) {
       next(error)
-    })
+    }
   }
 }
+
 export function quantityCheckBeforeBasketItemUpdate () {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -72,17 +86,55 @@ export function quantityCheckBeforeBasketItemUpdate () {
         if (item == null) {
           throw new Error('No such item found!')
         }
-        void quantityCheck(req, res, next, item.ProductId, req.body.quantity)
-      } else {
-        next()
+        if (!await quantityCheck(req, res, item.ProductId, req.body.quantity)) {
+          return
+        }
+        if (!await reserveBasketItemQuantity(item, Number(req.body.quantity))) {
+          outOfStock(res)
+          return
+        }
+        delete req.body.quantity
       }
+      next()
     } catch (error) {
       next(error)
     }
   }
 }
 
-async function quantityCheck (req: Request, res: Response, next: NextFunction, id: number, quantity: number) {
+async function reserveNewBasketItem ({ ProductId, BasketId, quantity }: { ProductId: unknown, BasketId: unknown, quantity: number }) {
+  if (!Number.isFinite(quantity)) {
+    return null
+  }
+  const now = new Date()
+  const [id, inserted] = await models.sequelize.query(
+    `INSERT INTO BasketItems (ProductId, BasketId, quantity, createdAt, updatedAt)
+     SELECT :ProductId, :BasketId, :quantity, :now, :now WHERE ${availableUnits} >= :quantity`,
+    { replacements: { ProductId: ProductId ?? null, BasketId: BasketId ?? null, quantity, now, id: null }, type: QueryTypes.INSERT }
+  )
+  if (inserted !== 1) {
+    return null
+  }
+  return { id, ProductId, BasketId, quantity, createdAt: now, updatedAt: now }
+}
+
+async function reserveBasketItemQuantity (item: BasketItemModel, quantity: number) {
+  if (!Number.isFinite(quantity)) {
+    return false
+  }
+  const updated = await models.sequelize.query(
+    `UPDATE BasketItems SET quantity = :quantity, updatedAt = :now
+     WHERE id = :id AND ProductId = :ProductId AND ${availableUnits} >= :quantity`,
+    { replacements: { ProductId: item.ProductId, id: item.id, quantity, now: new Date() }, type: QueryTypes.BULKUPDATE }
+  )
+  return updated === 1
+}
+
+function outOfStock (res: Response) {
+  res.status(400).json({ error: res.__('We are out of stock! Sorry for the inconvenience.') })
+}
+
+async function quantityCheck (req: Request, res: Response, id: number, quantity: number) {
   const product = await QuantityModel.findOne({ where: { ProductId: id } })
   if (product == null) {
     throw new Error('No such product found!')
@@ -91,11 +143,12 @@ async function quantityCheck (req: Request, res: Response, next: NextFunction, i
   // is product limited per user and order, except if user is deluxe?
   if (!product.limitPerUser || (product.limitPerUser && product.limitPerUser >= quantity) || security.isDeluxe(req)) {
     if (product.quantity >= quantity) { // enough in stock?
-      next()
+      return true
     } else {
-      res.status(400).json({ error: res.__('We are out of stock! Sorry for the inconvenience.') })
+      outOfStock(res)
     }
   } else {
     res.status(400).json({ error: res.__('You can order only up to {{quantity}} items of this product.', { quantity: product.limitPerUser.toString() }) })
   }
+  return false
 }

@@ -7,6 +7,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import config from 'config'
 import { type Request, type Response, type NextFunction } from 'express'
+import { Op, literal } from 'sequelize'
 
 import { challenges, products } from '../data/datacache'
 import * as challengeUtils from '../lib/challengeUtils'
@@ -16,6 +17,7 @@ import { QuantityModel } from '../models/quantity'
 import { ProductModel } from '../models/product'
 import { BasketModel } from '../models/basket'
 import { WalletModel } from '../models/wallet'
+import * as models from '../models/index'
 import * as security from '../lib/insecurity'
 import * as utils from '../lib/utils'
 import * as db from '../data/mongodb'
@@ -35,6 +37,16 @@ export function placeOrder () {
     BasketModel.findOne({ where: { id }, include: [{ model: ProductModel, paranoid: false, as: 'Products' }] })
       .then(async (basket: BasketModel | null) => {
         if (basket != null) {
+          const basketItems = (basket.Products ?? []).map(({ BasketItem }) => BasketItem).filter((item): item is BasketItemModel => item != null)
+          const takenStock = await takeStock(basketItems)
+          if (takenStock == null) {
+            res.status(400).json({ error: res.__('We are out of stock! Sorry for the inconvenience.') })
+            return
+          }
+          const fail = (error: unknown) => {
+            void returnStock(takenStock).then(() => { next(error) }, () => { next(error) })
+          }
+
           const customer = security.authenticatedUsers.from(req)
           const email = customer ? customer.data ? customer.data.email : '' : ''
           const orderId = security.hash(email).slice(0, 4) + '-' + utils.randomHexString(16)
@@ -42,19 +54,6 @@ export function placeOrder () {
           const { default: PDFDocument } = await import('pdfkit')
           const doc = new PDFDocument()
           const date = new Date().toJSON().slice(0, 10)
-          const fileWriter = doc.pipe(fs.createWriteStream(path.join('ftp/', pdfFile)))
-
-          fileWriter.on('finish', () => {
-            void (async () => {
-              try {
-                void basket.update({ coupon: null })
-                await BasketItemModel.destroy({ where: { BasketId: id } })
-                res.json({ orderConfirmation: orderId })
-              } catch (error: unknown) {
-                next(error)
-              }
-            })()
-          })
 
           doc.font('Times-Roman').fontSize(40).text(config.get<string>('application.name'), { align: 'center' })
           doc.moveTo(70, 115).lineTo(540, 115).stroke()
@@ -74,16 +73,6 @@ export function placeOrder () {
           for (const { BasketItem, price, deluxePrice, name, id } of basket.Products ?? []) {
             if (BasketItem != null) {
               challengeUtils.solveIf(challenges.christmasSpecialChallenge, () => { return BasketItem.ProductId === products.christmasSpecial.id })
-              try {
-                const quantityRow = await QuantityModel.findOne({ where: { ProductId: BasketItem.ProductId } })
-                if (quantityRow) {
-                  const newQuantity = quantityRow.quantity - BasketItem.quantity
-                  await QuantityModel.update({ quantity: newQuantity }, { where: { ProductId: BasketItem.ProductId } })
-                }
-              } catch (error: unknown) {
-                next(error)
-                return
-              }
               let itemPrice: number
               if (security.isDeluxe(req)) {
                 itemPrice = deluxePrice
@@ -122,11 +111,16 @@ export function placeOrder () {
             eta: 5
           }
           if (req.body.orderDetails?.deliveryMethodId) {
-            const deliveryMethodFromModel = await DeliveryModel.findOne({ where: { id: req.body.orderDetails.deliveryMethodId } })
-            if (deliveryMethodFromModel != null) {
-              deliveryMethod.deluxePrice = deliveryMethodFromModel.deluxePrice
-              deliveryMethod.price = deliveryMethodFromModel.price
-              deliveryMethod.eta = deliveryMethodFromModel.eta
+            try {
+              const deliveryMethodFromModel = await DeliveryModel.findOne({ where: { id: req.body.orderDetails.deliveryMethodId } })
+              if (deliveryMethodFromModel != null) {
+                deliveryMethod.deluxePrice = deliveryMethodFromModel.deluxePrice
+                deliveryMethod.price = deliveryMethodFromModel.price
+                deliveryMethod.eta = deliveryMethodFromModel.eta
+              }
+            } catch (error: unknown) {
+              fail(error)
+              return
             }
           }
           const deliveryAmount = security.isDeluxe(req) ? deliveryMethod.deluxePrice : deliveryMethod.price
@@ -144,19 +138,19 @@ export function placeOrder () {
           challengeUtils.solveIf(challenges.negativeOrderChallenge, () => { return totalPrice < 0 })
 
           if (req.body.UserId) {
-            if (req.body.orderDetails && req.body.orderDetails.paymentId === 'wallet') {
-              const wallet = await WalletModel.findOne({ where: { UserId: req.body.UserId } })
-              if ((wallet != null) && wallet.balance >= totalPrice) {
-                await WalletModel.decrement({ balance: totalPrice }, { where: { UserId: req.body.UserId } })
-              } else {
-                next(new Error('Insufficient wallet balance.'))
-                return
-              }
-            }
             try {
+              if (req.body.orderDetails && req.body.orderDetails.paymentId === 'wallet') {
+                const wallet = await WalletModel.findOne({ where: { UserId: req.body.UserId } })
+                if ((wallet != null) && wallet.balance >= totalPrice) {
+                  await WalletModel.decrement({ balance: totalPrice }, { where: { UserId: req.body.UserId } })
+                } else {
+                  fail(new Error('Insufficient wallet balance.'))
+                  return
+                }
+              }
               await WalletModel.increment({ balance: totalPoints }, { where: { UserId: req.body.UserId } })
             } catch (error: unknown) {
-              next(error)
+              fail(error)
               return
             }
           }
@@ -174,8 +168,20 @@ export function placeOrder () {
             deliveryPrice: deliveryAmount,
             eta: deliveryMethod.eta.toString()
           }).then(() => {
+            const fileWriter = doc.pipe(fs.createWriteStream(path.join('ftp/', pdfFile)))
+            fileWriter.on('finish', () => {
+              void (async () => {
+                try {
+                  void basket.update({ coupon: null })
+                  await BasketItemModel.destroy({ where: { BasketId: id } })
+                  res.json({ orderConfirmation: orderId })
+                } catch (error: unknown) {
+                  next(error)
+                }
+              })()
+            })
             doc.end()
-          }).catch((error: unknown) => {
+          }, fail).catch((error: unknown) => {
             next(error)
           })
         } else {
@@ -184,6 +190,38 @@ export function placeOrder () {
       }).catch((error: unknown) => {
         next(error)
       })
+  }
+}
+
+async function takeStock (items: BasketItemModel[]) {
+  const taken: BasketItemModel[] = []
+  try {
+    for (const item of items) {
+      const quantityRow = await QuantityModel.findOne({ where: { ProductId: item.ProductId } })
+      if (quantityRow == null) continue
+      const [updated] = await QuantityModel.update(
+        { quantity: literal(`quantity - ${models.sequelize.escape(item.quantity)}`) },
+        { where: { ProductId: item.ProductId, quantity: { [Op.gte]: item.quantity } } }
+      )
+      if (updated === 0) {
+        await returnStock(taken)
+        return null
+      }
+      taken.push(item)
+    }
+  } catch (error: unknown) {
+    await returnStock(taken)
+    throw error
+  }
+  return taken
+}
+
+async function returnStock (items: BasketItemModel[]) {
+  for (const item of items) {
+    await QuantityModel.update(
+      { quantity: literal(`quantity + ${models.sequelize.escape(item.quantity)}`) },
+      { where: { ProductId: item.ProductId } }
+    )
   }
 }
 
