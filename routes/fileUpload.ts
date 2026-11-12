@@ -12,6 +12,7 @@ import unzipper from 'unzipper'
 import { type NextFunction, type Request, type Response } from 'express'
 
 import * as challengeUtils from '../lib/challengeUtils'
+import { SNIPPET_PATHS } from '../lib/codingChallenges'
 import { challenges } from '../data/datacache'
 import * as utils from '../lib/utils'
 import { parseXmlString } from '../lib/xml'
@@ -24,14 +25,43 @@ function ensureFileIsPassed ({ file }: Request, res: Response, next: NextFunctio
   }
 }
 
+const isWithin = (directory: string, target: string) => target === directory || target.startsWith(directory + path.sep)
+
+async function realpathOrNull (target: string) {
+  try {
+    return await fs.promises.realpath(target)
+  } catch {
+    return null
+  }
+}
+
+// Entries may still traverse out of uploads/complaints (Arbitrary File Write and Video XSS challenges),
+// but never out of the application or into the sources the coding challenge loader parses.
+async function resolveZipEntryTarget (absolutePath: string) {
+  const appRoot = await fs.promises.realpath('.')
+  const parent = await realpathOrNull(path.dirname(absolutePath))
+  if (parent === null) return null
+  const target = path.join(parent, path.basename(absolutePath))
+  if (!isWithin(appRoot, target)) return null
+  for (const snippetPath of SNIPPET_PATHS) {
+    if (isWithin((await realpathOrNull(snippetPath)) ?? path.resolve(snippetPath), target)) return null
+  }
+  return target
+}
+
+const zipEntryWriteFlags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | (fs.constants.O_NOFOLLOW ?? 0)
+
 async function extractZipBuffer (buffer: Buffer) {
   const directory = await unzipper.Open.buffer(buffer)
   for (const entry of directory.files) {
     const fileName = entry.path
     const absolutePath = path.resolve('uploads/complaints/' + fileName)
     challengeUtils.solveIf(challenges.fileWriteChallenge, () => { return absolutePath === path.resolve('ftp/legal.md') })
-    if (absolutePath.includes(path.resolve('.'))) {
-      await pipeline(entry.stream(), fs.createWriteStream('uploads/complaints/' + fileName))
+    if (entry.type === 'Directory') continue
+    const target = await resolveZipEntryTarget(absolutePath)
+    if (target !== null) {
+      const file = await fs.promises.open(target, zipEntryWriteFlags)
+      await pipeline(entry.stream(), file.createWriteStream())
     }
   }
 }
