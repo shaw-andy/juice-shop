@@ -6,6 +6,7 @@
 import { type Request, type Response, type NextFunction } from 'express'
 import { BasketItemModel } from '../models/basketitem'
 import { QuantityModel } from '../models/quantity'
+import { ProductModel } from '../models/product'
 import * as challengeUtils from '../lib/challengeUtils'
 
 import * as utils from '../lib/utils'
@@ -18,15 +19,17 @@ interface RequestWithRawBody extends Request {
 
 export function addBasketItem () {
   return async (req: Request, res: Response, next: NextFunction) => {
+    const product: ProductModel | undefined = res.locals.product
+    if (product == null) {
+      next(new Error('No such product found!'))
+      return
+    }
     const result = utils.parseJsonCustom((req as RequestWithRawBody).rawBody)
-    const productIds = []
     const basketIds = []
     const quantities = []
 
     for (let i = 0; i < result.length; i++) {
-      if (result[i].key === 'ProductId') {
-        productIds.push(result[i].value)
-      } else if (result[i].key === 'BasketId') {
+      if (result[i].key === 'BasketId') {
         basketIds.push(result[i].value)
       } else if (result[i].key === 'quantity') {
         quantities.push(result[i].value)
@@ -38,7 +41,7 @@ export function addBasketItem () {
       res.status(401).send('{\'error\' : \'Invalid BasketId\'}')
     } else {
       const basketItem = {
-        ProductId: productIds[productIds.length - 1],
+        ProductId: product.id,
         BasketId: basketIds[basketIds.length - 1],
         quantity: quantities[quantities.length - 1]
       }
@@ -56,10 +59,17 @@ export function addBasketItem () {
 }
 
 export function quantityCheckBeforeBasketItemAddition () {
-  return (req: Request, res: Response, next: NextFunction) => {
-    void quantityCheck(req, res, next, req.body.ProductId, req.body.quantity).catch((error: Error) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const product = await ProductModel.findByPk(req.body.ProductId)
+      if (product == null) {
+        throw new Error('No such product found!')
+      }
+      res.locals.product = product
+      await quantityCheck(req, res, next, product.id, req.body.quantity)
+    } catch (error) {
       next(error)
-    })
+    }
   }
 }
 export function quantityCheckBeforeBasketItemUpdate () {
@@ -72,7 +82,11 @@ export function quantityCheckBeforeBasketItemUpdate () {
         if (item == null) {
           throw new Error('No such item found!')
         }
-        void quantityCheck(req, res, next, item.ProductId, req.body.quantity)
+        const product = await ProductModel.findByPk(item.ProductId)
+        if (product == null) {
+          throw new Error('No such product found!')
+        }
+        await quantityCheck(req, res, next, product.id, req.body.quantity)
       } else {
         next()
       }

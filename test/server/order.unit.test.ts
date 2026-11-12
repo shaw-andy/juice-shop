@@ -48,7 +48,8 @@ void describe('order', () => {
         price: 10,
         deluxePrice: 5,
         name: 'Product 1',
-        id: 1
+        id: 1,
+        isSoftDeleted: () => false
       }],
       update: mock.fn()
     }
@@ -75,7 +76,8 @@ void describe('order', () => {
         price: 10,
         deluxePrice: 5,
         name: 'Product 1',
-        id: 1
+        id: 1,
+        isSoftDeleted: () => false
       }],
       update: mock.fn()
     }
@@ -103,7 +105,8 @@ void describe('order', () => {
         price: 100,
         deluxePrice: 100,
         name: 'Expensive Product',
-        id: 1
+        id: 1,
+        isSoftDeleted: () => false
       }],
       update: mock.fn()
     }
@@ -135,7 +138,8 @@ void describe('order', () => {
         price: 10,
         deluxePrice: 5,
         name: 'Product 1',
-        id: 1
+        id: 1,
+        isSoftDeleted: () => false
       }],
       update: mock.fn(),
       coupon: null
@@ -261,7 +265,8 @@ void describe('order', () => {
         price: 100,
         deluxePrice: 100,
         name: 'Expensive Product',
-        id: 1
+        id: 1,
+        isSoftDeleted: () => false
       }],
       update: mock.fn()
     }
