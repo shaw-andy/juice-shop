@@ -37,6 +37,31 @@ describe('QuantityService', () => {
         httpMock.verify()
     })
 
+    it('should get product availability directly from the rest api', () => {
+        const service = TestBed.inject(QuantityService)
+        const httpMock = TestBed.inject(HttpTestingController)
+
+        let res
+        service.getAvailability().subscribe((data) => (res = data))
+        const req = httpMock.expectOne('http://localhost:3000/rest/products/availability')
+        req.flush({ data: 'apiResponse' })
+        expect(req.request.method).toBe('GET')
+        expect(res).toBe('apiResponse')
+        httpMock.verify()
+    })
+
+    it('should handle error when getting product availability', () => {
+        const service = TestBed.inject(QuantityService)
+        const httpMock = TestBed.inject(HttpTestingController)
+
+        let capturedError: any
+        service.getAvailability().subscribe({ next: () => { throw new Error('expected error') }, error: (e) => { capturedError = e } })
+        const req = httpMock.expectOne('http://localhost:3000/rest/products/availability')
+        req.error(new ErrorEvent('Request failed'), { status: 500, statusText: 'Internal Server Error' })
+        expect(capturedError.status).toBe(500)
+        httpMock.verify()
+    })
+
     it('should change quantity directly via the rest api', () => {
         const service = TestBed.inject(QuantityService)
         const httpMock = TestBed.inject(HttpTestingController)

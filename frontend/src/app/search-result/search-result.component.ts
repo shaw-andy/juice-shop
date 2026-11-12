@@ -61,7 +61,7 @@ export class SearchResultComponent implements OnDestroy, AfterViewInit {
   // vuln-code-snippet start restfulXssChallenge
   ngAfterViewInit () {
     const products = this.productService.search('')
-    const quantities = this.quantityService.getAll()
+    const quantities = this.quantityService.getAvailability()
     forkJoin([quantities, products]).subscribe({
       next: ([quantities, products]) => {
         const dataTable: ProductTableEntry[] = []
