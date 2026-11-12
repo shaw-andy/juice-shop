@@ -4,13 +4,11 @@
  */
 
 import { UserService } from '../Services/user.service'
-import { SecurityQuestionService } from '../Services/security-question.service'
 import { type AbstractControl, UntypedFormControl, Validators, FormsModule, ReactiveFormsModule } from '@angular/forms'
 import { Component, inject, ChangeDetectionStrategy } from '@angular/core'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { faSave } from '@fortawesome/free-solid-svg-icons'
 import { faEdit } from '@fortawesome/free-regular-svg-icons'
-import { type SecurityQuestion } from '../Models/securityQuestion.model'
 import { TranslateService, TranslateModule } from '@ngx-translate/core'
 import { MatButtonModule } from '@angular/material/button'
 import { PasswordStrengthComponent } from '../password-strength/password-strength.component'
@@ -33,7 +31,6 @@ library.add(faSave, faEdit)
   imports: [MatCardModule, TranslateModule, MatFormFieldModule, MatLabel, MatInputModule, FormsModule, ReactiveFormsModule, MatIconModule, MatSuffix, MatTooltip, MatError, MatHint, MatSlideToggle, PasswordStrengthComponent, PasswordStrengthInfoComponent, MatButtonModule]
 })
 export class ForgotPasswordComponent {
-  private readonly securityQuestionService = inject(SecurityQuestionService)
   private readonly userService = inject(UserService)
   private readonly translate = inject(TranslateService)
 
@@ -41,39 +38,19 @@ export class ForgotPasswordComponent {
   public securityQuestionControl: UntypedFormControl = new UntypedFormControl({ disabled: true, value: '' }, [Validators.required])
   public passwordControl: UntypedFormControl = new UntypedFormControl({ disabled: true, value: '' }, [Validators.required, Validators.minLength(5)])
   public repeatPasswordControl: UntypedFormControl = new UntypedFormControl({ disabled: true, value: '' }, [Validators.required, matchValidator(this.passwordControl)])
-  public securityQuestion?: string
   public error?: string
   public confirmation?: string
-  public timeoutDuration = 1000
-  private timeout
 
-  findSecurityQuestion () {
-    clearTimeout(this.timeout)
-    this.timeout = setTimeout(() => {
-      this.securityQuestion = undefined
-      if (this.emailControl.value) {
-        this.securityQuestionService.findBy(this.emailControl.value).subscribe({
-          next: (securityQuestion: SecurityQuestion) => {
-            if (securityQuestion) {
-              this.securityQuestion = securityQuestion.question
-              this.securityQuestionControl.enable()
-              this.passwordControl.enable()
-              this.repeatPasswordControl.enable()
-            } else {
-              this.securityQuestionControl.disable()
-              this.passwordControl.disable()
-              this.repeatPasswordControl.disable()
-            }
-          },
-          error: (error) => error
-        }
-        )
-      } else {
-        this.securityQuestionControl.disable()
-        this.passwordControl.disable()
-        this.repeatPasswordControl.disable()
-      }
-    }, this.timeoutDuration)
+  updateResetFields () {
+    if (this.emailControl.valid) {
+      this.securityQuestionControl.enable()
+      this.passwordControl.enable()
+      this.repeatPasswordControl.enable()
+    } else {
+      this.securityQuestionControl.disable()
+      this.passwordControl.disable()
+      this.repeatPasswordControl.disable()
+    }
   }
 
   resetPassword () {

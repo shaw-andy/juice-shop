@@ -71,12 +71,12 @@ void describe('/api/SecurityQuestions/:id', () => {
 })
 
 void describe('/rest/user/security-question', () => {
-  void it('GET security question for an existing user\'s email address', async () => {
+  void it('GET security question does not reveal the question of an existing user\'s email address', async () => {
     const res = await request(app)
       .get(`/rest/user/security-question?email=jim@${config.get<string>('application.domain')}`)
 
     assert.equal(res.status, 200)
-    assert.equal(res.body.question.question, 'Your eldest siblings middle name?')
+    assert.deepEqual(res.body, {})
   })
 
   void it('GET security question returns nothing for an unknown email address', async () => {
@@ -87,14 +87,12 @@ void describe('/rest/user/security-question', () => {
     assert.deepEqual(res.body, {})
   })
 
-  void it('GET security question throws error for missing email address', async () => {
+  void it('GET security question returns nothing for missing email address', async () => {
     const res = await request(app)
       .get('/rest/user/security-question')
 
-    assert.equal(res.status, 500)
-    assert.ok(res.headers['content-type']?.includes('text/html'))
-    assert.ok(res.text.includes(`${config.get<string>('application.name')} (Express`))
-    assert.ok(res.text.includes('Error: WHERE parameter &quot;email&quot; has invalid &quot;undefined&quot; value'))
+    assert.equal(res.status, 200)
+    assert.deepEqual(res.body, {})
   })
 
   void it('GET security question is not susceptible to SQL Injection attacks', async () => {
