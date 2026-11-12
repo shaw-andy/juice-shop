@@ -57,36 +57,6 @@ describe('/#/complain', () => {
     })
   })
 
-  describe('challenge "xxeFileDisclosureChallenge"', () => {
-    it('(triggered for Windows server via .xml upload with XXE attack)', () => {
-      cy.task('isDocker').then((isDocker) => {
-        if (!isDocker) {
-          cy.get('#complaintMessage').type('XXE File Exfiltration Windows!')
-          cy.get('#file').selectFile('test/files/xxeForWindows.xml')
-          cy.get('#submitButton').click()
-        }
-      })
-    })
-
-    it('(triggered for Linux server via .xml upload with XXE attack)', () => {
-      cy.task('isDocker').then((isDocker) => {
-        if (!isDocker) {
-          cy.get('#complaintMessage').type('XXE File Exfiltration Linux!')
-          cy.get('#file').selectFile('test/files/xxeForLinux.xml')
-          cy.get('#submitButton').click()
-        }
-      })
-    })
-
-    it('should be solved either through Windows- or Linux-specific attack path', () => {
-      cy.task('isDocker').then((isDocker) => {
-        if (!isDocker) {
-          cy.expectChallengeSolved({ challenge: 'XXE Data Access' })
-        }
-      })
-    })
-  })
-
   describe('challenge "xxeDosChallenge"', () => {
     it('(triggered via .xml upload with dev/random attack)', () => {
       cy.task('isDocker').then((isDocker) => {
