@@ -4,14 +4,20 @@
  */
 
 import { type Request, type Response, type NextFunction } from 'express'
+import { Op, Sequelize } from 'sequelize'
 
 import * as challengeUtils from '../lib/challengeUtils'
 import { WalletModel } from '../models/wallet'
+import { exclusiveTransaction } from '../models/index'
 import { challenges } from '../data/datacache'
 import * as security from '../lib/insecurity'
 import { UserModel } from '../models/user'
 import { CardModel } from '../models/card'
 import * as utils from '../lib/utils'
+
+const membershipCost = 49
+
+class UpgradeRefused extends Error {}
 
 export function upgradeToDeluxe () {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -21,16 +27,6 @@ export function upgradeToDeluxe () {
         res.status(400).json({ status: 'error', error: 'Something went wrong. Please try again!' })
         return
       }
-      if (req.body.paymentMode === 'wallet') {
-        const wallet = await WalletModel.findOne({ where: { UserId: req.body.UserId } })
-        if ((wallet != null) && wallet.balance < 49) {
-          res.status(400).json({ status: 'error', error: 'Insuffienct funds in Wallet' })
-          return
-        } else {
-          await WalletModel.decrement({ balance: 49 }, { where: { UserId: req.body.UserId } })
-        }
-      }
-
       if (req.body.paymentMode === 'card') {
         const card = await CardModel.findOne({ where: { id: req.body.paymentId, UserId: req.body.UserId } })
         if ((card == null) || card.expYear < new Date().getFullYear() || (card.expYear === new Date().getFullYear() && card.expMonth - 1 < new Date().getMonth())) {
@@ -40,7 +36,37 @@ export function upgradeToDeluxe () {
       }
 
       try {
-        const updatedUser = await user.update({ role: security.roles.deluxe, deluxeToken: security.deluxeToken(user.email) })
+        await exclusiveTransaction(async (transaction) => {
+          const [upgradedUsers] = await UserModel.update(
+            { role: security.roles.deluxe, deluxeToken: security.deluxeToken(user.email) },
+            { where: { id: user.id, role: security.roles.customer }, transaction }
+          )
+          if (upgradedUsers !== 1) {
+            throw new UpgradeRefused('Something went wrong. Please try again!')
+          }
+          if (req.body.paymentMode === 'wallet') {
+            const wallet = await WalletModel.findOne({ where: { UserId: user.id }, transaction })
+            const [debitedWallets] = wallet != null
+              ? await WalletModel.update(
+                { balance: Sequelize.literal(`balance - ${membershipCost}`) },
+                { where: { id: wallet.id, balance: { [Op.gte]: membershipCost } }, transaction }
+              )
+              : [0]
+            if (debitedWallets !== 1) {
+              throw new UpgradeRefused('Insuffienct funds in Wallet')
+            }
+          }
+        })
+      } catch (error) {
+        if (error instanceof UpgradeRefused) {
+          res.status(400).json({ status: 'error', error: error.message })
+          return
+        }
+        throw error
+      }
+
+      try {
+        const updatedUser = await user.reload()
         challengeUtils.solveIf(challenges.freeDeluxeChallenge, () => {
           return security.verify(utils.jwtFrom(req)) && req.body.paymentMode !== 'wallet' && req.body.paymentMode !== 'card'
         })
@@ -60,7 +86,7 @@ export function upgradeToDeluxe () {
 export function deluxeMembershipStatus () {
   return (req: Request, res: Response, next: NextFunction) => {
     if (security.isCustomer(req)) {
-      res.status(200).json({ status: 'success', data: { membershipCost: 49 } })
+      res.status(200).json({ status: 'success', data: { membershipCost } })
     } else if (security.isDeluxe(req)) {
       res.status(400).json({ status: 'error', error: 'You are already a deluxe member!' })
     } else {
