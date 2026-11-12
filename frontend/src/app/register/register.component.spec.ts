@@ -4,7 +4,6 @@
  */
 
 import { LoginComponent } from '../login/login.component'
-import { SecurityAnswerService } from '../Services/security-answer.service'
 import { UserService } from '../Services/user.service'
 import { SecurityQuestionService } from '../Services/security-question.service'
 import { provideHttpClientTesting } from '@angular/common/http/testing'
@@ -30,16 +29,11 @@ import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http'
 describe('RegisterComponent', () => {
     let component: RegisterComponent
     let fixture: ComponentFixture<RegisterComponent>
-    let securityAnswerService: any
     let securityQuestionService: any
     let userService: any
     let location: Location
 
     beforeEach(async () => {
-        securityAnswerService = {
-            save: vi.fn().mockName("SecurityAnswerService.save")
-        }
-        securityAnswerService.save.mockReturnValue(of({}))
         securityQuestionService = {
             find: vi.fn().mockName("SecurityQuestionService.find")
         }
@@ -67,7 +61,6 @@ describe('RegisterComponent', () => {
                 MatSlideToggleModule,
                 RegisterComponent, LoginComponent],
             providers: [
-                { provide: SecurityAnswerService, useValue: securityAnswerService },
                 { provide: SecurityQuestionService, useValue: securityQuestionService },
                 { provide: UserService, useValue: userService },
                 provideHttpClient(withInterceptorsFromDi()),
@@ -145,7 +138,6 @@ describe('RegisterComponent', () => {
 
     it('redirects to login page after user registration', async () => {
         userService.save.mockReturnValue(of({ id: 1, question: 'Wat is?' }))
-        securityAnswerService.save.mockReturnValue(of({}))
         component.securityQuestions = [{ id: 1, question: 'Wat is?' }]
         component.emailControl.setValue('x@x.xx')
         component.passwordControl.setValue('password')
@@ -153,11 +145,9 @@ describe('RegisterComponent', () => {
         component.securityQuestionControl.setValue(1)
         component.securityAnswerControl.setValue('Answer')
         const user = { email: 'x@x.xx', password: 'password', passwordRepeat: 'password', securityQuestion: { id: 1, question: 'Wat is?' }, securityAnswer: 'Answer' }
-        const securityAnswerObject = { UserId: 1, answer: 'Answer', SecurityQuestionId: 1 }
         component.save()
         await fixture.whenStable()
         expect(vi.mocked(userService.save).mock.calls[0][0]).toEqual(user)
-        expect(vi.mocked(securityAnswerService.save).mock.calls[0][0]).toEqual(securityAnswerObject)
         expect(location.path()).toBe('/login')
         fixture.destroy()
     })
