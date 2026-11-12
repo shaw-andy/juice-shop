@@ -39,9 +39,99 @@ export function placeOrder () {
           const email = customer ? customer.data ? customer.data.email : '' : ''
           const orderId = security.hash(email).slice(0, 4) + '-' + utils.randomHexString(16)
           const pdfFile = `order_${orderId}.pdf`
+          const date = new Date().toJSON().slice(0, 10)
+          let totalPrice = 0
+          const basketProducts: Product[] = []
+          let totalPoints = 0
+          for (const { BasketItem, price, deluxePrice, name, id } of basket.Products ?? []) {
+            if (BasketItem != null) {
+              challengeUtils.solveIf(challenges.christmasSpecialChallenge, () => { return BasketItem.ProductId === products.christmasSpecial.id })
+              let itemPrice: number
+              if (security.isDeluxe(req)) {
+                itemPrice = deluxePrice
+              } else {
+                itemPrice = price
+              }
+              const itemTotal = itemPrice * BasketItem.quantity
+              const itemBonus = Math.round(itemPrice / 10) * BasketItem.quantity
+              const product = {
+                quantity: BasketItem.quantity,
+                id,
+                name: req.__(name),
+                price: itemPrice,
+                total: itemTotal,
+                bonus: itemBonus
+              }
+              basketProducts.push(product)
+              totalPrice += itemTotal
+              totalPoints += itemBonus
+            }
+          }
+          const discount = calculateApplicableDiscount(basket, req) ?? 0
+          const discountApplies = discount > 0 && discount <= 100
+          let discountAmount = '0'
+          if (discountApplies) {
+            discountAmount = (totalPrice * (discount / 100)).toFixed(2)
+            totalPrice -= parseFloat(discountAmount)
+          }
+          const deliveryMethod = {
+            deluxePrice: 0,
+            price: 0,
+            eta: 5
+          }
+          if (req.body.orderDetails?.deliveryMethodId) {
+            const deliveryMethodFromModel = await DeliveryModel.findOne({ where: { id: req.body.orderDetails.deliveryMethodId } })
+            if (deliveryMethodFromModel != null) {
+              deliveryMethod.deluxePrice = deliveryMethodFromModel.deluxePrice
+              deliveryMethod.price = deliveryMethodFromModel.price
+              deliveryMethod.eta = deliveryMethodFromModel.eta
+            }
+          }
+          const deliveryAmount = security.isDeluxe(req) ? deliveryMethod.deluxePrice : deliveryMethod.price
+          totalPrice += deliveryAmount
+
+          challengeUtils.solveIf(challenges.negativeOrderChallenge, () => { return totalPrice < 0 })
+
+          if (req.body.UserId && req.body.orderDetails && req.body.orderDetails.paymentId === 'wallet') {
+            if (totalPrice < 0) {
+              next(new Error('Wallet payment requires a non-negative order total.'))
+              return
+            }
+            const wallet = await WalletModel.findOne({ where: { UserId: req.body.UserId } })
+            if ((wallet != null) && wallet.balance >= totalPrice) {
+              await WalletModel.decrement({ balance: totalPrice }, { where: { UserId: req.body.UserId } })
+            } else {
+              next(new Error('Insufficient wallet balance.'))
+              return
+            }
+          }
+
+          for (const { BasketItem } of basket.Products ?? []) {
+            if (BasketItem != null) {
+              try {
+                const quantityRow = await QuantityModel.findOne({ where: { ProductId: BasketItem.ProductId } })
+                if (quantityRow) {
+                  const newQuantity = quantityRow.quantity - BasketItem.quantity
+                  await QuantityModel.update({ quantity: newQuantity }, { where: { ProductId: BasketItem.ProductId } })
+                }
+              } catch (error: unknown) {
+                next(error)
+                return
+              }
+            }
+          }
+
+          if (req.body.UserId) {
+            try {
+              await WalletModel.increment({ balance: totalPoints }, { where: { UserId: req.body.UserId } })
+            } catch (error: unknown) {
+              next(error)
+              return
+            }
+          }
+
           const { default: PDFDocument } = await import('pdfkit')
           const doc = new PDFDocument()
-          const date = new Date().toJSON().slice(0, 10)
           const fileWriter = doc.pipe(fs.createWriteStream(path.join('ftp/', pdfFile)))
 
           fileWriter.on('finish', () => {
@@ -68,69 +158,15 @@ export function placeOrder () {
           doc.font('Times-Roman').fontSize(15).text(`${req.__('Date')}: ${date}`, { align: 'left' })
           doc.moveDown()
           doc.moveDown()
-          let totalPrice = 0
-          const basketProducts: Product[] = []
-          let totalPoints = 0
-          for (const { BasketItem, price, deluxePrice, name, id } of basket.Products ?? []) {
-            if (BasketItem != null) {
-              challengeUtils.solveIf(challenges.christmasSpecialChallenge, () => { return BasketItem.ProductId === products.christmasSpecial.id })
-              try {
-                const quantityRow = await QuantityModel.findOne({ where: { ProductId: BasketItem.ProductId } })
-                if (quantityRow) {
-                  const newQuantity = quantityRow.quantity - BasketItem.quantity
-                  await QuantityModel.update({ quantity: newQuantity }, { where: { ProductId: BasketItem.ProductId } })
-                }
-              } catch (error: unknown) {
-                next(error)
-                return
-              }
-              let itemPrice: number
-              if (security.isDeluxe(req)) {
-                itemPrice = deluxePrice
-              } else {
-                itemPrice = price
-              }
-              const itemTotal = itemPrice * BasketItem.quantity
-              const itemBonus = Math.round(itemPrice / 10) * BasketItem.quantity
-              const product = {
-                quantity: BasketItem.quantity,
-                id,
-                name: req.__(name),
-                price: itemPrice,
-                total: itemTotal,
-                bonus: itemBonus
-              }
-              basketProducts.push(product)
-              doc.text(`${BasketItem.quantity}x ${req.__(name)} ${req.__('ea.')} ${itemPrice} = ${itemTotal}¤`)
-              doc.moveDown()
-              totalPrice += itemTotal
-              totalPoints += itemBonus
-            }
+          for (const product of basketProducts) {
+            doc.text(`${product.quantity}x ${product.name} ${req.__('ea.')} ${product.price} = ${product.total}¤`)
+            doc.moveDown()
           }
           doc.moveDown()
-          const discount = calculateApplicableDiscount(basket, req) ?? 0
-          let discountAmount = '0'
-          if (discount > 0) {
-            discountAmount = (totalPrice * (discount / 100)).toFixed(2)
+          if (discountApplies) {
             doc.text(discount + '% discount from coupon: -' + discountAmount + '¤')
             doc.moveDown()
-            totalPrice -= parseFloat(discountAmount)
           }
-          const deliveryMethod = {
-            deluxePrice: 0,
-            price: 0,
-            eta: 5
-          }
-          if (req.body.orderDetails?.deliveryMethodId) {
-            const deliveryMethodFromModel = await DeliveryModel.findOne({ where: { id: req.body.orderDetails.deliveryMethodId } })
-            if (deliveryMethodFromModel != null) {
-              deliveryMethod.deluxePrice = deliveryMethodFromModel.deluxePrice
-              deliveryMethod.price = deliveryMethodFromModel.price
-              deliveryMethod.eta = deliveryMethodFromModel.eta
-            }
-          }
-          const deliveryAmount = security.isDeluxe(req) ? deliveryMethod.deluxePrice : deliveryMethod.price
-          totalPrice += deliveryAmount
           doc.text(`${req.__('Delivery Price')}: ${deliveryAmount.toFixed(2)}¤`)
           doc.moveDown()
           doc.font('Helvetica-Bold').fontSize(20).text(`${req.__('Total Price')}: ${totalPrice.toFixed(2)}¤`)
@@ -140,26 +176,6 @@ export function placeOrder () {
           doc.moveDown()
           doc.moveDown()
           doc.font('Times-Roman').fontSize(15).text(req.__('Thank you for your order!'))
-
-          challengeUtils.solveIf(challenges.negativeOrderChallenge, () => { return totalPrice < 0 })
-
-          if (req.body.UserId) {
-            if (req.body.orderDetails && req.body.orderDetails.paymentId === 'wallet') {
-              const wallet = await WalletModel.findOne({ where: { UserId: req.body.UserId } })
-              if ((wallet != null) && wallet.balance >= totalPrice) {
-                await WalletModel.decrement({ balance: totalPrice }, { where: { UserId: req.body.UserId } })
-              } else {
-                next(new Error('Insufficient wallet balance.'))
-                return
-              }
-            }
-            try {
-              await WalletModel.increment({ balance: totalPoints }, { where: { UserId: req.body.UserId } })
-            } catch (error: unknown) {
-              next(error)
-              return
-            }
-          }
 
           db.ordersCollection.insert({
             promotionalAmount: discountAmount,
