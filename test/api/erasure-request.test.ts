@@ -8,9 +8,7 @@ import assert from 'node:assert/strict'
 import request from 'supertest'
 import type { Express } from 'express'
 import { createTestApp } from './helpers/setup'
-import { login } from './helpers/auth'
-import { challenges } from '../../data/datacache'
-import * as utils from '../../lib/utils'
+import { login, register } from './helpers/auth'
 
 let app: Express
 
@@ -89,30 +87,35 @@ void describe('/dataerasure', () => {
     assert.equal(res.status, 200)
   })
 
-  if (utils.isChallengeEnabled(challenges.lfrChallenge)) {
-    void it('POST erasure request with non-existing file path as layout parameter throws error', async () => {
-      const { token } = await login(app, { email: 'bjoern.kimminich@gmail.com', password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI=' })
+  void it('POST erasure request ignores a non-existing file path as layout parameter', async () => {
+    const token = await registerAndLogin('erasure-missing-layout@juice-sh.op')
 
-      const res = await request(app)
-        .post('/dataerasure/')
-        .set({ Cookie: 'token=' + token })
-        .send({ layout: '../this/file/does/not/exist' })
+    const res = await request(app)
+      .post('/dataerasure/')
+      .set({ Cookie: 'token=' + token })
+      .send({ layout: '../this/file/does/not/exist' })
 
-      assert.equal(res.status, 500)
-      assert.ok(res.text.includes('no such file or directory'))
-    })
+    assert.equal(res.status, 200)
+    assert.ok(res.text.includes('Sorry to see you leave'))
+  })
 
-    void it('POST erasure request with existing file path as layout parameter returns content truncated', async () => {
-      const { token } = await login(app, { email: 'bjoern.kimminich@gmail.com', password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI=' })
+  void it('POST erasure request ignores an existing file path as layout parameter', async () => {
+    const token = await registerAndLogin('erasure-existing-layout@juice-sh.op')
 
-      const res = await request(app)
-        .post('/dataerasure/')
-        .set({ Cookie: 'token=' + token })
-        .send({ layout: '../package.json' })
+    const res = await request(app)
+      .post('/dataerasure/')
+      .set({ Cookie: 'token=' + token })
+      .send({ layout: '../package.json' })
 
-      assert.equal(res.status, 200)
-      assert.ok(res.text.includes('juice-shop'))
-      assert.ok(res.text.includes('......'))
-    })
-  }
+    assert.equal(res.status, 200)
+    assert.ok(res.text.includes('Sorry to see you leave'))
+    assert.ok(!res.text.includes('"name": "juice-shop"'))
+  })
 })
+
+async function registerAndLogin (email: string): Promise<string> {
+  const password = 'placeholder-password'
+  await register(app, { email, password })
+  const { token } = await login(app, { email, password })
+  return token
+}
