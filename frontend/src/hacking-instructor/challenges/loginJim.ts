@@ -7,7 +7,7 @@ import {
   waitForInputToHaveValue,
   waitForElementToGetClicked,
   waitInMs,
-  waitForAngularRouteToBeVisited, waitForLogOut, waitForInputToNotHaveValueAndNotBeEmpty
+  waitForAngularRouteToBeVisited, waitForLogOut, waitForInputToNotBeEmpty
 } from '../helpers/helpers'
 import { type ChallengeInstruction } from '../'
 
@@ -70,7 +70,7 @@ export const LoginJimInstruction: ChallengeInstruction = {
       text: "Now put anything in the **password field**. Let's assume we don't know it yet, even if you happen to already do.",
       fixture: '#password',
       unskippable: true,
-      resolved: waitForInputToNotHaveValueAndNotBeEmpty('#password', 'ncc-1701')
+      resolved: waitForInputToNotBeEmpty('#password')
     },
     {
       text: 'Press the _Log in_ button.',

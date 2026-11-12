@@ -5,6 +5,7 @@
 
 import {
   waitForInputToHaveValue,
+  waitForInputToNotBeEmpty,
   waitForElementToGetClicked,
   waitInMs,
   waitForAngularRouteToBeVisited, waitForLogOut, waitForDevTools
@@ -57,7 +58,7 @@ export const ExposedCredentialsInstruction: ChallengeInstruction = {
       text: 'Now write the password in the **password field**.',
       fixture: '#password',
       unskippable: true,
-      resolved: waitForInputToHaveValue('#password', 'IamUsedForTesting')
+      resolved: waitForInputToNotBeEmpty('#password')
     },
     {
       text: 'Press the _Log in_ button.',
