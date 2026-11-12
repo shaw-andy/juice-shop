@@ -7,7 +7,6 @@ import fs from 'node:fs'
 import crypto from 'node:crypto'
 import { type Request, type Response, type NextFunction } from 'express'
 import { type UserModel } from '@juice-shop/models/user'
-import expressJwt from 'express-jwt'
 import jwt from 'jsonwebtoken'
 import jws from 'jws'
 import sanitizeHtmlLib from 'sanitize-html'
@@ -49,10 +48,60 @@ export const cutOffPoisonNullByte = (str: string) => {
   return str
 }
 
-export const isAuthorized = () => expressJwt(({ secret: publicKey }) as any)
-export const denyAll = () => expressJwt({ secret: '' + Math.random() } as any)
+const parseBase64UrlJson = (segment: string) => JSON.parse(Buffer.from(segment, 'base64url').toString('utf8'))
+
+// The algorithm is pinned here instead of being taken from the token header, so unsigned and HMAC tokens are rejected
+export const verifiedPayload = (token?: unknown): any => {
+  if (typeof token !== 'string') return undefined
+  const segments = token.split('.')
+  if (segments.length !== 3) return undefined
+  const [encodedHeader, encodedPayload, encodedSignature] = segments
+  try {
+    if (parseBase64UrlJson(encodedHeader)?.alg !== 'RS256') return undefined
+    const signatureValid = crypto.verify('sha256', Buffer.from(encodedHeader + '.' + encodedPayload), publicKey, Buffer.from(encodedSignature, 'base64url'))
+    if (!signatureValid) return undefined
+    const payload = parseBase64UrlJson(encodedPayload)
+    if (payload === null || typeof payload !== 'object') return undefined
+    if (payload.exp !== undefined && Date.now() / 1000 >= payload.exp) return undefined
+    return payload
+  } catch {
+    return undefined
+  }
+}
+
+const unauthorizedError = (code: string, message: string) => Object.assign(new Error(message), { name: 'UnauthorizedError', code, status: 401 })
+
+const isAuthorizationPreflight = (req: Request) => {
+  const requestedHeaders = req.headers?.['access-control-request-headers']
+  return req.method === 'OPTIONS' && typeof requestedHeaders === 'string' && requestedHeaders.split(',').some(header => header.includes('authorization'))
+}
+
+export const isAuthorized = () => (req: Request, res: Response, next: NextFunction) => {
+  if (isAuthorizationPreflight(req)) {
+    next(); return
+  }
+  if (!req.headers?.authorization) {
+    next(unauthorizedError('credentials_required', 'No Authorization header was found')); return
+  }
+  const token = utils.jwtFrom(req)
+  if (token === undefined) {
+    next(unauthorizedError('credentials_bad_format', 'Format is Authorization: Bearer [token]')); return
+  }
+  const payload = verifiedPayload(token)
+  if (payload === undefined) {
+    next(unauthorizedError('invalid_token', 'invalid signature')); return
+  }
+  (req as Request & { user?: unknown }).user = payload
+  next()
+}
+export const denyAll = () => (req: Request, res: Response, next: NextFunction) => {
+  if (isAuthorizationPreflight(req)) {
+    next(); return
+  }
+  next(unauthorizedError('invalid_token', 'invalid signature'))
+}
 export const authorize = (user = {}) => jwt.sign(user, privateKey, { expiresIn: '6h', algorithm: 'RS256' })
-export const verify = (token: string) => token ? (jws.verify as ((token: string, secret: string) => boolean))(token, publicKey) : false
+export const verify = (token: string) => verifiedPayload(token) !== undefined
 export const decode = (token: string) => { return jws.decode(token)?.payload }
 
 export const sanitizeHtml = (html: string) => sanitizeHtmlLib(html)
@@ -153,7 +202,7 @@ export const deluxeToken = (email: string) => {
 
 export const isAccounting = () => {
   return (req: Request, res: Response, next: NextFunction) => {
-    const decodedToken = verify(utils.jwtFrom(req)) && decode(utils.jwtFrom(req))
+    const decodedToken = verifiedPayload(utils.jwtFrom(req))
     if (decodedToken?.data?.role === roles.accounting) {
       next()
     } else {
@@ -163,12 +212,12 @@ export const isAccounting = () => {
 }
 
 export const isDeluxe = (req: Request) => {
-  const decodedToken = verify(utils.jwtFrom(req)) && decode(utils.jwtFrom(req))
+  const decodedToken = verifiedPayload(utils.jwtFrom(req))
   return decodedToken?.data?.role === roles.deluxe && decodedToken?.data?.deluxeToken && decodedToken?.data?.deluxeToken === deluxeToken(decodedToken?.data?.email)
 }
 
 export const isCustomer = (req: Request) => {
-  const decodedToken = verify(utils.jwtFrom(req)) && decode(utils.jwtFrom(req))
+  const decodedToken = verifiedPayload(utils.jwtFrom(req))
   return decodedToken?.data?.role === roles.customer
 }
 
@@ -186,12 +235,11 @@ export const appendUserId = () => {
 export const updateAuthenticatedUsers = () => (req: Request, res: Response, next: NextFunction) => {
   const token = req.cookies.token || utils.jwtFrom(req)
   if (token && authenticatedUsers.get(token) === undefined) {
-    jwt.verify(token, publicKey, (err: Error | null, decoded: any) => {
-      if (err === null && decoded?.data !== undefined) {
-        authenticatedUsers.put(token, decoded)
-        res.cookie('token', token)
-      }
-    })
+    const decoded = verifiedPayload(token)
+    if (decoded?.data !== undefined) {
+      authenticatedUsers.put(token, decoded)
+      res.cookie('token', token)
+    }
   }
   next()
 }
