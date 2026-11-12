@@ -2,13 +2,24 @@ import { type Request, type Response } from 'express'
 import * as challengeUtils from '../lib/challengeUtils'
 import * as utils from '../lib/utils'
 import { challenges } from '../data/datacache'
+import type { HDNodeWallet } from 'ethers'
+
+let fallbackWallet: HDNodeWallet | undefined
+
+async function unlockWallet (): Promise<HDNodeWallet> {
+  const { HDNodeWallet } = await import('ethers')
+  const mnemonic = process.env.NFT_UNLOCK_MNEMONIC
+  if (mnemonic) {
+    return HDNodeWallet.fromPhrase(mnemonic)
+  }
+  fallbackWallet ??= HDNodeWallet.createRandom()
+  return fallbackWallet
+}
 
 export function checkKeys () {
   return async (req: Request, res: Response) => {
     try {
-      const { HDNodeWallet } = await import('ethers')
-      const mnemonic = 'purpose betray marriage blame crunch monitor spin slide donate sport lift clutch'
-      const mnemonicWallet = HDNodeWallet.fromPhrase(mnemonic)
+      const mnemonicWallet = await unlockWallet()
       const privateKey = mnemonicWallet.privateKey
       const publicKey = mnemonicWallet.publicKey
       const address = mnemonicWallet.address

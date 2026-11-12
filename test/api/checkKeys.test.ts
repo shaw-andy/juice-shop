@@ -3,19 +3,30 @@
  * SPDX-License-Identifier: MIT
  */
 
-import { describe, it, before } from 'node:test'
+import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import request from 'supertest'
 import type { Express } from 'express'
+import type { HDNodeWallet } from 'ethers'
 import { createTestApp } from './helpers/setup'
 
 let app: Express
+let wallet: HDNodeWallet
 
 void describe('Web3 Key Derivation & NFT Unlock', () => {
   before(async () => {
+    const { Wallet, HDNodeWallet } = await import('ethers')
+    const mnemonic = Wallet.createRandom().mnemonic?.phrase
+    assert.ok(mnemonic)
+    process.env.NFT_UNLOCK_MNEMONIC = mnemonic
+    wallet = HDNodeWallet.fromPhrase(mnemonic)
     const result = await createTestApp()
     app = result.app
   }, { timeout: 60000 })
+
+  after(() => {
+    delete process.env.NFT_UNLOCK_MNEMONIC
+  })
 
   void describe('/rest/web3/submitKey', () => {
     void it('POST missing key in request body gets rejected as non-Ethereum key', async () => {
@@ -43,7 +54,7 @@ void describe('Web3 Key Derivation & NFT Unlock', () => {
     void it('POST public wallet key in request body gets rejected as such', async () => {
       const res = await request(app)
         .post('/rest/web3/submitKey')
-        .send({ privateKey: '0x02c7a2a93289c9fbda5990bac6596993e9bb0a8d3f178175a80b7cfd983983f506' })
+        .send({ privateKey: wallet.publicKey })
 
       assert.equal(res.status, 401)
       assert.ok(res.headers['content-type']?.includes('application/json'))
@@ -54,7 +65,7 @@ void describe('Web3 Key Derivation & NFT Unlock', () => {
     void it('POST wallet address in request body gets rejected as such', async () => {
       const res = await request(app)
         .post('/rest/web3/submitKey')
-        .send({ privateKey: '0x8343d2eb2B13A2495De435a1b15e85b98115Ce05' })
+        .send({ privateKey: wallet.address })
 
       assert.equal(res.status, 401)
       assert.ok(res.headers['content-type']?.includes('application/json'))
@@ -65,12 +76,26 @@ void describe('Web3 Key Derivation & NFT Unlock', () => {
     void it('POST private key in request body gets accepted', async () => {
       const res = await request(app)
         .post('/rest/web3/submitKey')
-        .send({ privateKey: '0x5bcc3e9d38baa06e7bfaab80ae5957bbe8ef059e640311d7d6d465e6bc948e3e' })
+        .send({ privateKey: wallet.privateKey })
 
       assert.equal(res.status, 200)
       assert.ok(res.headers['content-type']?.includes('application/json'))
       assert.equal(res.body.success, true)
       assert.equal(res.body.message, 'Challenge successfully solved')
+    })
+
+    void it('POST private key of the configured wallet gets rejected once the configured phrase is removed', async () => {
+      delete process.env.NFT_UNLOCK_MNEMONIC
+      try {
+        const res = await request(app)
+          .post('/rest/web3/submitKey')
+          .send({ privateKey: wallet.privateKey })
+
+        assert.equal(res.status, 401)
+        assert.equal(res.body.success, false)
+      } finally {
+        process.env.NFT_UNLOCK_MNEMONIC = wallet.mnemonic?.phrase
+      }
     })
   })
 

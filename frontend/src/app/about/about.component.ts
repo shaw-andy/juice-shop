@@ -4,7 +4,6 @@
  */
 
 import { Component, type OnInit, inject, ChangeDetectionStrategy } from '@angular/core'
-import { DomSanitizer } from '@angular/platform-browser'
 import { ConfigurationService } from '../Services/configuration.service'
 import { FeedbackService } from '../Services/feedback.service'
 import { Gallery, type GalleryRef, GalleryComponent, GalleryImageDef } from 'ng-gallery'
@@ -31,7 +30,6 @@ library.add(faFacebook, faTwitter, faSlack, faReddit, faNewspaper, faStar, fasSt
 export class AboutComponent implements OnInit {
   private readonly configurationService = inject(ConfigurationService)
   private readonly feedbackService = inject(FeedbackService)
-  private readonly sanitizer = inject(DomSanitizer)
   private readonly gallery = inject(Gallery)
 
   public blueSkyUrl?: string
@@ -117,9 +115,6 @@ export class AboutComponent implements OnInit {
           feedbacks[i].comment = `<figcaption><p class="feedback-comment">${
             feedbacks[i].comment
           }</p><div class="feedback-stars">(${this.stars[feedbacks[i].rating]})</div></figcaption>`
-          feedbacks[i].comment = this.sanitizer.bypassSecurityTrustHtml(
-            feedbacks[i].comment
-          )
 
           this.galleryRef.addImage({
             src: this.images[i % this.images.length],
