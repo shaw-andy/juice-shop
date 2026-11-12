@@ -31,6 +31,10 @@ export function resetPassword () {
       res.status(401).send(res.__('New and repeated password do not match.'))
       return
     }
+    if (security.isPasswordDerivedFromEmail(email, newPassword)) {
+      res.status(401).send(res.__('Password must not be derived from the email address.'))
+      return
+    }
     try {
       const data = await SecurityAnswerModel.findOne({
         include: [{

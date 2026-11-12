@@ -9,7 +9,7 @@ import request from 'supertest'
 import type { Express } from 'express'
 import * as http from 'http'
 import { createTestApp } from './helpers/setup'
-import { login } from './helpers/auth'
+import { login, loginWithGoogle } from './helpers/auth'
 
 const MOCK_LLM_PORT = 43210
 
@@ -258,7 +258,7 @@ void describe('/rest/chat', { timeout: 120000 }, () => {
   })
 
   void it('POST includes authenticated user name in system prompt', { timeout: 15000 }, async () => {
-    const { token } = await login(app, { email: 'bjoern.kimminich@gmail.com', password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI=' })
+    const { token } = await loginWithGoogle(app, 'bjoern.kimminich@gmail.com')
     let parsedBody: any
     onLlmRequest = (_req, body, res) => {
       parsedBody = JSON.parse(body)

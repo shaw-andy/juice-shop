@@ -9,7 +9,7 @@ import request from 'supertest'
 import type { Express } from 'express'
 import config from 'config'
 import { createTestApp } from './helpers/setup'
-import { login } from './helpers/auth'
+import { login, loginWithGoogle } from './helpers/auth'
 import { QuantityModel } from '../../models/quantity'
 import { WalletModel } from '../../models/wallet'
 import * as db from '../../data/mongodb'
@@ -109,10 +109,7 @@ void describe('/api/Baskets/:id', () => {
 
 void describe('/rest/basket/:id', () => {
   void it('GET existing basket of another user', async () => {
-    const { token } = await login(app, {
-      email: 'bjoern.kimminich@gmail.com',
-      password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI='
-    })
+    const { token } = await loginWithGoogle(app, 'bjoern.kimminich@gmail.com')
     const res = await request(app)
       .get('/rest/basket/2')
       .set({ Authorization: 'Bearer ' + token })
@@ -167,7 +164,7 @@ void describe('/rest/basket/:id/checkout', () => {
 
   void describe('error cases', () => {
     void it('should return 500 if QuantityModel.findOne fails during checkout', async (t) => {
-      const { token } = await login(app, { email: 'bjoern.kimminich@gmail.com', password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI=' })
+      const { token } = await loginWithGoogle(app, 'bjoern.kimminich@gmail.com')
       const authHeader = { Authorization: 'Bearer ' + token, 'content-type': 'application/json' }
       await request(app).post('/api/BasketItems').set(authHeader).send({ BasketId: 4, ProductId: 1, quantity: 1 })
 

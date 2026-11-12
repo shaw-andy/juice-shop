@@ -59,7 +59,6 @@ export const CHALLENGE_KEYS = [
   'loginAdminChallenge',
   'loginAmyChallenge',
   'loginBenderChallenge',
-  'oauthUserPasswordChallenge',
   'loginJimChallenge',
   'loginRapperChallenge',
   'loginSupportChallenge',

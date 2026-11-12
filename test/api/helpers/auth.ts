@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+import config from 'config'
 import request from 'supertest'
 import { generateSync } from 'otplib'
 import type { Express } from 'express'
@@ -79,4 +80,35 @@ export async function register (app: Express, { email, password, totpSecret }: {
   }
 
   return res
+}
+
+export function stubGoogleTokenInfo (tokenInfo: Record<string, unknown>, status = 200) {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async () => new Response(JSON.stringify(tokenInfo), { status, headers: jsonHeader })) as typeof fetch
+  return () => { globalThis.fetch = originalFetch }
+}
+
+export function validGoogleTokenInfo (email: string) {
+  return {
+    aud: config.get<string>('application.googleOauth.clientId'),
+    email,
+    email_verified: 'true',
+    exp: String(Math.floor(Date.now() / 1000) + 3600)
+  }
+}
+
+export async function loginWithGoogle (app: Express, email: string) {
+  const restoreFetch = stubGoogleTokenInfo(validGoogleTokenInfo(email))
+  try {
+    const res = await request(app)
+      .post('/rest/user/oauth')
+      .set(jsonHeader)
+      .send({ accessToken: 'placeholder-google-access-token' })
+    if (res.status !== 200) {
+      throw new Error(`Failed to login '${email}' with Google: ${res.status}`)
+    }
+    return res.body.authentication
+  } finally {
+    restoreFetch()
+  }
 }

@@ -193,7 +193,7 @@ async function createUsers () {
         const user = await UserModel.create({
           username,
           email: completeEmail,
-          password,
+          password: password ?? security.randomPassword(),
           role,
           deluxeToken: role === security.roles.deluxe ? security.deluxeToken(completeEmail) : '',
           profileImage: `assets/public/images/uploads/${profileImage ?? (role === security.roles.admin ? 'defaultAdmin.png' : 'default.svg')}`,

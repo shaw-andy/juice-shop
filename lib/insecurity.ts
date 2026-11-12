@@ -151,6 +151,15 @@ export const deluxeToken = (email: string) => {
   return hmac.update(email + roles.deluxe).digest('hex')
 }
 
+export const randomPassword = () => crypto.randomBytes(32).toString('base64url')
+
+// Former Google sign-in clients registered accounts with this password, which anyone knowing the email can compute
+export const isPasswordDerivedFromEmail = (email: unknown, password: unknown) => {
+  if (typeof email !== 'string' || typeof password !== 'string') return false
+  return [email, email.toLowerCase()].some((candidate) =>
+    Buffer.from(candidate.split('').reverse().join(''), 'latin1').toString('base64') === password)
+}
+
 export const isAccounting = () => {
   return (req: Request, res: Response, next: NextFunction) => {
     const decodedToken = verify(utils.jwtFrom(req)) && decode(utils.jwtFrom(req))

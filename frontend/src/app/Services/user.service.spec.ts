@@ -174,18 +174,19 @@ describe('UserService', () => {
         httpMock.verify()
     })
 
-    it('should fetch user info from Google via oauthLogin', () => {
+    it('should exchange the Google access token for a session via the rest api', () => {
         const service = TestBed.inject(UserService)
         const httpMock = TestBed.inject(HttpTestingController)
 
         let res: any
         service.oauthLogin('at').subscribe((data) => (res = data))
 
-        const req = httpMock.expectOne('https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token=at')
-        req.flush({ id: '123' })
+        const req = httpMock.expectOne('http://localhost:3000/rest/user/oauth')
+        req.flush({ authentication: { token: 'apiToken', bid: 1 } })
 
-        expect(req.request.method).toBe('GET')
-        expect(res).toEqual({ id: '123' })
+        expect(req.request.method).toBe('POST')
+        expect(req.request.body).toEqual({ accessToken: 'at' })
+        expect(res).toEqual({ token: 'apiToken', bid: 1 })
         httpMock.verify()
     })
 
