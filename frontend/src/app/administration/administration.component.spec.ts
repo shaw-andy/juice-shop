@@ -173,4 +173,57 @@ describe('AdministrationComponent', () => {
         expect(component.showToolCalls()).toBe(false)
         expect(cookieService.put).toHaveBeenCalledWith('show_tool_calls', 'false', expect.any(Object))
     })
+
+    it('should draw one star per point for ratings from 0 through 5', () => {
+        expect(component.times(0)).toHaveLength(0)
+        expect(component.times(1)).toHaveLength(1)
+        expect(component.times(5)).toHaveLength(5)
+    })
+
+    function starCount (rating: number) {
+        let stars: string[] = []
+        expect(() => { stars = component.times(rating) }).not.toThrow()
+        return stars.length
+    }
+
+    it('should not throw when drawing stars for a negative rating', () => {
+        expect(starCount(-1)).toBeLessThanOrEqual(5)
+    })
+
+    it('should not throw when drawing stars for a non-integer rating', () => {
+        expect(starCount(1.5)).toBeLessThanOrEqual(5)
+        expect(starCount(Number.NaN)).toBeLessThanOrEqual(5)
+        expect(starCount(Number.POSITIVE_INFINITY)).toBeLessThanOrEqual(5)
+    })
+
+    it('should cap the star list for a rating above 5', () => {
+        expect(starCount(6)).toBeLessThanOrEqual(5)
+    })
+
+    it('should cap the star list for a very large rating', () => {
+        expect(starCount(100000)).toBeLessThanOrEqual(5)
+    })
+
+    function renderFeedbackRating (rating: number) {
+        feedbackService.find.mockReturnValue(of([{ comment: 'stored', rating, id: 1, UserId: 1 }]))
+        component.findAllFeedbacks()
+        expect(() => fixture.detectChanges()).not.toThrow()
+        return fixture.nativeElement.querySelectorAll('mat-icon').length
+    }
+
+    it('should render one star icon per point for a stored rating of 3', () => {
+        expect(renderFeedbackRating(3)).toBe(3)
+    })
+
+    it('should finish rendering a feedback row whose stored rating is negative', () => {
+        expect(renderFeedbackRating(-1)).toBeLessThanOrEqual(5)
+    })
+
+    it('should finish rendering a feedback row whose stored rating is not an integer', () => {
+        expect(renderFeedbackRating(1.5)).toBeLessThanOrEqual(5)
+    })
+
+    it('should finish rendering a feedback row whose stored rating is above 5', () => {
+        expect(renderFeedbackRating(6)).toBeLessThanOrEqual(5)
+    })
 })
