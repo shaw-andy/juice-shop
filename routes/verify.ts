@@ -16,6 +16,7 @@ import * as challengeUtils from '../lib/challengeUtils'
 import * as antiCheat from '../lib/antiCheat'
 import { ComplaintModel } from '../models/complaint'
 import { FeedbackModel } from '../models/feedback'
+import { ProductModel } from '../models/product'
 import * as security from '../lib/insecurity'
 import * as utils from '../lib/utils'
 import { buildSystemPrompt } from './chat'
@@ -141,81 +142,159 @@ function hasEmail (token: { data: { email: string } }, email: string | RegExp) {
   return token?.data?.email?.match(email)
 }
 
+interface RowScope {
+  feedbackId?: number
+  complaintId?: number
+}
+
 async function checkPatternInFeedbackAndComplaints (
   challenge: Challenge,
-  fieldCriteria: any
+  fieldCriteria: any,
+  scope: RowScope = {}
 ): Promise<void> {
-  const feedbackCheck = FeedbackModel.findAndCountAll({
-    where: { comment: fieldCriteria }
-  }).then(({ count, rows }: { count: number, rows: any[] }) => {
-    if (count > 0) {
-      const isCheating = rows.some((row: any) => antiCheat.checkForSourceFileOverlap(challenge.key, row.comment ?? ''))
-      challengeUtils.solve(challenge, false, isCheating)
-    }
-  }).catch(() => {
-    throw new Error('Unable to retrieve feedback details. Please try again')
-  })
+  const checks: Array<Promise<void>> = []
 
-  const complaintCheck = ComplaintModel.findAndCountAll({
-    where: { message: fieldCriteria }
-  }).then(({ count, rows }: { count: number, rows: any[] }) => {
-    if (count > 0) {
-      const isCheating = rows.some((row: any) => antiCheat.checkForSourceFileOverlap(challenge.key, row.message ?? ''))
-      challengeUtils.solve(challenge, false, isCheating)
-    }
-  }).catch(() => {
-    throw new Error('Unable to retrieve complaint details. Please try again')
-  })
+  if (scope.complaintId === undefined) {
+    const where: Record<string, unknown> = { comment: fieldCriteria }
+    if (scope.feedbackId !== undefined) where.id = scope.feedbackId
+    checks.push(FeedbackModel.findAndCountAll({ where }).then(({ count, rows }: { count: number, rows: any[] }) => {
+      if (count > 0) {
+        const isCheating = rows.some((row: any) => antiCheat.checkForSourceFileOverlap(challenge.key, row.comment ?? ''))
+        challengeUtils.solve(challenge, false, isCheating)
+      }
+    }).catch(() => {
+      throw new Error('Unable to retrieve feedback details. Please try again')
+    }))
+  }
 
-  await Promise.all([feedbackCheck, complaintCheck])
+  if (scope.feedbackId === undefined) {
+    const where: Record<string, unknown> = { message: fieldCriteria }
+    if (scope.complaintId !== undefined) where.id = scope.complaintId
+    checks.push(ComplaintModel.findAndCountAll({ where }).then(({ count, rows }: { count: number, rows: any[] }) => {
+      if (count > 0) {
+        const isCheating = rows.some((row: any) => antiCheat.checkForSourceFileOverlap(challenge.key, row.message ?? ''))
+        challengeUtils.solve(challenge, false, isCheating)
+      }
+    }).catch(() => {
+      throw new Error('Unable to retrieve complaint details. Please try again')
+    }))
+  }
+
+  await Promise.all(checks)
 }
 
-export const databaseRelatedChallenges = () => (req: Request, res: Response, next: NextFunction) => {
-  if (challengeUtils.notSolved(challenges.changeProductChallenge) && products.osaft) {
-    changeProductChallenge(products.osaft)
-  }
-  if (challengeUtils.notSolved(challenges.feedbackChallenge)) {
-    feedbackChallenge()
-  }
+function patternChallengeChecks (scope?: RowScope): Array<Promise<void>> {
+  const checks: Array<Promise<void>> = []
   if (challengeUtils.notSolved(challenges.knownVulnerableComponentChallenge)) {
-    knownVulnerableComponentChallenge()
+    checks.push(knownVulnerableComponentChallenge(scope))
   }
   if (challengeUtils.notSolved(challenges.weirdCryptoChallenge)) {
-    weirdCryptoChallenge()
+    checks.push(weirdCryptoChallenge(scope))
   }
   if (challengeUtils.notSolved(challenges.typosquattingNpmChallenge)) {
-    typosquattingNpmChallenge()
+    checks.push(typosquattingNpmChallenge(scope))
   }
   if (challengeUtils.notSolved(challenges.typosquattingAngularChallenge)) {
-    typosquattingAngularChallenge()
+    checks.push(typosquattingAngularChallenge(scope))
   }
   if (challengeUtils.notSolved(challenges.hiddenImageChallenge)) {
-    hiddenImageChallenge()
+    checks.push(hiddenImageChallenge(scope))
   }
   if (challengeUtils.notSolved(challenges.supplyChainAttackChallenge)) {
-    supplyChainAttackChallenge()
+    checks.push(supplyChainAttackChallenge(scope))
   }
   if (challengeUtils.notSolved(challenges.dlpPastebinDataLeakChallenge)) {
-    dlpPastebinDataLeakChallenge()
+    checks.push(dlpPastebinDataLeakChallenge(scope))
   }
   if (challengeUtils.notSolved(challenges.csafChallenge)) {
-    csafChallenge()
+    checks.push(csafChallenge(scope))
   }
   if (challengeUtils.notSolved(challenges.leakedApiKeyChallenge)) {
-    leakedApiKeyChallenge()
+    checks.push(leakedApiKeyChallenge(scope))
   }
   if (challengeUtils.notSolved(challenges.vulnerableDockerImageChallenge)) {
-    vulnerableDockerImageChallenge()
+    checks.push(vulnerableDockerImageChallenge(scope))
   }
-  if (challengeUtils.notSolved(challenges.systemPromptExtractionChallenge)) {
-    void systemPromptExtractionChallenge()
-  }
-  next()
+  return checks
 }
 
-function changeProductChallenge (osaft: Product) {
+export async function verifyDatabaseRelatedChallenges (): Promise<void> {
+  const checks: Array<Promise<void>> = []
+  if (challengeUtils.notSolved(challenges.changeProductChallenge) && products.osaft) {
+    checks.push(changeProductChallenge(products.osaft))
+  }
+  if (challengeUtils.notSolved(challenges.feedbackChallenge)) {
+    checks.push(feedbackChallenge())
+  }
+  checks.push(...patternChallengeChecks())
+  if (challengeUtils.notSolved(challenges.systemPromptExtractionChallenge)) {
+    checks.push(systemPromptExtractionChallenge())
+  }
+  await Promise.allSettled(checks)
+}
+
+async function verifyFeedback (feedback: FeedbackModel) {
+  await Promise.allSettled(patternChallengeChecks({ feedbackId: feedback.id }))
+}
+
+async function verifyComplaint (complaint: ComplaintModel) {
+  const checks = patternChallengeChecks({ complaintId: complaint.id })
+  if (challengeUtils.notSolved(challenges.systemPromptExtractionChallenge)) {
+    solveSystemPromptExtractionIfLeaked([complaint.message])
+  }
+  await Promise.allSettled(checks)
+}
+
+async function verifyFiveStarFeedbackRemoval () {
+  if (challengeUtils.notSolved(challenges.feedbackChallenge)) {
+    await feedbackChallenge().catch(() => {})
+  }
+}
+
+async function verifyProductTampering (productId?: number) {
+  const osaft = products.osaft
+  if (osaft && challengeUtils.notSolved(challenges.changeProductChallenge) && (productId === undefined || productId === osaft.id)) {
+    await changeProductChallenge(osaft).catch(() => {})
+  }
+}
+
+const hookName = 'databaseRelatedChallenges'
+
+/* Challenge checks follow writes to the inspected tables instead of running on every incoming request */
+export function registerDatabaseRelatedChallengeHooks () {
+  FeedbackModel.removeHook('afterCreate', hookName)
+  FeedbackModel.addHook('afterCreate', hookName, verifyFeedback)
+  FeedbackModel.removeHook('afterBulkCreate', hookName)
+  FeedbackModel.addHook('afterBulkCreate', hookName, async (feedbacks: FeedbackModel[]) => { await Promise.all(feedbacks.map(verifyFeedback)) })
+  FeedbackModel.removeHook('afterUpdate', hookName)
+  FeedbackModel.addHook('afterUpdate', hookName, async (feedback: FeedbackModel) => { await Promise.all([verifyFeedback(feedback), verifyFiveStarFeedbackRemoval()]) })
+  FeedbackModel.removeHook('afterDestroy', hookName)
+  FeedbackModel.addHook('afterDestroy', hookName, async (feedback: FeedbackModel) => {
+    if (feedback.rating === 5) await verifyFiveStarFeedbackRemoval()
+  })
+  FeedbackModel.removeHook('afterBulkUpdate', hookName)
+  FeedbackModel.addHook('afterBulkUpdate', hookName, verifyDatabaseRelatedChallenges)
+  FeedbackModel.removeHook('afterBulkDestroy', hookName)
+  FeedbackModel.addHook('afterBulkDestroy', hookName, verifyFiveStarFeedbackRemoval)
+
+  ComplaintModel.removeHook('afterCreate', hookName)
+  ComplaintModel.addHook('afterCreate', hookName, verifyComplaint)
+  ComplaintModel.removeHook('afterBulkCreate', hookName)
+  ComplaintModel.addHook('afterBulkCreate', hookName, async (complaints: ComplaintModel[]) => { await Promise.all(complaints.map(verifyComplaint)) })
+  ComplaintModel.removeHook('afterUpdate', hookName)
+  ComplaintModel.addHook('afterUpdate', hookName, verifyComplaint)
+  ComplaintModel.removeHook('afterBulkUpdate', hookName)
+  ComplaintModel.addHook('afterBulkUpdate', hookName, verifyDatabaseRelatedChallenges)
+
+  ProductModel.removeHook('afterUpdate', hookName)
+  ProductModel.addHook('afterUpdate', hookName, async (product: ProductModel) => { await verifyProductTampering(product.id) })
+  ProductModel.removeHook('afterBulkUpdate', hookName)
+  ProductModel.addHook('afterBulkUpdate', hookName, async () => { await verifyProductTampering() })
+}
+
+function changeProductChallenge (osaft: Product): Promise<void> {
   let urlForProductTamperingChallenge: string | null = null
-  void osaft.reload().then(() => {
+  return osaft.reload().then(() => {
     for (const product of config.get<ProductConfig[]>('products')) {
       if (product.urlForProductTamperingChallenge !== undefined) {
         urlForProductTamperingChallenge = product.urlForProductTamperingChallenge
@@ -232,8 +311,8 @@ function changeProductChallenge (osaft: Product) {
   })
 }
 
-function feedbackChallenge () {
-  FeedbackModel.findAndCountAll({ where: { rating: 5 } }).then(({ count }: { count: number }) => {
+function feedbackChallenge (): Promise<void> {
+  return FeedbackModel.findAndCountAll({ where: { rating: 5 } }).then(({ count }: { count: number }) => {
     if (count === 0) {
       challengeUtils.solve(challenges.feedbackChallenge)
     }
@@ -242,10 +321,11 @@ function feedbackChallenge () {
   })
 }
 
-function knownVulnerableComponentChallenge () {
-  void checkPatternInFeedbackAndComplaints(
+function knownVulnerableComponentChallenge (scope?: RowScope) {
+  return checkPatternInFeedbackAndComplaints(
     challenges.knownVulnerableComponentChallenge,
-    { [Op.or]: knownVulnerableComponents() }
+    { [Op.or]: knownVulnerableComponents() },
+    scope
   )
 }
 
@@ -266,10 +346,11 @@ function knownVulnerableComponents () {
   ]
 }
 
-function weirdCryptoChallenge () {
-  void checkPatternInFeedbackAndComplaints(
+function weirdCryptoChallenge (scope?: RowScope) {
+  return checkPatternInFeedbackAndComplaints(
     challenges.weirdCryptoChallenge,
-    { [Op.or]: weirdCryptos() }
+    { [Op.or]: weirdCryptos() },
+    scope
   )
 }
 
@@ -283,31 +364,35 @@ function weirdCryptos () {
   ]
 }
 
-function typosquattingNpmChallenge () {
-  void checkPatternInFeedbackAndComplaints(
+function typosquattingNpmChallenge (scope?: RowScope) {
+  return checkPatternInFeedbackAndComplaints(
     challenges.typosquattingNpmChallenge,
-    { [Op.like]: '%epilogue-js%' }
+    { [Op.like]: '%epilogue-js%' },
+    scope
   )
 }
 
-function typosquattingAngularChallenge () {
-  void checkPatternInFeedbackAndComplaints(
+function typosquattingAngularChallenge (scope?: RowScope) {
+  return checkPatternInFeedbackAndComplaints(
     challenges.typosquattingAngularChallenge,
-    { [Op.like]: '%ngy-cookie%' }
+    { [Op.like]: '%ngy-cookie%' },
+    scope
   )
 }
 
-function hiddenImageChallenge () {
-  void checkPatternInFeedbackAndComplaints(
+function hiddenImageChallenge (scope?: RowScope) {
+  return checkPatternInFeedbackAndComplaints(
     challenges.hiddenImageChallenge,
-    { [Op.like]: '%pickle rick%' }
+    { [Op.like]: '%pickle rick%' },
+    scope
   )
 }
 
-function supplyChainAttackChallenge () {
-  void checkPatternInFeedbackAndComplaints(
+function supplyChainAttackChallenge (scope?: RowScope) {
+  return checkPatternInFeedbackAndComplaints(
     challenges.supplyChainAttackChallenge,
-    { [Op.or]: eslintScopeVulnIds() }
+    { [Op.or]: eslintScopeVulnIds() },
+    scope
   )
 }
 
@@ -318,36 +403,40 @@ function eslintScopeVulnIds () {
   ]
 }
 
-function dlpPastebinDataLeakChallenge () {
-  void checkPatternInFeedbackAndComplaints(
+function dlpPastebinDataLeakChallenge (scope?: RowScope) {
+  return checkPatternInFeedbackAndComplaints(
     challenges.dlpPastebinDataLeakChallenge,
-    { [Op.and]: dangerousIngredients() }
+    { [Op.and]: dangerousIngredients() },
+    scope
   )
 }
 
-function csafChallenge () {
-  void checkPatternInFeedbackAndComplaints(
+function csafChallenge (scope?: RowScope) {
+  return checkPatternInFeedbackAndComplaints(
     challenges.csafChallenge,
-    { [Op.like]: '%' + config.get<string>('challenges.csafHashValue') + '%' }
+    { [Op.like]: '%' + config.get<string>('challenges.csafHashValue') + '%' },
+    scope
   )
 }
 
-function leakedApiKeyChallenge () {
-  void checkPatternInFeedbackAndComplaints(
+function leakedApiKeyChallenge (scope?: RowScope) {
+  return checkPatternInFeedbackAndComplaints(
     challenges.leakedApiKeyChallenge,
-    { [Op.like]: '%6PPi37DBxP4lDwlriuaxP15HaDJpsUXY5TspVmie%' }
+    { [Op.like]: '%6PPi37DBxP4lDwlriuaxP15HaDJpsUXY5TspVmie%' },
+    scope
   )
 }
 
-function vulnerableDockerImageChallenge () {
-  void checkPatternInFeedbackAndComplaints(
+function vulnerableDockerImageChallenge (scope?: RowScope) {
+  return checkPatternInFeedbackAndComplaints(
     challenges.vulnerableDockerImageChallenge,
     {
       [Op.and]: [
         { [Op.like]: '%mongo%' },
         { [Op.like]: '%4.4.29%' }
       ]
-    }
+    },
+    scope
   )
 }
 
@@ -366,12 +455,13 @@ export function checkSystemPromptSimilarity (submission: string, reference: stri
 }
 
 async function systemPromptExtractionChallenge (): Promise<void> {
-  const reference = buildSystemPrompt().toLowerCase().trim()
   const complaints = await ComplaintModel.findAll().catch(() => [])
-  for (const complaint of complaints) {
-    if (checkSystemPromptSimilarity(complaint.message ?? '', reference)) {
-      challengeUtils.solveIf(challenges.systemPromptExtractionChallenge, () => true)
-      return
-    }
+  solveSystemPromptExtractionIfLeaked(complaints.map(complaint => complaint.message))
+}
+
+function solveSystemPromptExtractionIfLeaked (messages: Array<string | undefined>) {
+  const reference = buildSystemPrompt().toLowerCase().trim()
+  if (messages.some(message => checkSystemPromptSimilarity(message ?? '', reference))) {
+    challengeUtils.solveIf(challenges.systemPromptExtractionChallenge, () => true)
   }
 }

@@ -492,9 +492,6 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
     security.isAuthorized(),
     utils.asyncHandler(twoFactorAuth.disable)
   )
-  /* Verifying DB related challenges can be postponed until the next request for challenges is coming via finale */
-  app.use(verify.databaseRelatedChallenges())
-
   // vuln-code-snippet start registerAdminChallenge
   /* Generated API endpoints */
   finale.initialize({ app, sequelize: seq })
@@ -755,6 +752,8 @@ export async function start (readyCallback?: () => void) {
   await sequelize.sync({ force: true })
   await preconditionsReady
   await datacreator()
+  verify.registerDatabaseRelatedChallengeHooks() // vuln-code-snippet hide-line
+  await verify.verifyDatabaseRelatedChallenges() // vuln-code-snippet hide-line
   datacreatorEnd()
   const port = process.env.PORT ?? config.get('server.port')
   process.env.BASE_PATH = process.env.BASE_PATH ?? config.get('server.basePath')
@@ -805,6 +804,8 @@ export async function createApp (options?: { inMemoryDb?: boolean }) {
   configureApp(testApp, seq)
   await seq.sync({ force: true })
   await datacreator()
+  verify.registerDatabaseRelatedChallengeHooks()
+  await verify.verifyDatabaseRelatedChallenges()
   return { app: testApp, sequelize: seq }
 }
 
