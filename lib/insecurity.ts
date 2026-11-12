@@ -183,6 +183,19 @@ export const appendUserId = () => {
   }
 }
 
+// Stores the user id outside req.body, because multipart parsers such as multer replace req.body when they run.
+export const bindAuthenticatedUserId = () => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const userId = authenticatedUsers.tokenMap[utils.jwtFrom(req)]?.data?.id
+    if (userId === undefined || userId === null) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' })
+      return
+    }
+    res.locals.authenticatedUserId = userId
+    next()
+  }
+}
+
 export const updateAuthenticatedUsers = () => (req: Request, res: Response, next: NextFunction) => {
   const token = req.cookies.token || utils.jwtFrom(req)
   if (token && authenticatedUsers.get(token) === undefined) {
