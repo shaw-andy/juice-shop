@@ -12,23 +12,24 @@ import * as security from '../lib/insecurity'
 export function imageCaptchas () {
   return async (req: Request, res: Response) => {
     try {
-      const { default: svgCaptcha } = await import('svg-captcha')
-      const captcha = svgCaptcha.create({ size: 5, noise: 2, color: true })
-
       const user = security.authenticatedUsers.from(req)
       if (!user) {
         res.status(401).send(res.__('You need to be logged in to request a CAPTCHA.'))
         return
       }
 
-      const imageCaptcha = {
+      const { default: svgCaptcha } = await import('svg-captcha')
+      const captcha = svgCaptcha.create({ size: 5, noise: 2, color: true })
+
+      await ImageCaptchaModel.upsert(
+        { UserId: user.data.id, answer: captcha.text, createdAt: new Date() },
+        { conflictFields: ['UserId'] }
+      )
+      res.json({
         image: captcha.data,
         answer: captcha.text,
         UserId: user.data.id
-      }
-      const imageCaptchaInstance = ImageCaptchaModel.build(imageCaptcha)
-      await imageCaptchaInstance.save()
-      res.json(imageCaptcha)
+      })
     } catch (error) {
       res.status(400).send(res.__('Unable to create CAPTCHA. Please try again.'))
     }
@@ -39,17 +40,24 @@ export const verifyImageCaptcha = () => async (req: Request, res: Response, next
   try {
     const user = security.authenticatedUsers.from(req)
     const UserId = user ? user.data ? user.data.id : undefined : undefined
-    const captchas = await ImageCaptchaModel.findAll({
-      limit: 1,
+    const captcha = await ImageCaptchaModel.findOne({
       where: {
         UserId,
         createdAt: {
           [Op.gt]: new Date(Date.now() - 300000)
         }
-      },
-      order: [['createdAt', 'DESC']]
+      }
     })
-    if (!captchas[0] || req.body.answer === captchas[0].answer) {
+    if (!captcha) {
+      next()
+      return
+    }
+    if (req.body.answer !== captcha.answer) {
+      res.status(401).send(res.__('Wrong answer to CAPTCHA. Please try again.'))
+      return
+    }
+    const consumed = await ImageCaptchaModel.destroy({ where: { id: captcha.id, answer: captcha.answer } })
+    if (consumed === 1) {
       next()
     } else {
       res.status(401).send(res.__('Wrong answer to CAPTCHA. Please try again.'))

@@ -17,7 +17,7 @@ InferAttributes<ImageCaptcha>,
 InferCreationAttributes<ImageCaptcha>
 > {
   declare id: CreationOptional<number>
-  declare image: string
+  declare image: CreationOptional<string>
   declare answer: string
   declare UserId: number
   declare createdAt: CreationOptional<Date>
@@ -31,9 +31,9 @@ const ImageCaptchaModelInit = (sequelize: Sequelize) => {
         primaryKey: true,
         autoIncrement: true
       },
-      image: DataTypes.STRING,
+      image: { type: DataTypes.STRING, defaultValue: '' }, // the SVG is only sent to the client, never persisted
       answer: DataTypes.STRING,
-      UserId: { type: DataTypes.INTEGER },
+      UserId: { type: DataTypes.INTEGER, unique: true },
       createdAt: DataTypes.DATE
     },
     {
