@@ -42,7 +42,7 @@ const SecurityAnswerModelInit = (sequelize: Sequelize) => {
       answer: {
         type: DataTypes.STRING,
         set (answer: string) {
-          this.setDataValue('answer', security.hmac(answer))
+          this.setDataValue('answer', security.hashSecurityAnswer(answer))
         }
       }
     },

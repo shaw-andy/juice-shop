@@ -196,11 +196,32 @@ void describe('insecurity', () => {
     })
   })
 
-  void describe('hmac', () => {
-    void it('returns SHA-256 HMAC with "pa4qacea4VK9t9nGv7yZtwmj" as salt any input string', () => {
-      assert.equal(security.hmac('admin123'), '6be13e2feeada221f29134db71c0ab0be0e27eccfc0fb436ba4096ba73aafb20')
-      assert.equal(security.hmac('password'), 'da28fc4354f4a458508a461fbae364720c4249c27f10fccf68317fc4bf6531ed')
-      assert.equal(security.hmac(''), 'f052179ec5894a2e79befa8060cfcb517f1e14f7f6222af854377b6481ae953e')
+  void describe('hashSecurityAnswer', () => {
+    void it('returns a salted hash that differs for the same answer', () => {
+      const first = security.hashSecurityAnswer('placeholder-answer')
+      const second = security.hashSecurityAnswer('placeholder-answer')
+      assert.match(first, /^[0-9a-f]{32}:[0-9a-f]{64}$/)
+      assert.notEqual(first, second)
+    })
+  })
+
+  void describe('verifySecurityAnswer', () => {
+    void it('accepts the hashed answer', () => {
+      assert.equal(security.verifySecurityAnswer('placeholder-answer', security.hashSecurityAnswer('placeholder-answer')), true)
+      assert.equal(security.verifySecurityAnswer('', security.hashSecurityAnswer('')), true)
+    })
+
+    void it('rejects a different answer', () => {
+      assert.equal(security.verifySecurityAnswer('placeholder-other', security.hashSecurityAnswer('placeholder-answer')), false)
+    })
+
+    void it('rejects non-string answers and malformed stored values', () => {
+      const stored = security.hashSecurityAnswer('placeholder-answer')
+      assert.equal(security.verifySecurityAnswer(['placeholder-answer'], stored), false)
+      assert.equal(security.verifySecurityAnswer(undefined, stored), false)
+      assert.equal(security.verifySecurityAnswer('placeholder-answer', ''), false)
+      assert.equal(security.verifySecurityAnswer('placeholder-answer', 'abc'), false)
+      assert.equal(security.verifySecurityAnswer('placeholder-answer', stored.split(':')[0] + ':00'), false)
     })
   })
 

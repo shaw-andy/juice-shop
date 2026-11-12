@@ -39,7 +39,23 @@ interface IAuthenticatedUsers {
 }
 
 export const hash = (data: string) => crypto.createHash('md5').update(data).digest('hex')
-export const hmac = (data: string) => crypto.createHmac('sha256', 'pa4qacea4VK9t9nGv7yZtwmj').update(data).digest('hex')
+// Security answers are re-created on every startup, so a per-process key never has to outlive the database
+const securityAnswerKey = crypto.randomBytes(32)
+const securityAnswerDigest = (answer: string, salt: Buffer) => crypto.scryptSync(crypto.createHmac('sha256', securityAnswerKey).update(answer).digest(), salt, 32)
+
+export const hashSecurityAnswer = (answer: string) => {
+  const salt = crypto.randomBytes(16)
+  return `${salt.toString('hex')}:${securityAnswerDigest(answer, salt).toString('hex')}`
+}
+
+export const verifySecurityAnswer = (answer: unknown, stored: string) => {
+  if (typeof answer !== 'string' || typeof stored !== 'string') return false
+  const [salt, digest] = stored.split(':')
+  if (!salt || !digest) return false
+  const expected = Buffer.from(digest, 'hex')
+  if (expected.length !== 32) return false
+  return crypto.timingSafeEqual(securityAnswerDigest(answer, Buffer.from(salt, 'hex')), expected)
+}
 
 export const cutOffPoisonNullByte = (str: string) => {
   const nullByte = '%00'

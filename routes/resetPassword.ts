@@ -38,7 +38,7 @@ export function resetPassword () {
           where: { email }
         }]
       })
-      if ((data != null) && security.hmac(answer) === data.answer) {
+      if ((data != null) && security.verifySecurityAnswer(answer, data.answer)) {
         const user = await UserModel.findByPk(data.UserId)
         if (user) {
           const updatedUser = await user.update({ password: newPassword })
