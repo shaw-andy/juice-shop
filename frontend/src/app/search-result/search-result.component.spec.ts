@@ -215,10 +215,11 @@ describe('SearchResultComponent', () => {
         expect(component.dataSource.filter).toEqual('product search')
     })
 
-    it('should pass the search query as trusted HTML', () => {
+    it('should keep the search query as plain text without bypassing sanitization', () => {
         activatedRoute.setQueryParameter('<script>scripttag</script>')
         component.filterTable()
-        expect(sanitizer.bypassSecurityTrustHtml).toHaveBeenCalledWith('<script>scripttag</script>')
+        expect(component.searchValue).toBe('<script>scripttag</script>')
+        expect(sanitizer.bypassSecurityTrustHtml).not.toHaveBeenCalledWith('<script>scripttag</script>')
     })
 
     describe('template rendering', () => {
