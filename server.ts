@@ -86,7 +86,7 @@ import { saveLoginIp } from './routes/saveLoginIp'
 import { serveKeyFiles } from './routes/keyServer'
 import * as basketItems from './routes/basketItems'
 import { performRedirect } from './routes/redirect'
-import { serveEasterEgg } from './routes/easterEgg'
+import { easterEggPath, serveEasterEgg, serveEasterEggAsset } from './routes/easterEgg'
 import { getLanguageList } from './routes/languages'
 import { getUserProfile } from './routes/userProfile'
 import { serveAngularClient } from './routes/angular'
@@ -281,6 +281,25 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
     } else {
       express.static('infrastructure')(req, res, next)
     }
+  })
+
+  /* Private assets are served only by their dedicated routes, never from the static frontend root */
+  const frontendRoot = path.resolve('frontend/dist/frontend')
+  const privateAssetsDir = path.join(frontendRoot, 'assets', 'private').toLowerCase()
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    let requestedPath: string
+    try {
+      requestedPath = decodeURIComponent(req.path)
+    } catch {
+      next()
+      return
+    }
+    const resolved = path.join(frontendRoot, path.normalize('.' + path.sep + requestedPath)).toLowerCase()
+    if (resolved === privateAssetsDir || resolved.startsWith(privateAssetsDir + path.sep)) {
+      res.status(404).end()
+      return
+    }
+    next()
   })
 
   // vuln-code-snippet start directoryListingChallenge accessLogDisclosureChallenge
@@ -667,7 +686,8 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.post('/b2b/v2/orders', b2bOrder())
 
   /* File Serving */
-  app.get('/the/devs/are/so/funny/they/hid/an/easter/egg/within/the/easter/egg', serveEasterEgg())
+  app.get(easterEggPath, serveEasterEgg())
+  app.get(easterEggPath + '/:file', serveEasterEggAsset())
   app.get('/this/page/is/hidden/behind/an/incredibly/high/paywall/that/could/only/be/unlocked/by/sending/1btc/to/us', servePremiumContent())
   app.get('/we/may/also/instruct/you/to/refuse/all/reasonably/necessary/responsibility', servePrivacyPolicyProof())
 

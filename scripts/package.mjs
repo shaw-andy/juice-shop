@@ -80,6 +80,7 @@ const files = await glob([
   'data/static/**',
   'encryptionkeys/**',
   'frontend/dist/frontend/**',
+  'frontend/dist/private/**',
   'frontend/dist/bom/**',
   'frontend/src/**/*.ts',
   'ftp/**',

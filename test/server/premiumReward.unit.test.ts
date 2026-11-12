@@ -22,11 +22,11 @@ void describe('premiumReward', () => {
     })
   })
 
-  void it('should serve /frontend/dist/frontend/assets/private/JuiceShop_Wallpaper_1920x1080_VR.jpg', () => {
+  void it('should serve /frontend/dist/private/JuiceShop_Wallpaper_1920x1080_VR.jpg', () => {
     servePremiumContent()(req, res)
 
     assert.equal(res.sendFile.mock.calls.length, 1)
-    assert.match(res.sendFile.mock.calls[0].arguments[0], /frontend[/\\]dist[/\\]frontend[/\\]assets[/\\]private[/\\]JuiceShop_Wallpaper_1920x1080_VR\.jpg/)
+    assert.match(res.sendFile.mock.calls[0].arguments[0], /frontend[/\\]dist[/\\]private[/\\]JuiceShop_Wallpaper_1920x1080_VR\.jpg/)
   })
 
   void it('should solve "premiumPaywallChallenge"', () => {

@@ -2,15 +2,15 @@
 <html>
 <head>
     <title>Welcome to Planet Orangeuze</title>
-    <script src="/assets/private/three.js"></script>
-    <script src="/assets/private/OrbitControls.js"></script>
-    <script src="/assets/private/dat.gui.min.js"></script>
-    <script src="/assets/private/stats.min.js"></script>
-    <script src="/assets/private/EffectComposer.js"></script>
-    <script src="/assets/private/RenderPass.js"></script>
-    <script src="/assets/private/CopyShader.js"></script>
-    <script src="/assets/private/ShaderPass.js"></script>
-    <script src="/assets/private/MaskPass.js"></script>
+    <script src="/the/devs/are/so/funny/they/hid/an/easter/egg/within/the/easter/egg/three.js"></script>
+    <script src="/the/devs/are/so/funny/they/hid/an/easter/egg/within/the/easter/egg/OrbitControls.js"></script>
+    <script src="/the/devs/are/so/funny/they/hid/an/easter/egg/within/the/easter/egg/dat.gui.min.js"></script>
+    <script src="/the/devs/are/so/funny/they/hid/an/easter/egg/within/the/easter/egg/stats.min.js"></script>
+    <script src="/the/devs/are/so/funny/they/hid/an/easter/egg/within/the/easter/egg/EffectComposer.js"></script>
+    <script src="/the/devs/are/so/funny/they/hid/an/easter/egg/within/the/easter/egg/RenderPass.js"></script>
+    <script src="/the/devs/are/so/funny/they/hid/an/easter/egg/within/the/easter/egg/CopyShader.js"></script>
+    <script src="/the/devs/are/so/funny/they/hid/an/easter/egg/within/the/easter/egg/ShaderPass.js"></script>
+    <script src="/the/devs/are/so/funny/they/hid/an/easter/egg/within/the/easter/egg/MaskPass.js"></script>
     <style>
         body {
             margin: 0;
@@ -86,7 +86,7 @@ function init() {
     cameraBG.position.z = 50;
     sceneBG = new THREE.Scene();
 
-    var materialColor = new THREE.MeshBasicMaterial({ map: THREE.ImageUtils.loadTexture("/assets/private/starry_background.avif"), depthTest: false });
+    var materialColor = new THREE.MeshBasicMaterial({ map: THREE.ImageUtils.loadTexture("/the/devs/are/so/funny/they/hid/an/easter/egg/within/the/easter/egg/starry_background.avif"), depthTest: false });
     var bgPlane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), materialColor);
     bgPlane.position.z = -100;
     bgPlane.scale.set(window.innerWidth * 2, window.innerHeight * 2, 1);
@@ -110,9 +110,9 @@ function init() {
 
 
 function createOrangeMaterial() {
-    var orangeTexture = THREE.ImageUtils.loadTexture("/assets/private/orangemap2k.avif");
-    var specularMap = THREE.ImageUtils.loadTexture("/assets/private/earthspec4k.avif");
-    var normalMap = THREE.ImageUtils.loadTexture("/assets/private/earth_normalmap_flat4k.avif");
+    var orangeTexture = THREE.ImageUtils.loadTexture("/the/devs/are/so/funny/they/hid/an/easter/egg/within/the/easter/egg/orangemap2k.avif");
+    var specularMap = THREE.ImageUtils.loadTexture("/the/devs/are/so/funny/they/hid/an/easter/egg/within/the/easter/egg/earthspec4k.avif");
+    var normalMap = THREE.ImageUtils.loadTexture("/the/devs/are/so/funny/they/hid/an/easter/egg/within/the/easter/egg/earth_normalmap_flat4k.avif");
 
     var orangeMaterial = new THREE.MeshPhongMaterial();
     orangeMaterial.map = orangeTexture;
@@ -127,7 +127,7 @@ function createOrangeMaterial() {
 }
 
 function createCloudMaterial() {
-    var cloudTexture = THREE.ImageUtils.loadTexture("/assets/private/fair_clouds_4k.avif");
+    var cloudTexture = THREE.ImageUtils.loadTexture("/the/devs/are/so/funny/they/hid/an/easter/egg/within/the/easter/egg/fair_clouds_4k.avif");
 
     var cloudMaterial = new THREE.MeshPhongMaterial();
     cloudMaterial.map = cloudTexture;
