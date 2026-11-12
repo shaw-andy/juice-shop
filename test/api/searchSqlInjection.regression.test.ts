@@ -73,9 +73,9 @@ async function assertLiteralSearch (q: string) {
   assert.equal(res.status, 200)
   assert.equal(raw.includes('SQLITE_ERROR'), false)
   assert.equal(raw.toLowerCase().includes('syntax error'), false)
+  await assertStoredValuesAbsent(raw)
   assert.equal(raw.includes('CREATE TABLE'), false)
   assert.equal(Array.isArray(res.body?.data) ? res.body.data.length : -1, 0)
-  await assertStoredValuesAbsent(raw)
 }
 
 void describe('unauthenticated product search query binding', () => {
