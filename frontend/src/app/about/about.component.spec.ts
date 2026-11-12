@@ -168,6 +168,15 @@ describe('AboutComponent', () => {
         expect(component.galleryRef).toBe(galleryRef)
     })
 
+    it('does not mark customer feedback as trusted HTML on the carousel', () => {
+        feedbackService.find.mockReturnValue(of([{ comment: 'placeholder comment', rating: 1 }]))
+        sanitizer.bypassSecurityTrustHtml.mockClear()
+
+        component.populateSlideshowFromFeedbacks()
+
+        expect(sanitizer.bypassSecurityTrustHtml).not.toHaveBeenCalled()
+    })
+
     it('should add an image to the gallery for each feedback with formatted comment and stars', () => {
         feedbackService.find.mockReturnValue(of([{ comment: 'Great!', rating: 3 }]))
 

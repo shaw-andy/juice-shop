@@ -106,6 +106,13 @@ describe('AdministrationComponent', () => {
         expect(component.feedbackDataSource.data[1].comment.toString()).toContain('Feedback2')
     })
 
+    it('does not mark customer feedback as trusted HTML', () => {
+        component.findAllFeedbacks()
+        for (const row of component.feedbackDataSource.data) {
+            expect(typeof row.comment).toBe('string')
+        }
+    })
+
     it('should give an error if FeedbackService fails to find all feedbacks', () => {
         vi.spyOn(console, 'log').mockImplementation(() => {})
         feedbackService.find.mockReturnValue(throwError('Error'))
