@@ -4,6 +4,7 @@
  */
 
 import { type Request, type Response, type NextFunction } from 'express'
+import { BasketModel } from '../models/basket'
 import { BasketItemModel } from '../models/basketitem'
 import { QuantityModel } from '../models/quantity'
 import * as challengeUtils from '../lib/challengeUtils'
@@ -14,6 +15,32 @@ import * as security from '../lib/insecurity'
 
 interface RequestWithRawBody extends Request {
   rawBody: string
+}
+
+async function ownBasketIds (req: Request): Promise<number[]> {
+  const userId = security.authenticatedUsers.from(req)?.data?.id
+  if (userId == null) return []
+  const baskets = await BasketModel.findAll({ where: { UserId: userId }, attributes: ['id'] })
+  return baskets.map(basket => basket.id)
+}
+
+export function filterOwnBasketItems () {
+  return async (req: Request, res: Response, context: { instance: BasketItemModel[], continue: any }) => {
+    const basketIds = await ownBasketIds(req)
+    context.instance = context.instance.filter(item => basketIds.includes(item.BasketId))
+    return context.continue
+  }
+}
+
+export function requireOwnBasketItem () {
+  return async (req: Request, res: Response, context: { instance: BasketItemModel, continue: any, error: (status: number, message: string) => void }) => {
+    const basketIds = await ownBasketIds(req)
+    if (!basketIds.includes(context.instance.BasketId)) {
+      context.error(404, 'Not Found')
+      return
+    }
+    return context.continue
+  }
 }
 
 export function addBasketItem () {
@@ -65,7 +92,7 @@ export function quantityCheckBeforeBasketItemAddition () {
 export function quantityCheckBeforeBasketItemUpdate () {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const item = await BasketItemModel.findOne({ where: { id: req.params.id } })
+      const item = await BasketItemModel.findOne({ where: { id: req.params.id, BasketId: await ownBasketIds(req) } })
       const user = security.authenticatedUsers.from(req)
       challengeUtils.solveIf(challenges.basketManipulateChallenge, () => { return user && req.body.BasketId && user.bid != req.body.BasketId }) // eslint-disable-line eqeqeq
       if (req.body.quantity) {

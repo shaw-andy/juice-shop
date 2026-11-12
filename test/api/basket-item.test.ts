@@ -48,6 +48,19 @@ void describe('/api/BasketItems', () => {
     assert.equal(res.status, 200)
   })
 
+  void it('GET all basket items only lists items of own basket', async () => {
+    const res = await request(app).get('/api/BasketItems').set(authHeader)
+    assert.equal(res.status, 200)
+    assert.ok(res.body.data.length > 0)
+    assert.ok(res.body.data.every((item: { BasketId: number }) => item.BasketId === 2))
+  })
+
+  void it('GET all basket items filtered by basket ID of another user lists nothing', async () => {
+    const res = await request(app).get('/api/BasketItems').query({ BasketId: 1 }).set(authHeader)
+    assert.equal(res.status, 200)
+    assert.deepEqual(res.body.data, [])
+  })
+
   void it('POST new basket item', async () => {
     const res = await request(app)
       .post('/api/BasketItems')
@@ -154,7 +167,7 @@ void describe('/api/BasketItems/:id', () => {
     assert.deepEqual(res.body.errors, [{ field: 'BasketId', message: '`BasketId` cannot be updated due `noUpdate` constraint' }])
   })
 
-  void it('PUT update basket ID of basket item without basket ID', async () => {
+  void it('PUT update basket ID of basket item without basket ID is forbidden', async () => {
     const createRes = await request(app)
       .post('/api/BasketItems')
       .set(authHeader)
@@ -166,8 +179,29 @@ void describe('/api/BasketItems/:id', () => {
       .put('/api/BasketItems/' + createRes.body.data.id)
       .set(authHeader)
       .send({ BasketId: 3 })
-    assert.equal(res.status, 200)
-    assert.equal(res.body.data.BasketId, 3)
+    assert.equal(res.status, 404)
+  })
+
+  void it('GET basket item of another user is not found', async () => {
+    const res = await request(app)
+      .get('/api/BasketItems/1')
+      .set(authHeader)
+    assert.equal(res.status, 404)
+  })
+
+  void it('PUT update basket item of another user is forbidden', async () => {
+    const res = await request(app)
+      .put('/api/BasketItems/1')
+      .set(authHeader)
+      .send({ quantity: 1 })
+    assert.equal(res.status, 500)
+  })
+
+  void it('DELETE basket item of another user is not found', async () => {
+    const res = await request(app)
+      .delete('/api/BasketItems/1')
+      .set(authHeader)
+    assert.equal(res.status, 404)
   })
 
   void it('PUT update product ID of basket item is forbidden', async () => {
