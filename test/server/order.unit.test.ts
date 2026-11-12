@@ -226,7 +226,7 @@ void describe('order', () => {
     assert.equal(err, error)
   })
 
-  void it('should handle base64 coupon data in calculateApplicableDiscount', async () => {
+  void it('should not apply an expired campaign coupon even if the client claims its campaign date', async () => {
     const validOn = new Date('Mar 08, 2019 00:00:00 GMT+0100').getTime()
     const couponData = Buffer.from(`WMNSDY2019-${validOn}`).toString('base64')
     req.body.couponData = couponData
@@ -239,7 +239,7 @@ void describe('order', () => {
     }
     mock.method(BasketModel, 'findOne', async () => basket)
     mock.method(security.authenticatedUsers, 'from', () => ({ data: { email: 'test@juice-sh.op' } }))
-    mock.method(db.ordersCollection, 'insert', async () => {})
+    const insert = mock.method(db.ordersCollection, 'insert', async () => {})
     mock.method(BasketItemModel, 'destroy', async () => {})
     mock.method(WalletModel, 'increment', async () => {})
 
@@ -250,7 +250,7 @@ void describe('order', () => {
     placeOrder()(req, res, next)
     await p
 
-    assert.ok(true)
+    assert.equal((insert.mock.calls[0].arguments[0] as any).promotionalAmount, '0')
   })
 
   void it('should call next with error if wallet balance is insufficient', async () => {
