@@ -9,6 +9,8 @@ import request from 'supertest'
 import type { Express } from 'express'
 import { createTestApp } from './helpers/setup'
 import * as security from '../../lib/insecurity'
+import * as challengeUtils from '../../lib/challengeUtils'
+import { challenges } from '../../data/datacache'
 import { ChallengeDependencyModelInit } from '../../models/challengeDependency'
 
 let app: Express
@@ -20,6 +22,13 @@ before(async () => {
   ChallengeDependencyModelInit(result.sequelize)
   await result.sequelize.sync()
 }, { timeout: 60000 })
+
+async function issuedContinueCode (url: string) {
+  const res = await request(app).get(url)
+  assert.equal(res.status, 200)
+  assert.match(res.body.continueCode, /^[a-zA-Z0-9]+$/)
+  return res.body.continueCode
+}
 
 void describe('/api/Challenges', () => {
   void it('GET all challenges', async () => {
@@ -100,15 +109,26 @@ void describe('/rest/continue-code', () => {
   })
 
   void it('PUT continue code for more than one challenge is accepted', async () => {
+    await challengeUtils.solve(challenges.scoreBoardChallenge, true)
+    await challengeUtils.solve(challenges.adminSectionChallenge, true)
+    const continueCode = await issuedContinueCode('/rest/continue-code')
     const res = await request(app)
-      .put('/rest/continue-code/apply/yXjv6Z5jWJnzD6a3YvmwPRXK7roAyzHDde2Og19yEN84plqxkMBbLVQrDeoY')
+      .put('/rest/continue-code/apply/' + continueCode)
     assert.equal(res.status, 200)
   })
 
-  void it('PUT continue code for non-existent challenge #999 is accepted', async () => {
+  void it('PUT continue code that was not issued by the server is rejected', async () => {
     const res = await request(app)
       .put('/rest/continue-code/apply/69OxrZ8aJEgxONZyWoz1Dw4BvXmRGkM6Ae9M7k2rK63YpqQLPjnlb5V5LvDj')
-    assert.equal(res.status, 200)
+    assert.equal(res.status, 404)
+  })
+
+  void it('PUT find-it continue code is rejected', async () => {
+    await challengeUtils.solveFindIt('scoreBoardChallenge', true)
+    const continueCode = await issuedContinueCode('/rest/continue-code-findIt')
+    const res = await request(app)
+      .put('/rest/continue-code/apply/' + continueCode)
+    assert.equal(res.status, 404)
   })
 })
 
@@ -132,9 +152,18 @@ void describe('/rest/continue-code-findIt', () => {
   })
 
   void it('PUT continue code for more than one challenge is accepted', async () => {
+    await challengeUtils.solveFindIt('scoreBoardChallenge', true)
+    await challengeUtils.solveFindIt('adminSectionChallenge', true)
+    const continueCode = await issuedContinueCode('/rest/continue-code-findIt')
+    const res = await request(app)
+      .put('/rest/continue-code-findIt/apply/' + continueCode)
+    assert.equal(res.status, 200)
+  })
+
+  void it('PUT continue code that was not issued by the server is rejected', async () => {
     const res = await request(app)
       .put('/rest/continue-code-findIt/apply/Xg9oK0VdbW5g1KX9G7JYnqLpz3rAPBh6p4eRlkDM6EaBON2QoPmxjyvwMrP6')
-    assert.equal(res.status, 200)
+    assert.equal(res.status, 404)
   })
 })
 
@@ -158,8 +187,17 @@ void describe('/rest/continue-code-fixIt', () => {
   })
 
   void it('PUT continue code for more than one challenge is accepted', async () => {
+    await challengeUtils.solveFixIt('scoreBoardChallenge', true)
+    await challengeUtils.solveFixIt('adminSectionChallenge', true)
+    const continueCode = await issuedContinueCode('/rest/continue-code-fixIt')
+    const res = await request(app)
+      .put('/rest/continue-code-fixIt/apply/' + continueCode)
+    assert.equal(res.status, 200)
+  })
+
+  void it('PUT continue code that was not issued by the server is rejected', async () => {
     const res = await request(app)
       .put('/rest/continue-code-fixIt/apply/y28BEPE2k3yRrdz5p6DGqJONnj41n5UEWawYWgBMoVmL79bKZ8Qve0Xl5QLW')
-    assert.equal(res.status, 200)
+    assert.equal(res.status, 404)
   })
 })

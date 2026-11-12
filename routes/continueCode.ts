@@ -7,6 +7,7 @@ import Hashids from 'hashids/cjs'
 import { type Request, type Response } from 'express'
 import { ChallengeModel } from '../models/challenge'
 import { challenges } from '../data/datacache'
+import { encrypt } from '../lib/continueCodes'
 import { Op } from 'sequelize'
 
 export function continueCode () {
@@ -16,7 +17,7 @@ export function continueCode () {
     for (const challenge of Object.values(challenges)) {
       if (challenge.solved) ids.push(challenge.id)
     }
-    const continueCode = ids.length > 0 ? hashids.encode(ids) : undefined
+    const continueCode = ids.length > 0 ? hashids.encodeHex(encrypt('hacking', ids)) : undefined
     res.json({ continueCode })
   }
 }
@@ -29,7 +30,7 @@ export function continueCodeFindIt () {
     for (const challenge of challenges) {
       ids.push(challenge.id)
     }
-    const continueCode = ids.length > 0 ? hashids.encode(ids) : undefined
+    const continueCode = ids.length > 0 ? hashids.encodeHex(encrypt('findIt', ids)) : undefined
     res.json({ continueCode })
   }
 }
@@ -42,7 +43,7 @@ export function continueCodeFixIt () {
     for (const challenge of challenges) {
       ids.push(challenge.id)
     }
-    const continueCode = ids.length > 0 ? hashids.encode(ids) : undefined
+    const continueCode = ids.length > 0 ? hashids.encodeHex(encrypt('fixIt', ids)) : undefined
     res.json({ continueCode })
   }
 }
