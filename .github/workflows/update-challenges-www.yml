@@ -23,9 +23,10 @@ jobs:
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
       with:
         path: juice-shop
+        persist-credentials: false
     - name: Update challenges.yml
       run: |
-        if [ "${{ github.ref_name }}" = "master" ]; then
+        if [ "$GITHUB_REF_NAME" = "master" ]; then
           DEST_FILE="_data/challenges.yml"
         else
           DEST_FILE="_data/challenges_dev.yml"
@@ -34,7 +35,7 @@ jobs:
         cp juice-shop/data/static/challenges.yml $DEST_FILE
     - name: Update snippets
       run: |
-        if [ "${{ github.ref_name }}" = "master" ]; then
+        if [ "$GITHUB_REF_NAME" = "master" ]; then
           DEST_FILE="_data/snippets.json"
         else
           DEST_FILE="_data/snippets_dev.json"

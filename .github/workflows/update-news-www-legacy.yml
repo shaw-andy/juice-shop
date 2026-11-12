@@ -15,8 +15,19 @@ jobs:
         repository: OWASP/www-project-juice-shop
         branch: master
     - name: Update tab_news.md
+      env:
+        PUBLISHED_AT: ${{ github.event.release.published_at }}
+        TAG_NAME: ${{ github.event.release.tag_name }}
       run: |
-        sed -i 's/<!-- next:juice-shop -->/<!-- next:juice-shop -->\n* ${{ github.event.release.published_at }}: juice-shop [`${{ github.event.release.tag_name }}`](https:\/\/github.com\/juice-shop\/juice-shop\/releases\/tag\/${{ github.event.release.tag_name }})/' tab_news.md
+        awk '
+          BEGIN {
+            marker = "<!-- next:juice-shop -->"
+            entry = "* " ENVIRON["PUBLISHED_AT"] ": juice-shop [`" ENVIRON["TAG_NAME"] "`](https://github.com/juice-shop/juice-shop/releases/tag/" ENVIRON["TAG_NAME"] ")"
+          }
+          (i = index($0, marker)) { $0 = substr($0, 1, i + length(marker) - 1) "\n" entry substr($0, i + length(marker)) }
+          { print }
+        ' tab_news.md > tab_news.md.tmp
+        mv tab_news.md.tmp tab_news.md
     - uses: stefanzweifel/git-auto-commit-action@8621497c8c39c72f3e2a999a26b4ca1b5058a842 #v5.0.1
       with:
         commit_message: "Add juice-shop ${{ github.event.release.tag_name }} release notes to tab_news.md"
