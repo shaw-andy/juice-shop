@@ -54,6 +54,9 @@ const FeedbackModelInit = (sequelize: Sequelize) => {
       rating: {
         type: DataTypes.INTEGER,
         allowNull: false,
+        validate: {
+          isInt: { args: { min: 0, max: 5 }, msg: 'Rating must be an integer from 0 to 5.' }
+        },
         set (rating: number) {
           this.setDataValue('rating', rating)
           challengeUtils.solveIf(challenges.zeroStarsChallenge, () => {
