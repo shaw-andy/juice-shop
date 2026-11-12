@@ -5,6 +5,7 @@
 
 import config from 'config'
 import { type Request, type Response, type NextFunction } from 'express'
+import { generateSecret } from 'otplib'
 
 import type { Memory as MemoryConfig } from '../lib/config.schema'
 import { SecurityAnswerModel } from '../models/securityAnswer'
@@ -41,9 +42,13 @@ export function resetPassword () {
       if ((data != null) && security.hmac(answer) === data.answer) {
         const user = await UserModel.findByPk(data.UserId)
         if (user) {
-          const updatedUser = await user.update({ password: newPassword })
+          const updatedUser = await user.update({
+            password: newPassword,
+            // A reset must not keep a previously exposed second factor usable
+            ...(user.totpSecret !== '' && { totpSecret: generateSecret() })
+          })
           verifySecurityAnswerChallenges(updatedUser, answer)
-          res.json({ user: updatedUser })
+          res.json({ status: 'success' })
         }
       } else {
         res.status(401).send(res.__('Wrong answer to security question.'))
