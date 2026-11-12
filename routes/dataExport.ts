@@ -105,7 +105,9 @@ export function dataExport () {
         for (const order of userData.orders) {
           challengeUtils.solveIf(challenges.dataExportChallenge, () => { return order.orderId.split('-')[0] !== emailHash })
         }
-        res.status(200).send({ userData: JSON.stringify(userData, null, 2), confirmation: 'Your data export will open in a new Browser window.' })
+        const userDataJson = JSON.stringify(userData, null, 2)
+          .replace(/[<>&]/g, (char) => '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0'))
+        res.status(200).send({ userData: userDataJson, confirmation: 'Your data export will open in a new Browser window.' })
       } else {
         next(new Error('Blocked illegal activity by ' + req.socket.remoteAddress))
       }
