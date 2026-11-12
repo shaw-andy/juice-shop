@@ -103,6 +103,10 @@ resource "aws_ecs_service" "juice_shop" {
   desired_count   = var.desired_count
   launch_type     = "FARGATE"
 
+  # Tasks do not share the shop database, so a deployment must stop the old task before starting its replacement.
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 100
+
   network_configuration {
     subnets          = aws_subnet.public[*].id
     security_groups  = [aws_security_group.ecs.id]

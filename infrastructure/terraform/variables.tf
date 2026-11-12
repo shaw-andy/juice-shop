@@ -43,7 +43,12 @@ variable "task_memory" {
 variable "desired_count" {
   description = "Number of ECS task instances"
   type        = number
-  default     = 2
+  default     = 1
+
+  validation {
+    condition     = var.desired_count == 0 || var.desired_count == 1
+    error_message = "desired_count must be 0 or 1: every task keeps its own copy of the shop database, so additional tasks would serve diverging accounts, wallets, baskets, orders and reviews."
+  }
 }
 
 variable "node_env" {
