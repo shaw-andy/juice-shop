@@ -12,6 +12,7 @@ import { login } from './helpers/auth'
 import { challenges } from '../../data/datacache'
 import * as security from '../../lib/insecurity'
 import * as utils from '../../lib/utils'
+import { UserModel } from '../../models/user'
 
 let app: Express
 let authHeader: Record<string, string>
@@ -19,7 +20,8 @@ let authHeader: Record<string, string>
 before(async () => {
   const result = await createTestApp()
   app = result.app
-  authHeader = { Authorization: `Bearer ${security.authorize()}`, 'content-type': 'application/json' }
+  const admin = await UserModel.findOne({ where: { role: security.roles.admin } })
+  authHeader = { Authorization: `Bearer ${security.authorize({ data: { id: admin?.id, email: admin?.email, role: admin?.role } })}`, 'content-type': 'application/json' }
 }, { timeout: 60000 })
 
 const jsonHeader = { 'content-type': 'application/json' }

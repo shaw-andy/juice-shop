@@ -11,13 +11,16 @@ import * as security from '../../lib/insecurity'
 import config from 'config'
 import { createTestApp } from './helpers/setup'
 import { login } from './helpers/auth'
+import { UserModel } from '../../models/user'
 
 let app: Express
-const authHeader = { Authorization: `Bearer ${security.authorize({ data: { email: 'admin@juice-sh.op' } })}`, 'content-type': 'application/json' }
+let authHeader: Record<string, string>
 
 before(async () => {
   const result = await createTestApp()
   app = result.app
+  const admin = await UserModel.findOne({ where: { email: `admin@${config.get<string>('application.domain')}` } })
+  authHeader = { Authorization: `Bearer ${security.authorize({ data: { id: admin?.id, email: admin?.email, role: admin?.role } })}`, 'content-type': 'application/json' }
 }, { timeout: 60000 })
 
 void describe('/rest/user/authentication-details', () => {

@@ -54,6 +54,21 @@ export const denyAll = () => expressJwt({ secret: '' + Math.random() } as any)
 export const authorize = (user = {}) => jwt.sign(user, privateKey, { expiresIn: '6h', algorithm: 'RS256' })
 export const verify = (token: string) => token ? (jws.verify as ((token: string, secret: string) => boolean))(token, publicKey) : false
 export const decode = (token: string) => { return jws.decode(token)?.payload }
+// Unlike isAuthorized() and verify(), this rejects unsigned tokens and any algorithm other than RS256
+export const verifiedPayload = (token?: string) => {
+  const parts = token?.split('.') ?? []
+  if (parts.length !== 3 || parts.some((part) => part.length === 0)) return undefined
+  const [header, payload, signature] = parts
+  try {
+    if (JSON.parse(Buffer.from(header, 'base64url').toString()).alg !== 'RS256') return undefined
+    if (!crypto.verify('RSA-SHA256', Buffer.from(`${header}.${payload}`), publicKey, Buffer.from(signature, 'base64url'))) return undefined
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString())
+    if (typeof claims?.exp === 'number' && claims.exp * 1000 <= Date.now()) return undefined
+    return claims
+  } catch {
+    return undefined
+  }
+}
 
 export const sanitizeHtml = (html: string) => sanitizeHtmlLib(html)
 export const sanitizeLegacy = (input = '') => input.replace(/<(?:\w+)\W+?[\w]/gi, '')
