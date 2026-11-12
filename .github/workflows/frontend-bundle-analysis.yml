@@ -5,9 +5,13 @@ on:
       - v*
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   NODE_DEFAULT_VERSION: 24
   NODE_OPTIONS: "--max_old_space_size=4096"
+  PLAYWRIGHT_VERSION: '1.65.0'
 
 jobs:
   bundle-analysis:
@@ -15,6 +19,8 @@ jobs:
     steps:
       - name: "Check out Git repository"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+        with:
+          persist-credentials: false
 
       - name: "Use Node.js ${{ env.NODE_DEFAULT_VERSION }}"
         uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af #v4.1.0
@@ -37,7 +43,7 @@ jobs:
           npm run bundle-visualizer
 
       - name: "Install Playwright for screenshot"
-        run: npm install playwright
+        run: npm install --ignore-scripts --no-save playwright@${{ env.PLAYWRIGHT_VERSION }}
 
       - name: "Take screenshot of bundle report"
         run: |
@@ -56,11 +62,41 @@ jobs:
             })();
           "
 
+      - name: "Upload screenshot"
+        uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b #v4.5.0
+        with:
+          name: bundle-analysis-screenshot
+          path: screenshots/bundle-analysis.png
+          if-no-files-found: error
+
+  # Kept separate so no code installed from the registry runs while the push credential is available
+  commit-screenshot:
+    needs: bundle-analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: "Check out Git repository"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+
+      - name: "Download screenshot"
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 #v4.1.8
+        with:
+          name: bundle-analysis-screenshot
+          path: ${{ runner.temp }}/bundle-analysis-screenshot
+
       - name: "Commit and push screenshot to master"
+        env:
+          SCREENSHOT: ${{ runner.temp }}/bundle-analysis-screenshot/bundle-analysis.png
         run: |
+          if [ -L "$SCREENSHOT" ] || [ ! -f "$SCREENSHOT" ] || [ "$(head -c 8 "$SCREENSHOT" | od -An -tx1 | tr -d ' \n')" != "89504e470d0a1a0a" ]; then
+            echo "Downloaded screenshot is not a regular PNG file"
+            exit 1
+          fi
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git checkout master || git checkout -b master
+          cp "$SCREENSHOT" screenshots/bundle-analysis.png
           git add screenshots/bundle-analysis.png
           git diff --quiet && git diff --staged --quiet || git commit -m "📸 Update bundle analysis screenshot" -s
           git push origin master

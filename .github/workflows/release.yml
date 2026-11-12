@@ -6,9 +6,13 @@ on:
 env:
   CYCLONEDX_NPM_VERSION: '^2.0.0||^3.0.0||^4.0.0'   # keep in sync with package.json
   TYPESCRIPT_VERSION: '^6.0.3'                      # keep in sync with package.json
+permissions:
+  contents: read
 jobs:
   create-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: "Check out Git repository"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
@@ -45,6 +49,8 @@ jobs:
     steps:
       - name: "Check out Git repository"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+        with:
+          persist-credentials: false
       - name: "Use Node.js ${{ matrix.node-version }}"
         uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af #v4.1.0
         with:
@@ -65,7 +71,27 @@ jobs:
         run: |
           npm install --production
           npm run package:ci
-      - name: 'Attach packaged archive to tag release'
+      - name: "Upload packaged archive"
+        uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b #v4.5.0
+        with:
+          name: package-${{ matrix.os.pckg-os }}-${{ matrix.os.cpu-arch }}-node${{ matrix.node-version }}
+          path: dist/*
+          if-no-files-found: error
+  # Kept separate so no code installed from the registry runs while a write-capable token is available
+  attach-packages:
+    needs: package
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: "Download packaged archives"
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 #v4.1.8
+        with:
+          pattern: package-*
+          path: dist
+          merge-multiple: true
+      - name: 'Attach packaged archives to tag release'
         uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 #v2.2.2
         with:
           draft: true
@@ -110,8 +136,12 @@ jobs:
     if: always()
     needs:
       - package
+      - attach-packages
       - docker
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     steps:
       - name: "Slack workflow notification"
         uses: Gamesight/slack-workflow-status@68bf00d0dbdbcb206c278399aa1ef6c14f74347a #v1.3.0
