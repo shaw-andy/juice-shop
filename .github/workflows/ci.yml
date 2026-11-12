@@ -352,11 +352,24 @@ jobs:
     if: github.repository == 'juice-shop/juice-shop' && github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master')
     needs: [frontend-test, server-test, api-test, e2e-test, custom-config-test]
     runs-on: ubuntu-latest
+    env:
+      HEROKU_DISABLE_AUTOUPDATE: 1
     steps:
       - name: "Check out Git repository"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
-      - name: "Install Heroku CLI"
-        run: curl https://cli-assets.heroku.com/install.sh | sh
+      - name: "Use Node.js ${{ env.NODE_DEFAULT_VERSION }}"
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af #v4.1.0
+        with:
+          node-version: ${{ env.NODE_DEFAULT_VERSION }}
+      - name: "Install pinned Heroku CLI"
+        # Installed outside the workspace because heroku-deploy commits and deploys every untracked file
+        run: |
+          HEROKU_CLI_DIR="$RUNNER_TEMP/heroku-cli"
+          mkdir -p "$HEROKU_CLI_DIR/bin"
+          cp .github/heroku-cli/package.json .github/heroku-cli/package-lock.json "$HEROKU_CLI_DIR"
+          npm ci --prefix "$HEROKU_CLI_DIR" --ignore-scripts --no-audit --no-fund
+          ln -s "$HEROKU_CLI_DIR/node_modules/heroku/bin/run.js" "$HEROKU_CLI_DIR/bin/heroku"
+          echo "$HEROKU_CLI_DIR/bin" >> "$GITHUB_PATH"
       - name: "Set Heroku app & branch for ${{ github.ref }}"
         run: |
           if [ "$GITHUB_REF" == "refs/heads/master" ]; then
