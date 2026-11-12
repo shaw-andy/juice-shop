@@ -27,17 +27,28 @@ void describe('order', () => {
     mock.restoreAll()
   })
 
-  void it('should call next with error if basket does not exist', async () => {
-    mock.method(BasketModel, 'findOne', async () => null)
+  void it('should respond with 401 if the request has no authenticated user', async () => {
+    const findOne = mock.method(BasketModel, 'findOne', async () => null)
+
+    placeOrder()(req, res, next)
+
+    assert.equal(res.status.mock.calls[0].arguments[0], 401)
+    assert.equal(findOne.mock.callCount(), 0)
+  })
+
+  void it('should respond with 403 if the basket does not belong to the customer', async () => {
+    const findOne = mock.method(BasketModel, 'findOne', async () => null)
+    mock.method(security.authenticatedUsers, 'from', () => ({ data: { id: 1, email: 'test@juice-sh.op' } }))
 
     const p = new Promise((resolve) => {
-      next = (err: any) => { resolve(err) }
+      res.json = (data: any) => { resolve(data) }
     })
 
     placeOrder()(req, res, next)
-    const err = await p as Error
+    await p
 
-    assert.match(err.message, /Basket with id=1 does not exist/)
+    assert.deepEqual(findOne.mock.calls[0].arguments[0]?.where, { id: '1', UserId: 1 })
+    assert.equal(res.status.mock.calls[0].arguments[0], 403)
   })
 
   void it('should call next with error if QuantityModel.findOne fails', async () => {
@@ -53,7 +64,7 @@ void describe('order', () => {
       update: mock.fn()
     }
     mock.method(BasketModel, 'findOne', async () => basket)
-    mock.method(security.authenticatedUsers, 'from', () => ({ data: { email: 'test@juice-sh.op' } }))
+    mock.method(security.authenticatedUsers, 'from', () => ({ data: { id: 1, email: 'test@juice-sh.op' } }))
     const error = new Error('Quantity error')
     mock.method(QuantityModel, 'findOne', async () => { throw error })
 
@@ -80,7 +91,7 @@ void describe('order', () => {
       update: mock.fn()
     }
     mock.method(BasketModel, 'findOne', async () => basket)
-    mock.method(security.authenticatedUsers, 'from', () => ({ data: { email: 'test@juice-sh.op' } }))
+    mock.method(security.authenticatedUsers, 'from', () => ({ data: { id: 1, email: 'test@juice-sh.op' } }))
     mock.method(QuantityModel, 'findOne', async () => ({ quantity: 10 }))
     const error = new Error('Quantity update error')
     mock.method(QuantityModel, 'update', async () => { throw error })
@@ -108,7 +119,7 @@ void describe('order', () => {
       update: mock.fn()
     }
     mock.method(BasketModel, 'findOne', async () => basket)
-    mock.method(security.authenticatedUsers, 'from', () => ({ data: { email: 'test@juice-sh.op' } }))
+    mock.method(security.authenticatedUsers, 'from', () => ({ data: { id: 1, email: 'test@juice-sh.op' } }))
     mock.method(QuantityModel, 'findOne', async () => ({ quantity: 10 }))
     mock.method(QuantityModel, 'update', async () => [1])
     req.body.UserId = 1
@@ -141,7 +152,7 @@ void describe('order', () => {
       coupon: null
     }
     mock.method(BasketModel, 'findOne', async () => basket)
-    mock.method(security.authenticatedUsers, 'from', () => ({ data: { email: 'test@juice-sh.op' } }))
+    mock.method(security.authenticatedUsers, 'from', () => ({ data: { id: 1, email: 'test@juice-sh.op' } }))
     mock.method(QuantityModel, 'findOne', async () => ({ quantity: 10 }))
     mock.method(QuantityModel, 'update', async () => [1])
     req.body.UserId = 1
@@ -166,7 +177,7 @@ void describe('order', () => {
       coupon: null
     }
     mock.method(BasketModel, 'findOne', async () => basket)
-    mock.method(security.authenticatedUsers, 'from', () => ({ data: { email: 'test@juice-sh.op' } }))
+    mock.method(security.authenticatedUsers, 'from', () => ({ data: { id: 1, email: 'test@juice-sh.op' } }))
     req.body.orderDetails = { deliveryMethodId: 1 }
     const error = new Error('Delivery error')
     mock.method(DeliveryModel, 'findOne', async () => { throw error })
@@ -189,7 +200,7 @@ void describe('order', () => {
       coupon: null
     }
     mock.method(BasketModel, 'findOne', async () => basket)
-    mock.method(security.authenticatedUsers, 'from', () => ({ data: { email: 'test@juice-sh.op' } }))
+    mock.method(security.authenticatedUsers, 'from', () => ({ data: { id: 1, email: 'test@juice-sh.op' } }))
     const error = new Error('Insert error')
     mock.method(db.ordersCollection, 'insert', async () => { throw error })
 
@@ -211,7 +222,7 @@ void describe('order', () => {
       coupon: null
     }
     mock.method(BasketModel, 'findOne', async () => basket)
-    mock.method(security.authenticatedUsers, 'from', () => ({ data: { email: 'test@juice-sh.op' } }))
+    mock.method(security.authenticatedUsers, 'from', () => ({ data: { id: 1, email: 'test@juice-sh.op' } }))
     const error = new Error('Destroy error')
     mock.method(BasketItemModel, 'destroy', async () => { throw error })
     mock.method(db.ordersCollection, 'insert', async () => {})
@@ -238,7 +249,7 @@ void describe('order', () => {
       coupon: null
     }
     mock.method(BasketModel, 'findOne', async () => basket)
-    mock.method(security.authenticatedUsers, 'from', () => ({ data: { email: 'test@juice-sh.op' } }))
+    mock.method(security.authenticatedUsers, 'from', () => ({ data: { id: 1, email: 'test@juice-sh.op' } }))
     mock.method(db.ordersCollection, 'insert', async () => {})
     mock.method(BasketItemModel, 'destroy', async () => {})
     mock.method(WalletModel, 'increment', async () => {})
@@ -266,7 +277,7 @@ void describe('order', () => {
       update: mock.fn()
     }
     mock.method(BasketModel, 'findOne', async () => basket)
-    mock.method(security.authenticatedUsers, 'from', () => ({ data: { email: 'test@juice-sh.op' } }))
+    mock.method(security.authenticatedUsers, 'from', () => ({ data: { id: 1, email: 'test@juice-sh.op' } }))
     mock.method(QuantityModel, 'findOne', async () => ({ quantity: 10 }))
     mock.method(QuantityModel, 'update', async () => [1])
     req.body.UserId = 1
