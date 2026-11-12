@@ -10,6 +10,7 @@ import { challenges } from '../data/datacache'
 import * as security from '../lib/insecurity'
 import { type Review } from '../data/types'
 import * as db from '../data/mongodb'
+import { isBoundedString, MAX_LIKES_PER_REVIEW, MAX_REVIEW_AUTHOR_LENGTH } from '../lib/productReviewLimits'
 
 const sleep = async (ms: number) => await new Promise(resolve => setTimeout(resolve, ms))
 
@@ -28,7 +29,7 @@ export function likeProductReviews () {
       }
 
       const likedBy = review.likedBy
-      if (likedBy.includes(user.data.email)) {
+      if (likedBy.includes(user.data.email) || likedBy.length >= MAX_LIKES_PER_REVIEW || !isBoundedString(user.data.email, MAX_REVIEW_AUTHOR_LENGTH)) {
         return res.status(403).json({ error: 'Not allowed' })
       }
 
@@ -42,6 +43,10 @@ export function likeProductReviews () {
       try {
         const updatedReview: Review = await db.reviewsCollection.findOne({ _id: id })
         const updatedLikedBy = updatedReview.likedBy
+        // Concurrent likes all pass the check above during the sleep, so the array written back is bounded here
+        if (updatedLikedBy.length >= MAX_LIKES_PER_REVIEW) {
+          return res.status(403).json({ error: 'Not allowed' })
+        }
         updatedLikedBy.push(user.data.email)
 
         const count = updatedLikedBy.filter(email => email === user.data.email).length
