@@ -8,8 +8,12 @@ import { decode } from 'jsonwebtoken'
 import * as security from '../lib/insecurity'
 
 async function retrieveUserList (req: Request, res: Response, next: NextFunction) {
+  if (!security.isAdmin(req)) {
+    res.status(403).json({ status: 'error', message: 'Forbidden' })
+    return
+  }
   try {
-    const users = await UserModel.findAll()
+    const users = await UserModel.findAll({ attributes: { exclude: ['deluxeToken'] } })
 
     res.json({
       status: 'success',

@@ -13,7 +13,7 @@ import { createTestApp } from './helpers/setup'
 import { login } from './helpers/auth'
 
 let app: Express
-const authHeader = { Authorization: `Bearer ${security.authorize({ data: { email: 'admin@juice-sh.op' } })}`, 'content-type': 'application/json' }
+const authHeader = { Authorization: `Bearer ${security.authorize({ data: { email: 'admin@juice-sh.op', role: 'admin' } })}`, 'content-type': 'application/json' }
 
 before(async () => {
   const result = await createTestApp()
