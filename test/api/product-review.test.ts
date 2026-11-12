@@ -41,8 +41,7 @@ void describe('/rest/products/:id/reviews', () => {
     assert.ok(res.headers['content-type']?.includes('application/json'))
   })
 
-  // FIXME Turn on when #1960 is resolved
-  void it.skip('GET product reviews by alphanumeric non-mongoDB-command product id', async () => {
+  void it('GET product reviews by alphanumeric non-mongoDB-command product id', async () => {
     const res = await request(app)
       .get('/rest/products/kaboom/reviews')
     assert.equal(res.status, 400)
