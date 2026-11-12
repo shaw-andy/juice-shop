@@ -19,17 +19,11 @@ interface RequestWithRawBody extends Request {
 export function addBasketItem () {
   return async (req: Request, res: Response, next: NextFunction) => {
     const result = utils.parseJsonCustom((req as RequestWithRawBody).rawBody)
-    const productIds = []
     const basketIds = []
-    const quantities = []
 
     for (let i = 0; i < result.length; i++) {
-      if (result[i].key === 'ProductId') {
-        productIds.push(result[i].value)
-      } else if (result[i].key === 'BasketId') {
+      if (result[i].key === 'BasketId') {
         basketIds.push(result[i].value)
-      } else if (result[i].key === 'quantity') {
-        quantities.push(result[i].value)
       }
     }
 
@@ -37,10 +31,11 @@ export function addBasketItem () {
     if (user && basketIds[0] && basketIds[0] !== 'undefined' && Number(user.bid) != Number(basketIds[0])) { // eslint-disable-line eqeqeq
       res.status(401).send('{\'error\' : \'Invalid BasketId\'}')
     } else {
+      // ProductId and quantity must be the values quantityCheck validated, not a raw-body duplicate
       const basketItem = {
-        ProductId: productIds[productIds.length - 1],
+        ProductId: req.body.ProductId,
         BasketId: basketIds[basketIds.length - 1],
-        quantity: quantities[quantities.length - 1]
+        quantity: req.body.quantity
       }
       challengeUtils.solveIf(challenges.basketManipulateChallenge, () => { return user && basketItem.BasketId && basketItem.BasketId !== 'undefined' && user.bid != basketItem.BasketId }) // eslint-disable-line eqeqeq
 
@@ -68,11 +63,11 @@ export function quantityCheckBeforeBasketItemUpdate () {
       const item = await BasketItemModel.findOne({ where: { id: req.params.id } })
       const user = security.authenticatedUsers.from(req)
       challengeUtils.solveIf(challenges.basketManipulateChallenge, () => { return user && req.body.BasketId && user.bid != req.body.BasketId }) // eslint-disable-line eqeqeq
-      if (req.body.quantity) {
+      if (req.body.quantity !== undefined) {
         if (item == null) {
           throw new Error('No such item found!')
         }
-        void quantityCheck(req, res, next, item.ProductId, req.body.quantity)
+        await quantityCheck(req, res, next, item.ProductId, req.body.quantity)
       } else {
         next()
       }
@@ -82,7 +77,15 @@ export function quantityCheckBeforeBasketItemUpdate () {
   }
 }
 
-async function quantityCheck (req: Request, res: Response, next: NextFunction, id: number, quantity: number) {
+export function isValidQuantity (quantity: unknown): quantity is number {
+  return Number.isInteger(quantity) && (quantity as number) >= 1
+}
+
+async function quantityCheck (req: Request, res: Response, next: NextFunction, id: number, quantity: unknown) {
+  if (!isValidQuantity(quantity)) {
+    res.status(400).json({ error: 'Quantity must be a positive whole number.' })
+    return
+  }
   const product = await QuantityModel.findOne({ where: { ProductId: id } })
   if (product == null) {
     throw new Error('No such product found!')
