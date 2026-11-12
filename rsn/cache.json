@@ -1225,23 +1225,44 @@
 		]
 	},
 	"restfulXssChallenge_1_correct.ts": {
-		"added": [
-			42,
-			43
-		],
+		"added": [],
 		"removed": []
 	},
 	"restfulXssChallenge_2.ts": {
 		"added": [],
-		"removed": []
+		"removed": [
+			8,
+			41,
+			42,
+			43,
+			44,
+			45,
+			46
+		]
 	},
 	"restfulXssChallenge_3.ts": {
 		"added": [],
-		"removed": []
+		"removed": [
+			8,
+			41,
+			42,
+			43,
+			44,
+			45,
+			46
+		]
 	},
 	"restfulXssChallenge_4.ts": {
 		"added": [],
-		"removed": []
+		"removed": [
+			8,
+			41,
+			42,
+			43,
+			44,
+			45,
+			46
+		]
 	},
 	"scoreBoardChallenge_1_correct.ts": {
 		"added": [],
