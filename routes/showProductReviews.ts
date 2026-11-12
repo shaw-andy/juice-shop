@@ -33,9 +33,31 @@ export function showProductReviews () {
     // Measure how long the query takes, to check if there was a nosql dos attack
     const t0 = new Date().getTime()
 
-    db.reviewsCollection.find({ $where: 'this.product == ' + id }).then((reviews: Review[]) => {
+    // MarsDB does not catch errors thrown by a $where clause, which leaves the query promise pending forever
+    let matchesProduct: (this: Review, obj: Review) => boolean
+    try {
+      // eslint-disable-next-line no-new-func
+      matchesProduct = Function('obj', 'return this.product == ' + id) as typeof matchesProduct
+    } catch {
+      return res.status(400).json({ error: 'Wrong Params' })
+    }
+    let whereFailed = false
+
+    db.reviewsCollection.find({
+      $where: function (this: Review, obj: Review) {
+        try {
+          return matchesProduct.call(this, obj)
+        } catch {
+          whereFailed = true
+          return false
+        }
+      }
+    }).then((reviews: Review[]) => {
       const t1 = new Date().getTime()
       challengeUtils.solveIf(challenges.noSqlCommandChallenge, () => { return (t1 - t0) > 2000 })
+      if (whereFailed) {
+        return res.status(400).json({ error: 'Wrong Params' })
+      }
       const user = security.authenticatedUsers.from(req)
       for (let i = 0; i < reviews.length; i++) {
         if (user === undefined || reviews[i].likedBy.includes(user.data.email)) {

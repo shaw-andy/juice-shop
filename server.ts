@@ -116,6 +116,7 @@ import { createProductReviews } from './routes/createProductReviews'
 import { getWalletBalance, addWalletBalance } from './routes/wallet'
 import { retrieveAppConfiguration } from './routes/appConfiguration'
 import { updateProductReviews } from './routes/updateProductReviews'
+import { checkReviewMessage } from './lib/productReviewLimits'
 import { servePrivacyPolicyProof } from './routes/privacyPolicyProof'
 import { profileImageUrlUpload } from './routes/profileImageUrlUpload'
 import { profileImageFileUpload } from './routes/profileImageFileUpload'
@@ -649,8 +650,18 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.get('/rest/memories', utils.asyncHandler(getMemories()))
   /* NoSQL API endpoints */
   app.get('/rest/products/:id/reviews', showProductReviews())
-  app.put('/rest/products/:id/reviews', utils.asyncHandler(createProductReviews()))
-  app.patch('/rest/products/reviews', security.isAuthorized(), updateProductReviews())
+  app.put('/rest/products/:id/reviews',
+    security.isAuthorized(),
+    rateLimit({
+      windowMs: 60 * 1000,
+      max: 100,
+      // Keyed on the session because 'trust proxy' lets clients choose req.ip via X-Forwarded-For
+      keyGenerator: (req: Request) => String(security.authenticatedUsers.from(req)?.data?.id ?? utils.jwtFrom(req)),
+      validate: false
+    }),
+    utils.asyncHandler(createProductReviews())
+  )
+  app.patch('/rest/products/reviews', security.isAuthorized(), checkReviewMessage(), updateProductReviews())
   app.post('/rest/products/reviews', security.isAuthorized(), utils.asyncHandler(likeProductReviews()))
 
   /* Chat API endpoint */
