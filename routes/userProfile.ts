@@ -49,29 +49,13 @@ export function getUserProfile () {
       return
     }
 
-    let username = user.username
+    const username = user.username
 
     const themeKey = config.get<string>('application.theme') as keyof typeof themes
     const theme = themes[themeKey] || themes['bluegrey-lightgreen']
 
     if (utils.isChallengeEnabled(challenges.usernameXssChallenge)) {
-      if (username?.match(/#{(.*)}/) !== null) {
-        req.app.locals.abused_ssti_bug = true
-        const code = username?.substring(2, username.length - 1)
-        try {
-          if (!code) {
-            throw new Error('Username is null')
-          }
-          username = eval(code) // eslint-disable-line no-eval
-        } catch (err) {
-          username = '\\' + username
-        }
-      } else {
-        username = '\\' + username
-      }
-      if (username) {
-        template = template.replace(/_username_/g, username)
-      }
+      template = template.replace(/_username_/g, '!{username}')
     } else {
       template = template.replace(/_username_/g, '#{username}')
     }
