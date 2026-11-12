@@ -24,15 +24,25 @@ function ensureFileIsPassed ({ file }: Request, res: Response, next: NextFunctio
   }
 }
 
+const complaintsDirectory = path.resolve('uploads/complaints')
+
+function isPlainFileName (fileName: string) {
+  return fileName !== '' && fileName !== '.' && fileName !== '..' && !/[/\\\0]/.test(fileName)
+}
+
 async function extractZipBuffer (buffer: Buffer) {
   const directory = await unzipper.Open.buffer(buffer)
   for (const entry of directory.files) {
     const fileName = entry.path
     const absolutePath = path.resolve('uploads/complaints/' + fileName)
     challengeUtils.solveIf(challenges.fileWriteChallenge, () => { return absolutePath === path.resolve('ftp/legal.md') })
-    if (absolutePath.includes(path.resolve('.'))) {
-      await pipeline(entry.stream(), fs.createWriteStream('uploads/complaints/' + fileName))
+    if (entry.type !== 'File' || !isPlainFileName(fileName)) {
+      continue
     }
+    // O_NOFOLLOW stops a pre-planted symlink in the complaints folder from redirecting the write
+    const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | (fs.constants.O_NOFOLLOW ?? 0)
+    const handle = await fs.promises.open(path.join(complaintsDirectory, fileName), flags, 0o644)
+    await pipeline(entry.stream(), handle.createWriteStream())
   }
 }
 

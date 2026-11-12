@@ -47,8 +47,7 @@ html(lang='en')
             video(controls='controls')
                source(src='./video', type='video/mp4')
 
-        script#subtitle.
-
+        div#subtitle(hidden, data-label='English', data-lang='en')= subtitles
 
         script.
             function parse_timestamp(s) {
@@ -105,7 +104,7 @@ html(lang='en')
             var subtitle = document.getElementById('subtitle');
             var track = video.addTextTrack('subtitles', subtitle.dataset.label, subtitle.dataset.lang);
             track.mode = "showing";
-            quick_and_dirty_vtt_or_srt_parser(subtitle.innerHTML).map(function(cue) {
+            quick_and_dirty_vtt_or_srt_parser(subtitle.textContent).map(function(cue) {
             track.addCue(cue);
             });
             }
