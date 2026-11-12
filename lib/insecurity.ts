@@ -49,11 +49,52 @@ export const cutOffPoisonNullByte = (str: string) => {
   return str
 }
 
+const tokenLifetimeSeconds = 6 * 60 * 60
+
 export const isAuthorized = () => expressJwt(({ secret: publicKey }) as any)
 export const denyAll = () => expressJwt({ secret: '' + Math.random() } as any)
-export const authorize = (user = {}) => jwt.sign(user, privateKey, { expiresIn: '6h', algorithm: 'RS256' })
+export const authorize = (user = {}) => jwt.sign(Object.assign(user, { jti: crypto.randomUUID() }), privateKey, { expiresIn: '6h', algorithm: 'RS256' })
 export const verify = (token: string) => token ? (jws.verify as ((token: string, secret: string) => boolean))(token, publicKey) : false
 export const decode = (token: string) => { return jws.decode(token)?.payload }
+
+// The pinned jsonwebtoken ignores the expiresIn option, so the lifetime is enforced from iat here.
+export const verifyIssuedToken = (token: unknown): Record<string, any> | undefined => {
+  if (typeof token !== 'string') return undefined
+  const [encodedHeader, encodedPayload, signature, ...rest] = token.split('.')
+  if (!encodedHeader || !encodedPayload || !signature || rest.length > 0) return undefined
+  try {
+    const header = JSON.parse(Buffer.from(encodedHeader, 'base64url').toString())
+    const signatureValid = header?.alg === 'RS256' &&
+      crypto.verify('RSA-SHA256', Buffer.from(`${encodedHeader}.${encodedPayload}`), publicKey, Buffer.from(signature, 'base64url'))
+    if (!signatureValid) return undefined
+    const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString())
+    const now = Date.now() / 1000
+    if (typeof payload?.iat !== 'number' || now >= payload.iat + tokenLifetimeSeconds) return undefined
+    if (payload.exp !== undefined && !(typeof payload.exp === 'number' && now < payload.exp)) return undefined
+    return payload
+  } catch {
+    return undefined
+  }
+}
+
+const redeemedTokens = new Map<string, number>()
+export const redeemOnce = ({ jti, iat }: { jti: string, iat: number }) => {
+  const now = Date.now() / 1000
+  for (const [redeemedJti, issuedAt] of redeemedTokens) {
+    if (now >= issuedAt + tokenLifetimeSeconds) redeemedTokens.delete(redeemedJti)
+  }
+  if (redeemedTokens.has(jti)) return false
+  redeemedTokens.set(jti, iat)
+  return true
+}
+
+const passwordChangedAt = new Map<number, number>()
+export const recordPasswordChange = (userId: number) => { passwordChangedAt.set(userId, Date.now()) }
+export const issuedAfterPasswordChange = (userId: number, iat: number) => {
+  const changedAt = passwordChangedAt.get(userId)
+  // iat is rounded to whole seconds, so a token signed shortly before the change can carry a later iat
+  return changedAt === undefined || changedAt < (iat - 1) * 1000
+}
 
 export const sanitizeHtml = (html: string) => sanitizeHtmlLib(html)
 export const sanitizeLegacy = (input = '') => input.replace(/<(?:\w+)\W+?[\w]/gi, '')

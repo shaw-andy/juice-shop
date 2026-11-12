@@ -135,6 +135,12 @@ const UserModelInit = (sequelize: Sequelize) => { // vuln-code-snippet start wea
       )
     }
   })
+
+  User.addHook('afterUpdate', (user: User) => {
+    if (user.changed('password')) {
+      security.recordPasswordChange(user.id)
+    }
+  })
 }
 
 export { User as UserModel, UserModelInit }

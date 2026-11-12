@@ -96,6 +96,7 @@ export class LoginComponent implements OnInit {
     this.user = {}
     this.user.email = this.emailControl.value
     this.user.password = this.passwordControl.value
+    localStorage.removeItem('totp_tmp_token')
     this.userService.login(this.user).subscribe({
       next: (authentication: any) => {
         const redirectUrl = this.route.snapshot.queryParamMap.get('redirectUrl') ?? '/search'

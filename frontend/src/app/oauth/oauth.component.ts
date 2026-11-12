@@ -65,6 +65,7 @@ export class OAuthComponent implements OnInit {
     console.log(error)
     this.cookieService.remove('token')
     localStorage.removeItem('token')
+    localStorage.removeItem('totp_tmp_token')
     sessionStorage.removeItem('bid')
   }
 

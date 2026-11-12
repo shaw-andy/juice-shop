@@ -100,6 +100,7 @@ export class ServerStartedNotificationComponent implements OnInit {
     sessionStorage.removeItem('bid')
     sessionStorage.removeItem('itemTotal')
     localStorage.removeItem('token')
+    localStorage.removeItem('totp_tmp_token')
     localStorage.removeItem('displayedDifficulties')
     localStorage.removeItem('showSolvedChallenges')
     localStorage.removeItem('showDisabledChallenges')
