@@ -110,11 +110,6 @@ async function assertRecycleIsOwnedByCaller (path: string, body: Record<string, 
 
   assert.equal(res.status, 201)
   const createdId = res.body.data.id as number
-  assert.equal(Number(res.body.data.UserId), attacker.id)
-  assert.equal(Number(res.body.data.AddressId), attacker.addressId)
-  assert.equal(Number(res.body.data.quantity), body.quantity)
-  assert.equal(res.body.data.isPickup, true)
-  assert.equal(sameInstant(res.body.data.date, pickupDate), true)
 
   const listed = await request(app).get('/api/Recycles/' + createdId)
   assert.equal(listed.status, 200)
@@ -127,6 +122,12 @@ async function assertRecycleIsOwnedByCaller (path: string, body: Record<string, 
   assert.equal(Number(match.quantity), body.quantity)
   assert.equal(match.isPickup, true)
   assert.equal(sameInstant(match.date, pickupDate), true)
+
+  assert.equal(Number(res.body.data.UserId), attacker.id)
+  assert.equal(Number(res.body.data.AddressId), attacker.addressId)
+  assert.equal(Number(res.body.data.quantity), body.quantity)
+  assert.equal(res.body.data.isPickup, true)
+  assert.equal(sameInstant(res.body.data.date, pickupDate), true)
 
   const row = await RecycleModel.findByPk(createdId)
   assert.ok(row)
