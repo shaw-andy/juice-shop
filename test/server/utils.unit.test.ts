@@ -199,6 +199,28 @@ void describe('utils', () => {
     })
   })
 
+  void describe('hasDuplicateJsonKeys', () => {
+    void it('returns false for an object with unique keys', () => {
+      assert.equal(utils.hasDuplicateJsonKeys('{"a": 1, "b": {"a": 2}, "c": [{"a": 3}, {"a": 4}], "d": {}}'), false)
+    })
+
+    void it('detects a duplicate key on the top level', () => {
+      assert.equal(utils.hasDuplicateJsonKeys('{"a": 1, "b": 2, "a": 3}'), true)
+    })
+
+    void it('detects a duplicate key in a nested object', () => {
+      assert.equal(utils.hasDuplicateJsonKeys('{"a": {"b": 1, "b": 2}}'), true)
+    })
+
+    void it('detects a duplicate key written with unicode escapes', () => {
+      assert.equal(utils.hasDuplicateJsonKeys('{"ab": 1, "\\u0061b": 2}'), true)
+    })
+
+    void it('throws on malformed JSON', () => {
+      assert.throws(() => utils.hasDuplicateJsonKeys('{"a": 1,'))
+    })
+  })
+
   void describe('containsOrEscaped', () => {
     void it('returns true if string contains element', () => {
       assert.equal(utils.containsOrEscaped('abc"def', 'abc'), true)
