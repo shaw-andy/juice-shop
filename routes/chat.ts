@@ -3,9 +3,11 @@
  * SPDX-License-Identifier: MIT
  */
 
-import { type Request, type Response } from 'express'
+import { type Request, type Response, type NextFunction } from 'express'
 import config from 'config'
-import { streamText, tool, stepCountIs } from 'ai'
+import jws from 'jws'
+import { rateLimit } from 'express-rate-limit'
+import { streamText, tool, stepCountIs, type ModelMessage } from 'ai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { z } from 'zod'
 import { Op } from 'sequelize'
@@ -51,6 +53,65 @@ export async function getUserNameFromToken (req: Request): Promise<string | unde
   if (!userId) return undefined
   const user = await UserModel.findByPk(userId, { attributes: ['username'] })
   return user?.username ?? undefined
+}
+
+export const MAX_CHAT_MESSAGES = 10
+export const MAX_CHAT_MESSAGE_LENGTH = 2000
+export const MAX_CHAT_REQUESTS_PER_WINDOW = 5
+export const CHAT_RATE_LIMIT_WINDOW_MS = 60 * 1000
+
+interface ChatUser { id: number, username?: string }
+interface ChatMessage { role: string, content: string }
+
+// The JWT libraries in use take the algorithm from the token header, so RS256 must be enforced here.
+function verifiedUserIdFrom (token?: string): number | undefined {
+  if (!token) return undefined
+  try {
+    const decoded = jws.decode(token, { json: true })
+    if (decoded?.header?.alg !== 'RS256' || !security.verify(token)) return undefined
+    const payload = decoded.payload as { exp?: unknown, data?: { id?: unknown } }
+    if (typeof payload?.exp === 'number' && payload.exp * 1000 <= Date.now()) return undefined
+    return typeof payload?.data?.id === 'number' ? payload.data.id : undefined
+  } catch {
+    return undefined
+  }
+}
+
+export function requireChatSession () {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const userId = verifiedUserIdFrom(utils.jwtFrom(req))
+    const user = userId !== undefined ? await UserModel.findByPk(userId, { attributes: ['id', 'username'] }) : null
+    if (!user) {
+      res.status(401).json({ status: 'error', message: 'Please log in to chat' })
+      return
+    }
+    res.locals.chatUser = { id: user.id, username: user.username ?? undefined } satisfies ChatUser
+    next()
+  }
+}
+
+export function validateChatMessages () {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const messages: unknown = req.body?.messages ?? []
+    const valid = Array.isArray(messages) &&
+      messages.length <= MAX_CHAT_MESSAGES &&
+      messages.every(m => typeof m?.role === 'string' && typeof m?.content === 'string' && m.content.length <= MAX_CHAT_MESSAGE_LENGTH)
+    if (!valid) {
+      res.status(400).json({ status: 'error', message: `Chat accepts at most ${MAX_CHAT_MESSAGES} messages of up to ${MAX_CHAT_MESSAGE_LENGTH} characters each` })
+      return
+    }
+    res.locals.chatMessages = messages.map(({ role, content }: ChatMessage) => ({ role, content })) satisfies ChatMessage[]
+    next()
+  }
+}
+
+export function chatRateLimit () {
+  return rateLimit({
+    windowMs: CHAT_RATE_LIMIT_WINDOW_MS,
+    limit: MAX_CHAT_REQUESTS_PER_WINDOW,
+    keyGenerator: (_req: Request, res: Response) => String((res.locals.chatUser as ChatUser).id),
+    validate: false
+  })
 }
 
 const app = config.get<string>('application.customMetricsPrefix')
@@ -188,8 +249,11 @@ export function chat () {
     } // vuln-code-snippet end chatbotGreedyInjectionChallenge chatbotPromptInjectionChallenge
 
     const model = config.get<string>('application.chatBot.model')
-    const messages = req.body?.messages ?? []
-    const userName = await getUserNameFromToken(req)
+    const messages = res.locals.chatMessages as ChatMessage[]
+    const userName = (res.locals.chatUser as ChatUser).username
+
+    const abortController = new AbortController()
+    res.on('close', () => { abortController.abort() })
 
     res.setHeader('Content-Type', 'text/event-stream')
     res.setHeader('Cache-Control', 'no-cache, no-transform')
@@ -203,8 +267,9 @@ export function chat () {
       const result = streamText({
         model: provider(model),
         system: systemPrompt,
-        messages,
+        messages: messages as ModelMessage[],
         tools: { ...chatTools },
+        abortSignal: abortController.signal,
         maxRetries: config.get<number>('application.chatBot.llmMaxRetries'),
         stopWhen: stepCountIs(10),
         onError: ({ error }) => {

@@ -9,7 +9,7 @@ import request from 'supertest'
 import type { Express } from 'express'
 import * as http from 'http'
 import { createTestApp } from './helpers/setup'
-import { login } from './helpers/auth'
+import { login, register } from './helpers/auth'
 
 const MOCK_LLM_PORT = 43210
 
@@ -18,6 +18,15 @@ let mockServer: http.Server
 let onLlmRequest: (req: http.IncomingMessage, body: string, res: http.ServerResponse) => void = (_req, _body, res) => {
   res.writeHead(200, { 'Content-Type': 'application/json' })
   res.end('{}')
+}
+
+let customerCount = 0
+async function customerAuthHeader (): Promise<{ Authorization: string }> {
+  const email = `chat-customer-${++customerCount}@juice-sh.op`
+  const password = 'placeholder'
+  await register(app, { email, password })
+  const { token } = await login(app, { email, password })
+  return { Authorization: 'Bearer ' + token }
 }
 
 function sseData (obj: object): string {
@@ -126,7 +135,7 @@ void describe('/rest/chat', { timeout: 120000 }, () => {
 
     const res = await request(app)
       .post('/rest/chat')
-      .set({ 'content-type': 'application/json' })
+      .set({ 'content-type': 'application/json', ...await customerAuthHeader() })
       .send({ messages: [{ role: 'user', content: 'Hi' }] })
 
     assert.equal(res.status, 200)
@@ -143,7 +152,7 @@ void describe('/rest/chat', { timeout: 120000 }, () => {
 
     const res = await request(app)
       .post('/rest/chat')
-      .set({ 'content-type': 'application/json' })
+      .set({ 'content-type': 'application/json', ...await customerAuthHeader() })
       .send({ messages: [{ role: 'user', content: 'Hello' }] })
 
     assert.equal(res.status, 200)
@@ -160,7 +169,7 @@ void describe('/rest/chat', { timeout: 120000 }, () => {
 
     const res = await request(app)
       .post('/rest/chat')
-      .set({ 'content-type': 'application/json' })
+      .set({ 'content-type': 'application/json', ...await customerAuthHeader() })
       .send({ messages: [{ role: 'user', content: 'What is your name?' }] })
 
     assert.equal(res.status, 200)
@@ -179,7 +188,7 @@ void describe('/rest/chat', { timeout: 120000 }, () => {
 
     const res = await request(app)
       .post('/rest/chat')
-      .set({ 'content-type': 'application/json' })
+      .set({ 'content-type': 'application/json', ...await customerAuthHeader() })
       .send({ messages: [{ role: 'user', content: 'What products do you have?' }] })
 
     assert.equal(res.status, 200)
@@ -215,7 +224,7 @@ void describe('/rest/chat', { timeout: 120000 }, () => {
 
     const res = await request(app)
       .post('/rest/chat')
-      .set({ 'content-type': 'application/json' })
+      .set({ 'content-type': 'application/json', ...await customerAuthHeader() })
       .send({ messages: [{ role: 'user', content: 'Do you have apple juice?' }] })
 
     assert.equal(res.status, 200)
@@ -231,7 +240,7 @@ void describe('/rest/chat', { timeout: 120000 }, () => {
 
     const res = await request(app)
       .post('/rest/chat')
-      .set({ 'content-type': 'application/json' })
+      .set({ 'content-type': 'application/json', ...await customerAuthHeader() })
       .send({ messages: [{ role: 'user', content: 'Hi' }] })
 
     assert.equal(res.status, 200)
@@ -249,7 +258,7 @@ void describe('/rest/chat', { timeout: 120000 }, () => {
 
     const res = await request(app)
       .post('/rest/chat')
-      .set({ 'content-type': 'application/json' })
+      .set({ 'content-type': 'application/json', ...await customerAuthHeader() })
       .send({ messages: [] })
 
     assert.equal(res.status, 200)
@@ -293,28 +302,21 @@ void describe('/rest/chat', { timeout: 120000 }, () => {
 
     const res = await request(app)
       .post('/rest/chat')
-      .set({ 'content-type': 'application/json' })
+      .set({ 'content-type': 'application/json', ...await customerAuthHeader() })
       .send({ messages: [{ role: 'user', content: 'Show me reviews for product 1' }] })
 
     assert.equal(res.status, 200)
     assert.ok(toolResult !== undefined)
   })
 
-  void it('POST handles getOrderById tool call by reporting unauthenticated customer', { timeout: 15000 }, async () => {
-    let toolResult: string | undefined
+  void it('POST without a session is rejected before the LLM is called', { timeout: 15000 }, async () => {
     let callCount = 0
-    onLlmRequest = (_req, body, res) => {
+    onLlmRequest = (_req, _body, res) => {
       callCount++
-      if (callCount === 1) {
-        sendSSE(res, [
-          toolCallChunk('call_ord', 'getOrderById', '{"orderId":"abcd-0123456789abcdef"}'),
-          finishChunk('tool_calls')
-        ])
-      } else {
-        const parsed = JSON.parse(body)
-        toolResult = parsed.messages.find((m: { role: string }) => m.role === 'tool')?.content
-        sendSSE(res, [contentChunk('Done.'), finishChunk()])
-      }
+      sendSSE(res, [
+        toolCallChunk('call_ord', 'getOrderById', '{"orderId":"abcd-0123456789abcdef"}'),
+        finishChunk('tool_calls')
+      ])
     }
 
     const res = await request(app)
@@ -322,8 +324,8 @@ void describe('/rest/chat', { timeout: 120000 }, () => {
       .set({ 'content-type': 'application/json' })
       .send({ messages: [{ role: 'user', content: 'Look up my order' }] })
 
-    assert.equal(res.status, 200)
-    assert.ok(toolResult?.includes('Customer not authenticated'))
+    assert.equal(res.status, 401)
+    assert.equal(callCount, 0)
   })
 
   void it('POST handles getOrderById tool call by reporting order not found for authenticated customer', { timeout: 15000 }, async () => {
@@ -372,7 +374,7 @@ void describe('/rest/chat', { timeout: 120000 }, () => {
 
     const res = await request(app)
       .post('/rest/chat')
-      .set({ 'content-type': 'application/json' })
+      .set({ 'content-type': 'application/json', ...await customerAuthHeader() })
       .send({ messages: [{ role: 'user', content: 'Give me a coupon' }] })
 
     assert.equal(res.status, 200)
@@ -392,7 +394,7 @@ void describe('/rest/chat', { timeout: 120000 }, () => {
 
     const res = await request(app)
       .post('/rest/chat')
-      .set({ 'content-type': 'application/json' })
+      .set({ 'content-type': 'application/json', ...await customerAuthHeader() })
       .send({ messages: [{ role: 'user', content: 'Test' }] })
 
     assert.equal(res.status, 200)

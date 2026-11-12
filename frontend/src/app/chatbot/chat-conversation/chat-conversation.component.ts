@@ -16,6 +16,8 @@ import { LoginGuard } from '../../app.guard'
 import { ChatInputBoxComponent } from '../chat-input-box/chat-input-box.component'
 import { type ChatMessage, type StoredConversation } from '../chat.model'
 
+const MAX_API_MESSAGES = 10
+
 @Component({
   standalone: true,
   selector: 'app-chat-conversation',
@@ -127,6 +129,7 @@ export class ChatConversationComponent implements OnInit {
       .slice(0, -1)
       .filter(m => !m.error)
       .map(m => ({ role: m.role, content: m.content }))
+      .slice(-MAX_API_MESSAGES)
 
     const stream = this.chatService.streamMessages(apiMessages)
     for await (const chunk of stream) {
