@@ -536,6 +536,16 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
     } // vuln-code-snippet neutral-line registerAdminChallenge
     // vuln-code-snippet end registerAdminChallenge
 
+    // finale merges req.body underneath context.attributes, so these values always win over client input
+    if (name === 'User') {
+      resource.create.write.before((req: Request, res: Response, context: { attributes: Record<string, unknown>, continue: any }) => {
+        context.attributes.role = security.roles.customer
+        context.attributes.deluxeToken = ''
+        context.attributes.profileImage = '/assets/public/images/uploads/default.svg'
+        return context.continue
+      })
+    }
+
     // translate challenge descriptions on-the-fly
     if (name === 'Challenge') {
       resource.list.fetch.after((req: Request, res: Response, context: { instance: string | any[], continue: any }) => {
