@@ -45,7 +45,7 @@ export function upgradeToDeluxe () {
           return security.verify(utils.jwtFrom(req)) && req.body.paymentMode !== 'wallet' && req.body.paymentMode !== 'card'
         })
         const userWithStatus = utils.queryResultToJson(updatedUser)
-        const updatedToken = security.authorize(userWithStatus)
+        const updatedToken = security.authorize(userWithStatus, security.credentialVersionOfToken(utils.jwtFrom(req)))
         security.authenticatedUsers.put(updatedToken, userWithStatus)
         res.status(200).json({ status: 'success', data: { confirmation: 'Congratulations! You are now a deluxe member!', token: updatedToken } })
       } catch (error) {
