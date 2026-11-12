@@ -95,12 +95,12 @@ void describe('/rest/products/search', () => {
     assert.ok(res.headers['content-type']?.includes('application/json'))
 
     const adminMatch = res.body.data.find((item: any) =>
-      item.id === 1 && item.price === `admin@${config.get<string>('application.domain')}` && item.deluxePrice === security.hash('admin123')
+      item.id === 1 && item.price === `admin@${config.get<string>('application.domain')}` && security.verifyPassword('admin123', item.deluxePrice)
     )
     assert.ok(adminMatch, 'Expected admin user in UNION SELECT results')
 
     const jimMatch = res.body.data.find((item: any) =>
-      item.id === 2 && item.price === `jim@${config.get<string>('application.domain')}` && item.deluxePrice === security.hash('ncc-1701')
+      item.id === 2 && item.price === `jim@${config.get<string>('application.domain')}` && security.verifyPassword('ncc-1701', item.deluxePrice)
     )
     assert.ok(jimMatch, 'Expected jim user in UNION SELECT results')
 
@@ -110,17 +110,17 @@ void describe('/rest/products/search', () => {
     assert.ok(benderMatch, 'Expected bender user in UNION SELECT results')
 
     const bjoernMatch = res.body.data.find((item: any) =>
-      item.id === 4 && item.price === 'bjoern.kimminich@gmail.com' && item.deluxePrice === security.hash('bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI=')
+      item.id === 4 && item.price === 'bjoern.kimminich@gmail.com' && security.verifyPassword('bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI=', item.deluxePrice)
     )
     assert.ok(bjoernMatch, 'Expected bjoern user in UNION SELECT results')
 
     const cisoMatch = res.body.data.find((item: any) =>
-      item.id === 5 && item.price === `ciso@${config.get<string>('application.domain')}` && item.deluxePrice === security.hash('mDLx?94T~1CfVfZMzw@sJ9f?s3L6lbMqE70FfI8^54jbNikY5fymx7c!YbJb')
+      item.id === 5 && item.price === `ciso@${config.get<string>('application.domain')}` && security.verifyPassword('mDLx?94T~1CfVfZMzw@sJ9f?s3L6lbMqE70FfI8^54jbNikY5fymx7c!YbJb', item.deluxePrice)
     )
     assert.ok(cisoMatch, 'Expected ciso user in UNION SELECT results')
 
     const supportMatch = res.body.data.find((item: any) =>
-      item.id === 6 && item.price === `support@${config.get<string>('application.domain')}` && item.deluxePrice === security.hash('J6aVjTgOpRs@?5l!Zkq2AYnCE@RF$P')
+      item.id === 6 && item.price === `support@${config.get<string>('application.domain')}` && security.verifyPassword('J6aVjTgOpRs@?5l!Zkq2AYnCE@RF$P', item.deluxePrice)
     )
     assert.ok(supportMatch, 'Expected support user in UNION SELECT results')
   })

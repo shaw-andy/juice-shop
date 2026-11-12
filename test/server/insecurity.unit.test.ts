@@ -196,6 +196,50 @@ void describe('insecurity', () => {
     })
   })
 
+  void describe('hashPassword', () => {
+    void it('returns a salted scrypt digest that differs for the same password', () => {
+      const first = security.hashPassword('placeholder-password')
+      const second = security.hashPassword('placeholder-password')
+      assert.match(first, /^scrypt\$[0-9a-f]{32}\$[0-9a-f]{128}$/)
+      assert.notEqual(first, second)
+      assert.notEqual(first, security.hash('placeholder-password'))
+    })
+  })
+
+  void describe('verifyPassword', () => {
+    void it('accepts the correct password for a salted digest', () => {
+      assert.ok(security.verifyPassword('placeholder-password', security.hashPassword('placeholder-password')))
+    })
+
+    void it('rejects a wrong password for a salted digest', () => {
+      assert.ok(!security.verifyPassword('placeholder-password-wrong', security.hashPassword('placeholder-password')))
+    })
+
+    void it('accepts the correct password for a legacy MD5 digest', () => {
+      assert.ok(security.verifyPassword('placeholder-password', security.hash('placeholder-password')))
+      assert.ok(!security.verifyPassword('placeholder-password-wrong', security.hash('placeholder-password')))
+    })
+
+    void it('rejects missing, non-string and malformed inputs', () => {
+      assert.ok(!security.verifyPassword(undefined, security.hashPassword('placeholder-password')))
+      assert.ok(!security.verifyPassword('placeholder-password', undefined))
+      assert.ok(!security.verifyPassword('placeholder-password', 'placeholder-password'))
+      assert.ok(!security.verifyPassword('', ''))
+    })
+  })
+
+  void describe('passwordDigest', () => {
+    void it('reproduces the stored digest only for the matching password', () => {
+      const stored = security.hashPassword('placeholder-password')
+      assert.equal(security.passwordDigest('placeholder-password', stored), stored)
+      assert.notEqual(security.passwordDigest('placeholder-password-wrong', stored), stored)
+    })
+
+    void it('returns a freshly salted digest when nothing usable is stored', () => {
+      assert.notEqual(security.passwordDigest('placeholder-password'), security.passwordDigest('placeholder-password'))
+    })
+  })
+
   void describe('hmac', () => {
     void it('returns SHA-256 HMAC with "pa4qacea4VK9t9nGv7yZtwmj" as salt any input string', () => {
       assert.equal(security.hmac('admin123'), '6be13e2feeada221f29134db71c0ab0be0e27eccfc0fb436ba4096ba73aafb20')

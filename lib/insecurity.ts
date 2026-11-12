@@ -39,6 +39,37 @@ interface IAuthenticatedUsers {
 }
 
 export const hash = (data: string) => crypto.createHash('md5').update(data).digest('hex')
+
+const passwordDigestPattern = /^scrypt\$([0-9a-f]{32})\$[0-9a-f]{128}$/
+const legacyPasswordDigestPattern = /^[0-9a-f]{32}$/
+
+const scryptDigest = (password: string, salt: string) => `scrypt$${salt}$${crypto.scryptSync(password, salt, 64).toString('hex')}`
+
+export const hashPassword = (password: string) => scryptDigest(password, crypto.randomBytes(16).toString('hex'))
+
+export const isLegacyPasswordDigest = (storedDigest?: string) => typeof storedDigest === 'string' && legacyPasswordDigestPattern.test(storedDigest)
+
+// Unknown or missing digests yield a freshly salted hash, which matches nothing stored
+export const passwordDigest = (password: string, storedDigest?: string) => {
+  const salt = typeof storedDigest === 'string' ? passwordDigestPattern.exec(storedDigest)?.[1] : undefined
+  if (salt) {
+    return scryptDigest(password, salt)
+  }
+  if (isLegacyPasswordDigest(storedDigest)) {
+    return hash(password)
+  }
+  return hashPassword(password)
+}
+
+export const verifyPassword = (password: unknown, storedDigest: unknown) => {
+  if (typeof password !== 'string' || typeof storedDigest !== 'string') {
+    return false
+  }
+  const expected = Buffer.from(storedDigest)
+  const actual = Buffer.from(passwordDigest(password, storedDigest))
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual)
+}
+
 export const hmac = (data: string) => crypto.createHmac('sha256', 'pa4qacea4VK9t9nGv7yZtwmj').update(data).digest('hex')
 
 export const cutOffPoisonNullByte = (str: string) => {
