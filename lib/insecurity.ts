@@ -49,8 +49,7 @@ export const hashPassword = (password: string) => scryptDigest(password, crypto.
 
 export const isLegacyPasswordDigest = (storedDigest?: string) => typeof storedDigest === 'string' && legacyPasswordDigestPattern.test(storedDigest)
 
-// Recomputes the digest the given password would have under the salt of storedDigest, so it can be compared to the stored value.
-// Unknown or missing digests get a freshly salted hash which never matches anything stored.
+// Unknown or missing digests yield a freshly salted hash, which matches nothing stored
 export const passwordDigest = (password: string, storedDigest?: string) => {
   const salt = typeof storedDigest === 'string' ? passwordDigestPattern.exec(storedDigest)?.[1] : undefined
   if (salt) {
