@@ -5,9 +5,8 @@
 
 import { Component, NgZone, type OnInit, inject, ChangeDetectionStrategy } from '@angular/core'
 import { UserService } from '../Services/user.service'
-import { ActivatedRoute, Router } from '@angular/router'
+import { Router } from '@angular/router'
 import { ConfigurationService } from '../Services/configuration.service'
-import { SocketIoService } from '../Services/socket-io.service'
 import { MatIconModule } from '@angular/material/icon'
 import { MatButtonModule } from '@angular/material/button'
 import { TranslateModule } from '@ngx-translate/core'
@@ -25,9 +24,7 @@ export class DeluxeUserComponent implements OnInit {
   private readonly router = inject(Router)
   private readonly userService = inject(UserService)
   private readonly configurationService = inject(ConfigurationService)
-  private readonly route = inject(ActivatedRoute)
   private readonly ngZone = inject(NgZone)
-  private readonly io = inject(SocketIoService)
 
   public membershipCost = 0
   public error?: string = undefined
@@ -55,7 +52,6 @@ export class DeluxeUserComponent implements OnInit {
   ngOnInit (): void {
     this.configurationService.getApplicationConfiguration().subscribe({
       next: (config) => {
-        const decalParam: string = this.route.snapshot.queryParams.testDecal // "Forgotten" test parameter to play with different stickers on the delivery box image
         if (config?.application) {
           if (config.application.name) {
             this.applicationName = config.application.name
@@ -66,13 +62,8 @@ export class DeluxeUserComponent implements OnInit {
             if (logo.substring(0, 4) === 'http') {
               logo = decodeURIComponent(logo.substring(logo.lastIndexOf('/') + 1))
             }
-            this.logoSrc = `assets/public/images/${decalParam || logo}`
+            this.logoSrc = `assets/public/images/${logo}`
           }
-        }
-        if (decalParam) {
-          this.ngZone.runOutsideAngular(() => {
-            this.io.socket().emit('verifySvgInjectionChallenge', decalParam)
-          })
         }
       },
       error: (err) => { console.log(err) }
