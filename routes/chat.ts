@@ -39,11 +39,15 @@ export function summarizeLlmError (error: unknown): string {
 const botName = config.get<string>('application.chatBot.name')
 const appName = config.get<string>('application.name')
 
+// The customer is bound on the first read of a request so tools running later in the stream cannot re-read a different header
+const customerIds = new WeakMap<Request, number | undefined>()
+
 export async function getUserId (req: Request): Promise<number | undefined> {
-  const token = utils.jwtFrom(req)
-  if (!token) return undefined
-  const decoded = security.decode(token) as { data?: { id?: number } } | undefined
-  return decoded?.data?.id
+  if (!customerIds.has(req)) {
+    const decoded = security.verifiedPayload(utils.jwtFrom(req)) as { data?: { id?: number } } | undefined
+    customerIds.set(req, decoded?.data?.id)
+  }
+  return customerIds.get(req)
 }
 
 export async function getUserNameFromToken (req: Request): Promise<string | undefined> {

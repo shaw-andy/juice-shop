@@ -55,6 +55,21 @@ export const authorize = (user = {}) => jwt.sign(user, privateKey, { expiresIn: 
 export const verify = (token: string) => token ? (jws.verify as ((token: string, secret: string) => boolean))(token, publicKey) : false
 export const decode = (token: string) => { return jws.decode(token)?.payload }
 
+// Unlike verify(), the algorithm is pinned instead of taken from the token header, so unsigned and HS256 tokens are rejected
+export const verifiedPayload = (token?: string) => {
+  const [header, payload, signature, ...rest] = token?.split('.') ?? []
+  if (!header || !payload || !signature || rest.length > 0) return undefined
+  try {
+    if (JSON.parse(Buffer.from(header, 'base64url').toString()).alg !== 'RS256') return undefined
+    if (!crypto.verify('RSA-SHA256', Buffer.from(`${header}.${payload}`), publicKey, Buffer.from(signature, 'base64url'))) return undefined
+    const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString())
+    if (typeof decoded?.exp === 'number' && decoded.exp <= Date.now() / 1000) return undefined
+    return decoded
+  } catch {
+    return undefined
+  }
+}
+
 export const sanitizeHtml = (html: string) => sanitizeHtmlLib(html)
 export const sanitizeLegacy = (input = '') => input.replace(/<(?:\w+)\W+?[\w]/gi, '')
 export const sanitizeFilename = (filename: string) => sanitizeFilenameLib(filename)
