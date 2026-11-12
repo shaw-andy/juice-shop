@@ -110,6 +110,43 @@ describe('DataExportComponent', () => {
         expect(component.resetForm).toHaveBeenCalled()
     })
 
+    it('downloads the export as a JSON file and does not write it into a document', () => {
+        const userData = '{\n  "orders": [{ "products": [{ "name": "<img src=x onerror=1>" }] }]\n}'
+        dataSubjectService.dataExport.mockReturnValue(of({ confirmation: 'exported', userData }))
+        const written: string[] = []
+        const openSpy = vi.spyOn(window, 'open').mockImplementation(() => {
+            return { document: { write: (value: string) => { written.push(String(value)) } } } as unknown as Window
+        })
+        const downloads: Array<{ href: string, download: string | null }> = []
+        const realCreate = document.createElement.bind(document)
+        const createSpy = vi.spyOn(document, 'createElement').mockImplementation((tag: string, options?: ElementCreationOptions) => {
+            const element = realCreate(tag, options)
+            if (tag.toLowerCase() === 'a') {
+                element.click = () => {
+                    downloads.push({ href: (element as HTMLAnchorElement).href, download: element.getAttribute('download') })
+                }
+            }
+            return element
+        })
+        const objectUrlTypes: string[] = []
+        const urlSpy = vi.spyOn(URL, 'createObjectURL').mockImplementation((blob: Blob | MediaSource) => {
+            objectUrlTypes.push(blob instanceof Blob ? blob.type : '')
+            return 'blob:export'
+        })
+        component.formatControl.setValue('1')
+        component.save()
+        openSpy.mockRestore()
+        createSpy.mockRestore()
+        urlSpy.mockRestore()
+        expect(written).toEqual([])
+        const downloadedJson = downloads.some((item) => item.download !== null && (
+            objectUrlTypes.some((type) => type.includes('json')) ||
+            item.href.startsWith('data:application/json') ||
+            item.href.startsWith('data:text/json')
+        ))
+        expect(downloadedJson).toBe(true)
+    })
+
     it('should clear the form and display error if exporting data fails', () => {
         dataSubjectService.dataExport.mockReturnValue(throwError({ error: 'Error' }))
         vi.spyOn(component, 'resetFormError')
