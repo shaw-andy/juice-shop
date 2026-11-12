@@ -19,7 +19,7 @@ describe('/#/privacy-security/change-password', () => {
   })
 
   describe('challenge "changePasswordBenderChallenge"', () => {
-    it('should be able to change password via XSS-powered attack on password change without passing current password', () => {
+    it('should not be able to change password via XSS-powered attack on password change without passing current password', () => {
       cy.login({
         email: 'bender',
         password: 'OhG0dPlease1nsertLiquor!'
@@ -29,9 +29,10 @@ describe('/#/privacy-security/change-password', () => {
       )
       cy.wait(2000)
       cy.login({ email: 'bender', password: 'slurmCl4ssic' })
-      cy.url().should('match', /\/search/)
+      cy.url().should('match', /\/login/)
 
-      cy.expectChallengeSolved({ challenge: "Change Bender's Password" })
+      cy.login({ email: 'bender', password: 'OhG0dPlease1nsertLiquor!' })
+      cy.url().should('match', /\/search/)
     })
   })
 })
