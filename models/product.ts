@@ -64,4 +64,12 @@ const ProductModelInit = (sequelize: Sequelize) => {
   )
 }
 
-export { Product as ProductModel, ProductModelInit }
+const isValidPrice = (price: unknown) => {
+  if (typeof price !== 'number' && (typeof price !== 'string' || price.trim() === '')) {
+    return false
+  }
+  const value = Number(price)
+  return Number.isFinite(value) && value >= 0
+}
+
+export { Product as ProductModel, ProductModelInit, isValidPrice }

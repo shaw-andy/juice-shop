@@ -140,16 +140,20 @@ void describe('/rest/basket/:id/checkout', () => {
     assert.ok(res.text.includes('Error: Basket with id=42 does not exist.'))
   })
 
-  void it('POST placing an order for a basket with a negative total cost is possible', async () => {
+  void it('POST placing an order for a basket with a negative total cost is refused', async () => {
     const itemRes = await request(app)
       .post('/api/BasketItems')
       .set(authHeader)
       .send({ BasketId: 2, ProductId: 10, quantity: -100 })
     assert.equal(itemRes.status, 200)
 
-    const res = await request(app).post('/rest/basket/3/checkout').set(authHeader)
-    assert.equal(res.status, 200)
-    assert.ok(res.body.orderConfirmation !== undefined)
+    const res = await request(app).post('/rest/basket/2/checkout').set(authHeader)
+    assert.equal(res.status, 500)
+    assert.equal(res.body.orderConfirmation, undefined)
+    assert.ok(res.text.includes('Error: Invalid order total.'))
+
+    const deleteRes = await request(app).delete('/api/BasketItems/' + itemRes.body.data.id).set(authHeader)
+    assert.equal(deleteRes.status, 200)
   })
 
   void it('POST placing an order for a basket with 99% discount is possible', async () => {
