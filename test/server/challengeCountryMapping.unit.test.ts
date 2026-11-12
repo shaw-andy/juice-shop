@@ -8,13 +8,13 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { promisify } from 'util'
-import { safeLoad } from 'js-yaml'
+import { load } from 'js-yaml'
 
 const readFile = promisify(fs.readFile)
 
 const loadYamlFile = async (filename: string) => {
   const contents = await readFile(filename, { encoding: 'utf8' })
-  return safeLoad(contents)
+  return load(contents)
 }
 
 void describe('challengeCountryMapping', () => {
