@@ -120,15 +120,15 @@ export async function setup (req: Request, res: Response) {
       throw new Error('Initial token doesnt match the secret from the setupToken')
     }
 
-    // Update db model and cached object
+    const [updatedRows] = await UserModel.update({ totpSecret: secret }, { where: { id: user.id, totpSecret: '' } })
+    if (updatedRows !== 1) {
+      throw new Error('No such user found or 2fa was set up concurrently!')
+    }
     const userModel = await UserModel.findByPk(user.id)
     if (userModel == null) {
       throw new Error('No such user found!')
     }
-
-    userModel.totpSecret = secret
-    await userModel.save()
-    security.authenticatedUsers.updateFrom(req, utils.queryResultToJson(userModel))
+    security.authenticatedUsers.revokeOtherSessionsFrom(req, utils.queryResultToJson(userModel))
 
     res.status(200).send()
   } catch (error) {
@@ -153,15 +153,19 @@ export async function disable (req: Request, res: Response) {
       throw new Error('Password doesnt match stored password')
     }
 
-    // Update db model and cached object
+    if (!user.totpSecret) {
+      throw new Error('User has no 2fa set up')
+    }
+
+    const [updatedRows] = await UserModel.update({ totpSecret: '' }, { where: { id: user.id, totpSecret: user.totpSecret } })
+    if (updatedRows !== 1) {
+      throw new Error('No such user found or 2fa was changed concurrently!')
+    }
     const userModel = await UserModel.findByPk(user.id)
     if (userModel == null) {
       throw new Error('No such user found!')
     }
-
-    userModel.totpSecret = ''
-    await userModel.save()
-    security.authenticatedUsers.updateFrom(req, utils.queryResultToJson(userModel))
+    security.authenticatedUsers.revokeOtherSessionsFrom(req, utils.queryResultToJson(userModel))
 
     res.status(200).send()
   } catch (error) {
