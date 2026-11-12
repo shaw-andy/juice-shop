@@ -105,4 +105,40 @@ describe('OAuthComponent', () => {
         expect(localStorage.getItem('token')).toBeNull()
         expect(sessionStorage.getItem('bid')).toBeNull()
     })
+
+    it('does not register or log in with a password derived only from the profile email', () => {
+        const emails = ['oauth.probe.8673@example.test', 'second.oauth.probe.8673@example.test']
+        for (const email of emails) {
+            userService.save.mockClear()
+            userService.login.mockClear()
+            userService.oauthLogin.mockReturnValue(of({ email }))
+            component.ngOnInit()
+            const derived = btoa(email.split('').reverse().join(''))
+            const saved = userService.save.mock.calls.some((call: [{ password?: string, passwordRepeat?: string }]) => call[0]?.password === derived || call[0]?.passwordRepeat === derived)
+            const loggedIn = userService.login.mock.calls.some((call: [{ password?: string }]) => call[0]?.password === derived)
+            expect(saved).toBe(false)
+            expect(loggedIn).toBe(false)
+        }
+    })
+
+    it('does not log in with a password derived only from the email when registration fails', () => {
+        const email = 'already.present.8673@example.test'
+        userService.save.mockClear()
+        userService.login.mockClear()
+        userService.oauthLogin.mockReturnValue(of({ email }))
+        userService.save.mockReturnValue(throwError({ error: 'Account already exists' }))
+        component.ngOnInit()
+        const derived = btoa(email.split('').reverse().join(''))
+        const loggedIn = userService.login.mock.calls.some((call: [{ password?: string }]) => call[0]?.password === derived)
+        expect(loggedIn).toBe(false)
+    })
+
+    it('does not log in from login() with a password derived only from the profile email', () => {
+        const email = 'direct.login.8673@example.test'
+        userService.login.mockClear()
+        component.login({ email })
+        const derived = btoa(email.split('').reverse().join(''))
+        const loggedIn = userService.login.mock.calls.some((call: [{ password?: string }]) => call[0]?.password === derived)
+        expect(loggedIn).toBe(false)
+    })
 })
