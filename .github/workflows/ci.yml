@@ -150,7 +150,6 @@ jobs:
         uses: nick-invision/retry@7152eba30c6575329ac0576536151aca5a72780e #v3.0.0
         env:
           NODE_ENV: test
-          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
         with:
           timeout_minutes: 5
           max_attempts: 3
@@ -248,7 +247,6 @@ jobs:
           group: ${{ matrix.browser }} @ ${{ matrix.os }}
         env:
           SOLUTIONS_WEBHOOK: ${{ secrets.E2E_SOLUTIONS_WEBHOOK }}
-          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: "Execute end-to-end tests on Mac"
@@ -263,7 +261,6 @@ jobs:
           group: ${{ matrix.browser }} @ ${{ matrix.os }}
         env:
           CYPRESS_CACHE_FOLDER: /Users/runner/Library/Caches/Cypress
-          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   smoke-test:
