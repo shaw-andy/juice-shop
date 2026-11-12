@@ -4,6 +4,7 @@ import config from 'config'
 import type { Memory as MemoryConfig, Product as ProductConfig } from './lib/config.schema'
 import * as utils from './lib/utils'
 import { generateSync } from 'otplib'
+import { Database, OPEN_READONLY } from 'sqlite3'
 
 export default defineConfig({
   projectId: '3hrkhu',
@@ -64,6 +65,20 @@ export default defineConfig({
         },
         GenerateAuthenticator (inputString: string) {
           return generateSync({ secret: inputString })
+        },
+        async GetImageCaptchaAnswer (email: string) {
+          return await new Promise((resolve, reject) => {
+            const db = new Database('data/juiceshop.sqlite', OPEN_READONLY)
+            db.get<{ answer: string }>(
+              'SELECT ImageCaptchas.answer FROM ImageCaptchas JOIN Users ON Users.id = ImageCaptchas.UserId WHERE Users.email = ? ORDER BY ImageCaptchas.id DESC LIMIT 1',
+              [email],
+              (err, row) => {
+                db.close()
+                if (err) reject(err)
+                else resolve(row?.answer ?? null)
+              }
+            )
+          })
         },
         toISO8601 () {
           const date = new Date()
