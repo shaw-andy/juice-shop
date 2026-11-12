@@ -412,6 +412,7 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.use('/api/SecurityQuestions/:id', security.denyAll())
   /* SecurityAnswers: Only POST of answer allowed. */
   app.get('/api/SecurityAnswers', security.denyAll())
+  app.post('/api/SecurityAnswers', security.isAuthorized(), security.requireOwnUserId()) // vuln-code-snippet hide-line
   app.use('/api/SecurityAnswers/:id', security.denyAll())
   /* REST API */
   app.use('/rest/user/authentication-details', security.isAuthorized())
@@ -535,6 +536,23 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
       }) // vuln-code-snippet neutral-line registerAdminChallenge
     } // vuln-code-snippet neutral-line registerAdminChallenge
     // vuln-code-snippet end registerAdminChallenge
+
+    // create the security answer as part of the user registration
+    if (name === 'User') {
+      resource.create.write.after(async (req: Request, res: Response, context: { instance: UserModel, continue: any }) => {
+        const securityQuestionId = req.body.securityQuestion?.id
+        const securityAnswer = req.body.securityAnswer
+        if (securityQuestionId != null && typeof securityAnswer === 'string' && securityAnswer.length > 0) {
+          try {
+            await SecurityAnswerModel.create({ UserId: context.instance.id, SecurityQuestionId: securityQuestionId, answer: securityAnswer })
+          } catch (err) {
+            await context.instance.destroy({ force: true })
+            throw new finale.Errors.BadRequestError('Invalid security question or answer', [], err)
+          }
+        }
+        return context.continue
+      })
+    }
 
     // translate challenge descriptions on-the-fly
     if (name === 'Challenge') {

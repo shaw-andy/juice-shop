@@ -183,6 +183,22 @@ export const appendUserId = () => {
   }
 }
 
+export const requireOwnUserId = () => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const userId = authenticatedUsers.get(utils.jwtFrom(req))?.data?.id
+    if (userId === undefined) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' })
+      return
+    }
+    if (req.body === null || typeof req.body !== 'object' || Array.isArray(req.body) || (req.body.UserId !== undefined && String(req.body.UserId) !== String(userId))) {
+      res.status(403).json({ status: 'error', message: 'Forbidden' })
+      return
+    }
+    req.body.UserId = userId
+    next()
+  }
+}
+
 export const updateAuthenticatedUsers = () => (req: Request, res: Response, next: NextFunction) => {
   const token = req.cookies.token || utils.jwtFrom(req)
   if (token && authenticatedUsers.get(token) === undefined) {
