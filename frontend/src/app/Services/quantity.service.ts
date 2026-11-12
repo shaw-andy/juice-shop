@@ -21,6 +21,10 @@ export class QuantityService {
     return this.http.get(this.host + '/').pipe(map((response: any) => response.data), catchError((err) => { throw err }))
   }
 
+  getAvailability () {
+    return this.http.get(this.hostServer + '/rest/products/availability').pipe(map((response: any) => response.data), catchError((err) => { throw err }))
+  }
+
   put (id: number, params) {
     return this.http.put(`${this.host}/${id}`, params).pipe(map((response: any) => response.data), catchError((error) => { throw error }))
   }

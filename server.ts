@@ -81,6 +81,7 @@ import { dataExport } from './routes/dataExport'
 import { chat } from './routes/chat'
 import { retrieveBasket } from './routes/basket'
 import { searchProducts } from './routes/search'
+import { getProductAvailability } from './routes/productAvailability'
 import { trackOrder } from './routes/trackOrder'
 import { saveLoginIp } from './routes/saveLoginIp'
 import { serveKeyFiles } from './routes/keyServer'
@@ -447,6 +448,7 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   /* Accounting users are allowed to check and update quantities */
   app.delete('/api/Quantitys/:id', security.denyAll())
   app.post('/api/Quantitys', security.denyAll())
+  app.get('/api/Quantitys', security.isAccounting())
   app.use('/api/Quantitys/:id', security.isAccounting(), IpFilter(['123.456.789'], { mode: 'allow' }))
   /* Feedbacks: Do not allow changes of existing feedback */
   app.put('/api/Feedbacks/:id', security.denyAll())
@@ -619,6 +621,7 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.get('/rest/user/whoami', utils.asyncHandler(retrieveLoggedInUser()))
   app.get('/rest/user/authentication-details', utils.asyncHandler(authenticatedUsers()))
   app.get('/rest/products/search', utils.asyncHandler(searchProducts()))
+  app.get('/rest/products/availability', utils.asyncHandler(getProductAvailability()))
   app.get('/rest/basket/:id', utils.asyncHandler(retrieveBasket()))
   app.post('/rest/basket/:id/checkout', placeOrder())
   app.put('/rest/basket/:id/coupon/:coupon', utils.asyncHandler(applyCoupon()))

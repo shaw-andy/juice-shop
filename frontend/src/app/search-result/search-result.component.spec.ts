@@ -73,9 +73,9 @@ describe('SearchResultComponent', () => {
         }
         dialog.open.mockReturnValue(null)
         quantityService = {
-            getAll: vi.fn().mockName("QuantityService.getAll")
+            getAvailability: vi.fn().mockName("QuantityService.getAvailability")
         }
-        quantityService.getAll.mockReturnValue(of([]))
+        quantityService.getAvailability.mockReturnValue(of([]))
         snackBar = {
             open: vi.fn().mockName("MatSnackBar.open")
         }
@@ -185,16 +185,16 @@ describe('SearchResultComponent', () => {
         expect(console.log).toHaveBeenCalledWith('Error')
     })
 
-    it('should hold no products when quantity getAll API call fails', () => {
+    it('should hold no products when quantity getAvailability API call fails', () => {
         vi.spyOn(console, 'log').mockImplementation(() => {})
-        quantityService.getAll.mockReturnValue(throwError(() => 'Error'))
+        quantityService.getAvailability.mockReturnValue(throwError(() => 'Error'))
         component.ngAfterViewInit()
         fixture.detectChanges()
         expect(component.tableData).toEqual([])
     })
 
-    it('should log error from quantity getAll API call directly to browser console', () => {
-        quantityService.getAll.mockReturnValue(throwError(() => 'Error'))
+    it('should log error from quantity getAvailability API call directly to browser console', () => {
+        quantityService.getAvailability.mockReturnValue(throwError(() => 'Error'))
         console.log = vi.fn()
         component.ngAfterViewInit()
         fixture.detectChanges()
@@ -293,7 +293,7 @@ describe('SearchResultComponent', () => {
                 { id: 1, name: 'Apple', price: 1, description: 'd', image: 'i' },
                 { id: 2, name: 'Orange', price: 2, description: 'd', image: 'i' }
             ]))
-            quantityService.getAll.mockReturnValue(of([
+            quantityService.getAvailability.mockReturnValue(of([
                 { ProductId: 1, quantity: 10 },
                 { ProductId: 3, quantity: 5 } // Non-existent product
             ]))
