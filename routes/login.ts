@@ -10,7 +10,6 @@ import { challenges, users } from '../data/datacache'
 import { BasketModel } from '../models/basket'
 import * as security from '../lib/insecurity'
 import { UserModel } from '../models/user'
-import * as models from '../models/index'
 import { type User } from '../data/types'
 import * as utils from '../lib/utils'
 
@@ -31,7 +30,7 @@ export function login () {
 
   return (req: Request, res: Response, next: NextFunction) => {
     verifyPreLoginChallenges(req) // vuln-code-snippet hide-line
-    models.sequelize.query(`SELECT * FROM Users WHERE email = '${req.body.email || ''}' AND password = '${security.hash(req.body.password || '')}' AND deletedAt IS NULL`, { model: UserModel, plain: true }) // vuln-code-snippet vuln-line loginAdminChallenge loginBenderChallenge loginJimChallenge
+    findUserByCredentials(req.body.email, req.body.password) // vuln-code-snippet vuln-line loginAdminChallenge loginBenderChallenge loginJimChallenge
       .then((authenticatedUser) => { // vuln-code-snippet neutral-line loginAdminChallenge loginBenderChallenge loginJimChallenge
         const user = utils.queryResultToJson(authenticatedUser)
         if (user.data?.id && user.data.totpSecret !== '') {
@@ -54,6 +53,17 @@ export function login () {
       })
   }
   // vuln-code-snippet end loginAdminChallenge loginBenderChallenge loginJimChallenge
+
+  async function findUserByCredentials (email: unknown, password: unknown): Promise<UserModel | null> {
+    if (typeof email !== 'string' || typeof password !== 'string') {
+      return null
+    }
+    const matches = await UserModel.findAll({ where: { email }, limit: 2 })
+    if (matches.length !== 1 || matches[0].password !== security.hash(password)) {
+      return null
+    }
+    return matches[0]
+  }
 
   function verifyPreLoginChallenges (req: Request) {
     challengeUtils.solveIf(challenges.weakPasswordChallenge, () => { return req.body.email === 'admin@' + config.get<string>('application.domain') && req.body.password === 'admin123' })
