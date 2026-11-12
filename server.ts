@@ -472,6 +472,7 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.get('/api/Deliverys', utils.asyncHandler(delivery.getDeliveryMethods()))
   app.get('/api/Deliverys/:id', utils.asyncHandler(delivery.getDeliveryMethod()))
   // vuln-code-snippet end changeProductChallenge
+  app.post('/api/Recycles', security.appendUserId(), utils.asyncHandler(recycles.createRecycleItem()))
 
   /* Verify the 2FA Token */
   app.post('/rest/2fa/verify',

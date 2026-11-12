@@ -8,14 +8,17 @@ import assert from 'node:assert/strict'
 import request from 'supertest'
 import type { Express } from 'express'
 import { createTestApp } from './helpers/setup'
+import { AddressModel } from '../../models/address'
 import * as security from '../../lib/insecurity'
 
 let app: Express
-const authHeader = { Authorization: 'Bearer ' + security.authorize(), 'content-type': 'application/json' }
+let authHeader: Record<string, string>
 
 before(async () => {
   const result = await createTestApp()
   app = result.app
+  const address = await AddressModel.findByPk(1)
+  authHeader = { Authorization: 'Bearer ' + security.authorize({ data: { id: address?.UserId } }), 'content-type': 'application/json' }
 }, { timeout: 60000 })
 
 void describe('/api/Recycles', () => {
