@@ -66,7 +66,7 @@ export async function register (app: Express, { email, password, totpSecret }: {
       })
       .send({
         password,
-        setupToken: security.authorize({
+        setupToken: security.authorizeInterim({
           secret: totpSecret,
           type: 'totp_setup_secret'
         }),

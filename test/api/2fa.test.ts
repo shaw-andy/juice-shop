@@ -34,7 +34,7 @@ before(async () => {
 
 void describe('/rest/2fa/verify', () => {
   void it('POST should return a valid authentication when a valid tmp token is passed', async () => {
-    const tmpTokenWurstbrot = security.authorize({
+    const tmpTokenWurstbrot = security.authorizeInterim({
       userId: 10,
       type: 'password_valid_needs_second_factor_token'
     })
@@ -58,7 +58,7 @@ void describe('/rest/2fa/verify', () => {
   })
 
   void it('POST should fail if a invalid totp token is used', async () => {
-    const tmpTokenWurstbrot = security.authorize({
+    const tmpTokenWurstbrot = security.authorizeInterim({
       userId: 10,
       type: 'password_valid_needs_second_factor_token'
     })
@@ -96,7 +96,7 @@ void describe('/rest/2fa/verify', () => {
   })
 
   void it('POST should fail if the token type is invalid', async () => {
-    const tmpTokenWurstbrot = security.authorize({
+    const tmpTokenWurstbrot = security.authorizeInterim({
       userId: 10,
       type: 'invalid_token_type'
     })
@@ -115,7 +115,7 @@ void describe('/rest/2fa/verify', () => {
   })
 
   void it('POST should fail if the user doesn\'t exist', async () => {
-    const tmpTokenWurstbrot = security.authorize({
+    const tmpTokenWurstbrot = security.authorizeInterim({
       userId: 999,
       type: 'password_valid_needs_second_factor_token'
     })
@@ -192,7 +192,7 @@ void describe('/rest/2fa/setup', () => {
       })
       .send({
         password,
-        setupToken: security.authorize({
+        setupToken: security.authorizeInterim({
           secret,
           type: 'totp_setup_secret'
         }),
@@ -224,7 +224,7 @@ void describe('/rest/2fa/setup', () => {
       })
       .send({
         password: password + ' this makes the password wrong',
-        setupToken: security.authorize({
+        setupToken: security.authorizeInterim({
           secret,
           type: 'totp_setup_secret'
         }),
@@ -250,7 +250,7 @@ void describe('/rest/2fa/setup', () => {
       })
       .send({
         password,
-        setupToken: security.authorize({
+        setupToken: security.authorizeInterim({
           secret,
           type: 'totp_setup_secret'
         }),
@@ -276,7 +276,7 @@ void describe('/rest/2fa/setup', () => {
       })
       .send({
         password,
-        setupToken: security.authorize({
+        setupToken: security.authorizeInterim({
           secret,
           type: 'totp_setup_secret_foobar'
         }),
@@ -301,7 +301,7 @@ void describe('/rest/2fa/setup', () => {
       })
       .send({
         password,
-        setupToken: security.authorize({
+        setupToken: security.authorizeInterim({
           secret: totpSecret,
           type: 'totp_setup_secret'
         }),
@@ -334,7 +334,7 @@ void describe('/rest/2fa/setup', () => {
       })
       .send({
         password,
-        setupToken: security.authorize({
+        setupToken: security.authorizeInterim({
           secret,
           type: 'totp_setup_secret'
         }),
