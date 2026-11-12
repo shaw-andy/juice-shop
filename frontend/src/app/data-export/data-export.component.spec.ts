@@ -66,6 +66,19 @@ describe('DataExportComponent', () => {
         expect(component).toBeTruthy()
     })
 
+    it('should always request a captcha on initialization', () => {
+        expect(imageCaptchaService.getCaptcha).toHaveBeenCalled()
+    })
+
+    it('should submit the captcha answer with the export request', () => {
+        dataSubjectService.dataExport.mockReturnValue(of({ confirmation: 'Data being exported', userData: '{ user data }' }))
+        vi.spyOn(window, 'open').mockReturnValue({ document: { write: vi.fn() } } as any)
+        component.captchaControl.setValue('abcde')
+        component.formatControl.setValue('1')
+        component.save()
+        expect(dataSubjectService.dataExport).toHaveBeenCalledWith(expect.objectContaining({ answer: 'abcde', format: '1' }))
+    })
+
     it('should reinitizalise form by calling resetForm', () => {
         component.captchaControl.setValue('captcha')
         component.formatControl.setValue('1')
@@ -113,9 +126,11 @@ describe('DataExportComponent', () => {
     it('should clear the form and display error if exporting data fails', () => {
         dataSubjectService.dataExport.mockReturnValue(throwError({ error: 'Error' }))
         vi.spyOn(component, 'resetFormError')
+        vi.spyOn(component, 'getNewCaptcha')
         component.save()
         expect(component.confirmation).toBeNull()
         expect(component.error).toBe('Error')
         expect(component.resetFormError).toHaveBeenCalled()
+        expect(component.getNewCaptcha).toHaveBeenCalled()
     })
 })
