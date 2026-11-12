@@ -473,22 +473,31 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.get('/api/Deliverys/:id', utils.asyncHandler(delivery.getDeliveryMethod()))
   // vuln-code-snippet end changeProductChallenge
 
+  /* 2FA attempts are budgeted per account because 'trust proxy' lets clients choose their own req.ip */
+  const twoFactorRateLimit = (accountOf: (req: Request) => string | undefined) => rateLimit({
+    windowMs: 5 * 60 * 1000,
+    max: 100,
+    keyGenerator: (req: Request) => {
+      const account = accountOf(req)
+      return account !== undefined ? `account:${account}` : `ip:${req.ip}`
+    }
+  })
   /* Verify the 2FA Token */
   app.post('/rest/2fa/verify',
-    rateLimit({ windowMs: 5 * 60 * 1000, max: 100, validate: false }),
+    twoFactorRateLimit(twoFactorAuth.verifyRateLimitAccount),
     utils.asyncHandler(twoFactorAuth.verify)
   )
   /* Check 2FA Status for the current User */
   app.get('/rest/2fa/status', security.isAuthorized(), utils.asyncHandler(twoFactorAuth.status))
   /* Enable 2FA for the current User */
   app.post('/rest/2fa/setup',
-    rateLimit({ windowMs: 5 * 60 * 1000, max: 100, validate: false }),
+    twoFactorRateLimit(twoFactorAuth.sessionRateLimitAccount),
     security.isAuthorized(),
     utils.asyncHandler(twoFactorAuth.setup)
   )
   /* Disable 2FA Status for the current User */
   app.post('/rest/2fa/disable',
-    rateLimit({ windowMs: 5 * 60 * 1000, max: 100, validate: false }),
+    twoFactorRateLimit(twoFactorAuth.sessionRateLimitAccount),
     security.isAuthorized(),
     utils.asyncHandler(twoFactorAuth.disable)
   )

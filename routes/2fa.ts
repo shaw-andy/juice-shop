@@ -13,6 +13,24 @@ import { challenges } from '../data/datacache'
 import { generateSecret, verifySync } from 'otplib'
 import * as security from '../lib/insecurity'
 
+export function verifyRateLimitAccount (req: Request): string | undefined {
+  try {
+    const { tmpToken } = req.body
+    if (!security.verify(tmpToken)) {
+      return undefined
+    }
+    const { userId, type } = security.decode(tmpToken)
+    return type === 'password_valid_needs_second_factor_token' && userId != null ? String(userId) : undefined
+  } catch {
+    return undefined
+  }
+}
+
+export function sessionRateLimitAccount (req: Request): string | undefined {
+  const userId = security.authenticatedUsers.from(req)?.data?.id
+  return userId != null ? String(userId) : undefined
+}
+
 export async function verify (req: Request, res: Response) {
   const { tmpToken, totpToken } = req.body
 
