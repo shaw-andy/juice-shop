@@ -11,6 +11,7 @@ import config from 'config'
 import path from 'node:path'
 import { createTestApp } from './helpers/setup'
 import { login } from './helpers/auth'
+import { latestImageCaptchaAnswer } from './helpers/captcha'
 import { MemoryModel } from '../../models/memory'
 import * as db from '../../data/mongodb'
 
@@ -120,7 +121,7 @@ void describe('/rest/user/data-export', () => {
     const res = await request(app)
       .post('/rest/user/data-export')
       .set(authHeader)
-      .send({ answer: captchaRes.body.answer, format: 1 })
+      .send({ answer: await latestImageCaptchaAnswer(token), format: 1 })
 
     assert.equal(res.status, 200)
     assert.ok(res.headers['content-type']?.includes('application/json'))
@@ -230,7 +231,7 @@ void describe('/rest/user/data-export', () => {
     const res = await request(app)
       .post('/rest/user/data-export')
       .set(authHeader)
-      .send({ answer: captchaRes.body.answer, format: 1 })
+      .send({ answer: await latestImageCaptchaAnswer(token), format: 1 })
 
     assert.equal(res.status, 200)
     assert.ok(res.headers['content-type']?.includes('application/json'))
@@ -261,7 +262,7 @@ void describe('/rest/user/data-export', () => {
     const res = await request(app)
       .post('/rest/user/data-export')
       .set(authHeader)
-      .send({ answer: captchaRes.body.answer, format: 1 })
+      .send({ answer: await latestImageCaptchaAnswer(token), format: 1 })
 
     assert.equal(res.status, 200)
     assert.ok(res.headers['content-type']?.includes('application/json'))
@@ -303,7 +304,7 @@ void describe('/rest/user/data-export', () => {
     const res = await request(app)
       .post('/rest/user/data-export')
       .set(authHeader)
-      .send({ answer: captchaRes.body.answer, format: 1 })
+      .send({ answer: await latestImageCaptchaAnswer(token), format: 1 })
 
     assert.equal(res.status, 200)
     assert.ok(res.headers['content-type']?.includes('application/json'))

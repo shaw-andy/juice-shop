@@ -18,7 +18,7 @@ InferCreationAttributes<ImageCaptcha>
 > {
   declare id: CreationOptional<number>
   declare image: string
-  declare answer: string
+  declare answer: string | null
   declare UserId: number
   declare createdAt: CreationOptional<Date>
 }

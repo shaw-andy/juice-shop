@@ -21,14 +21,13 @@ export function imageCaptchas () {
         return
       }
 
-      const imageCaptcha = {
+      const imageCaptchaInstance = ImageCaptchaModel.build({
         image: captcha.data,
         answer: captcha.text,
         UserId: user.data.id
-      }
-      const imageCaptchaInstance = ImageCaptchaModel.build(imageCaptcha)
+      })
       await imageCaptchaInstance.save()
-      res.json(imageCaptcha)
+      res.json({ image: captcha.data })
     } catch (error) {
       res.status(400).send(res.__('Unable to create CAPTCHA. Please try again.'))
     }
@@ -49,7 +48,14 @@ export const verifyImageCaptcha = () => async (req: Request, res: Response, next
       },
       order: [['createdAt', 'DESC']]
     })
-    if (!captchas[0] || req.body.answer === captchas[0].answer) {
+    const captcha = captchas[0]
+    if (!captcha) {
+      next()
+      return
+    }
+    // A used CAPTCHA keeps its row so a new one is still required, but its answer is cleared so it never matches again
+    const [consumed] = await ImageCaptchaModel.update({ answer: null }, { where: { id: captcha.id, answer: { [Op.not]: null } } })
+    if (consumed === 1 && req.body.answer === captcha.answer) {
       next()
     } else {
       res.status(401).send(res.__('Wrong answer to CAPTCHA. Please try again.'))
