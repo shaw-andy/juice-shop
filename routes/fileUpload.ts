@@ -4,6 +4,7 @@
  */
 
 import fs from 'node:fs'
+import crypto from 'node:crypto'
 import vm from 'node:vm'
 import path from 'node:path'
 import { pipeline } from 'node:stream/promises'
@@ -24,14 +25,28 @@ function ensureFileIsPassed ({ file }: Request, res: Response, next: NextFunctio
   }
 }
 
+function isPlainFileName (fileName: string) {
+  return fileName !== '' && fileName !== '.' && fileName !== '..' && !/[/\\:\0]/.test(fileName)
+}
+
 async function extractZipBuffer (buffer: Buffer) {
+  const complaintsDirectory = await fs.promises.realpath('uploads/complaints')
   const directory = await unzipper.Open.buffer(buffer)
   for (const entry of directory.files) {
     const fileName = entry.path
-    const absolutePath = path.resolve('uploads/complaints/' + fileName)
-    challengeUtils.solveIf(challenges.fileWriteChallenge, () => { return absolutePath === path.resolve('ftp/legal.md') })
-    if (absolutePath.includes(path.resolve('.'))) {
-      await pipeline(entry.stream(), fs.createWriteStream('uploads/complaints/' + fileName))
+    challengeUtils.solveIf(challenges.fileWriteChallenge, () => { return path.resolve('uploads/complaints/' + fileName) === path.resolve('ftp/legal.md') })
+    if (entry.type !== 'File' || !isPlainFileName(fileName)) {
+      continue
+    }
+    // Exclusive create never follows an existing link, and rename replaces the directory entry itself rather than writing through it
+    const tempPath = path.join(complaintsDirectory, `.${crypto.randomUUID()}.tmp`)
+    const handle = await fs.promises.open(tempPath, 'wx')
+    try {
+      await pipeline(entry.stream(), handle.createWriteStream())
+      await fs.promises.rename(tempPath, path.join(complaintsDirectory, fileName))
+    } catch (err) {
+      await fs.promises.rm(tempPath, { force: true })
+      throw err
     }
   }
 }
