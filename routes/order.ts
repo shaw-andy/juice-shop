@@ -193,18 +193,18 @@ function calculateApplicableDiscount (basket: BasketModel, req: Request) {
     challengeUtils.solveIf(challenges.forgedCouponChallenge, () => { return (discount ?? 0) >= 80 })
     return discount
   } else if (req.body.couponData) {
-    const couponData = Buffer.from(req.body.couponData, 'base64').toString().split('-')
-    const couponCode = couponData[0]
-    const couponDate = Number(couponData[1])
+    const couponCode = Buffer.from(String(req.body.couponData), 'base64').toString().split('-')[0]
     const campaign = campaigns[couponCode as keyof typeof campaigns]
+    const now = Date.now()
 
-    if (campaign && couponDate == campaign.validOn) { // eslint-disable-line eqeqeq
-      challengeUtils.solveIf(challenges.manipulateClockChallenge, () => { return campaign.validOn < new Date().getTime() })
+    if (campaign && now >= campaign.validOn && now < campaign.validOn + campaignDuration) {
       return campaign.discount
     }
   }
   return 0
 }
+
+const campaignDuration = 24 * 60 * 60 * 1000
 
 const campaigns = {
   WMNSDY2019: { validOn: new Date('Mar 08, 2019 00:00:00 GMT+0100').getTime(), discount: 75 },
