@@ -105,4 +105,11 @@ describe('OAuthComponent', () => {
         expect(localStorage.getItem('token')).toBeNull()
         expect(sessionStorage.getItem('bid')).toBeNull()
     })
+
+    it('removes the interim two-factor token when the session is invalidated', () => {
+        localStorage.setItem('totp_tmp_token', 'placeholder-interim-token')
+        vi.spyOn(console, 'log').mockImplementation(() => {})
+        component.invalidateSession(new Error('placeholder'))
+        expect(localStorage.getItem('totp_tmp_token')).toBeNull()
+    })
 })

@@ -295,6 +295,12 @@ describe('NavbarComponent', () => {
         expect(removeItemSpy).toHaveBeenCalledWith('token')
     })
 
+    it('should remove the interim two-factor token from localStorage on logout', () => {
+        localStorage.setItem('totp_tmp_token', 'placeholder-interim-token')
+        component.logout()
+        expect(localStorage.getItem('totp_tmp_token')).toBeNull()
+    })
+
     it('should remove authentication token from cookies', () => {
         component.logout()
         expect(cookieService.remove).toHaveBeenCalledWith('token')
