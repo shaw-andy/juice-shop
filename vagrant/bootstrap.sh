@@ -22,7 +22,10 @@ apt-get install -qy apache2 docker-ce
 cp /tmp/juice-shop/default.conf /etc/apache2/sites-available/000-default.conf
 
 # Download and start docker image with Juice Shop
-docker run --restart=always -d -p 3000:3000 --name juice-shop bkimminich/juice-shop
+# Pinned by digest so the shop cannot change when a tag is moved; update deliberately.
+JUICE_SHOP_IMAGE=bkimminich/juice-shop@sha256:877fc77b12d72b42e486eb09b6b1711cc56514306d92006b284e7e7cf076a809
+docker pull "$JUICE_SHOP_IMAGE"
+docker run --restart=always -d -p 3000:3000 --name juice-shop "$JUICE_SHOP_IMAGE"
 
 # Enable proxy modules in apache and restart
 a2enmod proxy_http
