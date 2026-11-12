@@ -15,8 +15,20 @@ jobs:
         repository: juice-shop/juice-shop.github.io
         branch: master
     - name: Update tab_news.md
+      env:
+        TAG_NAME: ${{ github.event.release.tag_name }}
+        PUBLISHED_AT: ${{ github.event.release.published_at }}
       run: |
-        sed -i 's/<!-- next:juice-shop -->/<!-- next:juice-shop -->\n* ${{ github.event.release.published_at }}: juice-shop [`${{ github.event.release.tag_name }}`](https:\/\/github.com\/juice-shop\/juice-shop\/releases\/tag\/${{ github.event.release.tag_name }})/' tab_news.md
+        if ! [[ "$TAG_NAME" =~ ^[A-Za-z0-9._-]+$ ]]; then
+          echo "Refusing to publish news for unexpected release tag format" >&2
+          exit 1
+        fi
+        export NEWS_ENTRY="* ${PUBLISHED_AT}: juice-shop [\`${TAG_NAME}\`](https://github.com/juice-shop/juice-shop/releases/tag/${TAG_NAME})"
+        awk -v marker='<!-- next:juice-shop -->' '
+          (i = index($0, marker)) { $0 = substr($0, 1, i + length(marker) - 1) "\n" ENVIRON["NEWS_ENTRY"] substr($0, i + length(marker)) }
+          { print }
+        ' tab_news.md > tab_news.md.tmp
+        mv tab_news.md.tmp tab_news.md
     - uses: stefanzweifel/git-auto-commit-action@8621497c8c39c72f3e2a999a26b4ca1b5058a842 #v5.0.1
       with:
         commit_message: "Add juice-shop ${{ github.event.release.tag_name }} release notes to tab_news.md"
