@@ -55,8 +55,8 @@ void describe('/profile/image/file', () => {
 
     assert.equal(res.status, 415)
     assert.ok(res.headers['content-type']?.includes('text/html'))
-    assert.ok(res.text.includes(`${config.get<string>('application.name')} (Express`))
-    assert.ok(res.text.includes('Error: Profile image upload does not accept this file type'))
+    assert.equal(res.text.includes(`${config.get<string>('application.name')} (Express`), false)
+    assert.equal(res.text.includes('Error: Profile image upload does not accept this file type'), false)
   })
 
   void it('POST profile image file forbidden for anonymous user', async () => {
@@ -68,7 +68,7 @@ void describe('/profile/image/file', () => {
 
     assert.equal(res.status, 500)
     assert.ok(res.headers['content-type']?.includes('text/html'))
-    assert.ok(res.text.includes('Error: Blocked illegal activity'))
+    assert.equal(res.text.includes('Error: Blocked illegal activity'), false)
   })
 
   void it('POST profile image file rejected for unrecognizable file content', async () => {
@@ -84,7 +84,7 @@ void describe('/profile/image/file', () => {
 
     assert.equal(res.status, 500)
     assert.ok(res.headers['content-type']?.includes('text/html'))
-    assert.ok(res.text.includes('Error: Illegal file type'))
+    assert.equal(res.text.includes('Error: Illegal file type'), false)
   })
 })
 
@@ -126,7 +126,7 @@ void describe('/profile/image/url', () => {
 
     assert.equal(res.status, 500)
     assert.ok(res.headers['content-type']?.includes('text/html'))
-    assert.ok(res.text.includes('Error: Blocked illegal activity'))
+    assert.equal(res.text.includes('Error: Blocked illegal activity'), false)
   })
 
   void it('POST valid image with tampered content length', { skip: 'Fails on CI/CD pipeline' }, async () => {

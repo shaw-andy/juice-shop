@@ -3,16 +3,15 @@
  * SPDX-License-Identifier: MIT
  */
 
-import { type Request, type Response } from 'express'
+import { type NextFunction, type Request, type Response } from 'express'
 
 import * as challengeUtils from '../lib/challengeUtils'
 import { reviewsCollection } from '../data/mongodb'
 import { challenges } from '../data/datacache'
 import * as security from '../lib/insecurity'
-import * as utils from '../lib/utils'
 
 export function createProductReviews () {
-  return async (req: Request, res: Response) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     const user = security.authenticatedUsers.from(req)
     challengeUtils.solveIf(
       challenges.forgedReviewChallenge,
@@ -29,7 +28,7 @@ export function createProductReviews () {
       })
       return res.status(201).json({ status: 'success' })
     } catch (err: unknown) {
-      return res.status(500).json(utils.getErrorMessage(err))
+      next(err)
     }
   }
 }

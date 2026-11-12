@@ -39,13 +39,13 @@ void describe('/rest/products/search', () => {
     assert.equal(res.body.data.length, 1)
   })
 
-  void it('GET product search fails with error message that exposes ins SQL Injection vulnerability', async () => {
+  void it('GET product search fails without error message exposing the SQL Injection vulnerability', async () => {
     const res = await request(app)
       .get("/rest/products/search?q=';")
     assert.equal(res.status, 500)
     assert.ok(res.headers['content-type']?.includes('text/html'))
-    assert.ok(res.text.includes(`<h1>${config.get<string>('application.name')} (Express`))
-    assert.ok(res.text.includes('SQLITE_ERROR: near &quot;;&quot;: syntax error'))
+    assert.equal(res.text.includes(`<h1>${config.get<string>('application.name')} (Express`), false)
+    assert.equal(res.text.includes('SQLITE_ERROR: near &quot;;&quot;: syntax error'), false)
   })
 
   void it('GET product search SQL Injection fails from two missing closing parenthesis', async () => {
@@ -53,8 +53,8 @@ void describe('/rest/products/search', () => {
       .get("/rest/products/search?q=' union select id,email,password from users--")
     assert.equal(res.status, 500)
     assert.ok(res.headers['content-type']?.includes('text/html'))
-    assert.ok(res.text.includes(`<h1>${config.get<string>('application.name')} (Express`))
-    assert.ok(res.text.includes('SQLITE_ERROR: near &quot;union&quot;: syntax error'))
+    assert.equal(res.text.includes(`<h1>${config.get<string>('application.name')} (Express`), false)
+    assert.equal(res.text.includes('SQLITE_ERROR: near &quot;union&quot;: syntax error'), false)
   })
 
   void it('GET product search SQL Injection fails from one missing closing parenthesis', async () => {
@@ -62,8 +62,8 @@ void describe('/rest/products/search', () => {
       .get("/rest/products/search?q=') union select id,email,password from users--")
     assert.equal(res.status, 500)
     assert.ok(res.headers['content-type']?.includes('text/html'))
-    assert.ok(res.text.includes(`<h1>${config.get<string>('application.name')} (Express`))
-    assert.ok(res.text.includes('SQLITE_ERROR: near &quot;union&quot;: syntax error'))
+    assert.equal(res.text.includes(`<h1>${config.get<string>('application.name')} (Express`), false)
+    assert.equal(res.text.includes('SQLITE_ERROR: near &quot;union&quot;: syntax error'), false)
   })
 
   void it('GET product search SQL Injection fails for SELECT * FROM attack due to wrong number of returned columns', async () => {
@@ -71,8 +71,8 @@ void describe('/rest/products/search', () => {
       .get("/rest/products/search?q=')) union select * from users--")
     assert.equal(res.status, 500)
     assert.ok(res.headers['content-type']?.includes('text/html'))
-    assert.ok(res.text.includes(`<h1>${config.get<string>('application.name')} (Express`))
-    assert.ok(res.text.includes('SQLITE_ERROR: SELECTs to the left and right of UNION do not have the same number of result columns'))
+    assert.equal(res.text.includes(`<h1>${config.get<string>('application.name')} (Express`), false)
+    assert.equal(res.text.includes('SQLITE_ERROR: SELECTs to the left and right of UNION do not have the same number of result columns'), false)
   })
 
   void it('GET product search can create UNION SELECT with Users table and fixed columns', async () => {

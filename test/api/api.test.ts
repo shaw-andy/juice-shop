@@ -26,11 +26,11 @@ void describe('/api', () => {
 })
 
 void describe('/rest', () => {
-  void it('GET error message with information leakage when calling unrecognized path with /rest in it', async () => {
+  void it('GET generic error without information leakage when calling unrecognized path with /rest in it', async () => {
     const res = await request(app)
       .get('/rest/unrecognized')
     assert.equal(res.status, 500)
-    assert.ok(res.text.includes('<h1>' + config.get<string>('application.name') + ' (Express'))
-    assert.ok(res.text.includes('Unexpected path: /rest/unrecognized'))
+    assert.equal(res.text.includes('<h1>' + config.get<string>('application.name') + ' (Express'), false)
+    assert.equal(res.text.includes('Unexpected path: /rest/unrecognized'), false)
   })
 })

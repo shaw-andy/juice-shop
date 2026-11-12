@@ -12,6 +12,7 @@ import multer from 'multer'
 import helmet from 'helmet'
 import http from 'node:http'
 import path from 'node:path'
+import { inspect } from 'node:util'
 import express from 'express'
 import colors from 'colors/safe'
 import serveIndex from 'serve-index'
@@ -90,6 +91,7 @@ import { serveEasterEgg } from './routes/easterEgg'
 import { getLanguageList } from './routes/languages'
 import { getUserProfile } from './routes/userProfile'
 import { serveAngularClient } from './routes/angular'
+import { errorHandler } from './routes/errorHandler'
 import { resetPassword } from './routes/resetPassword'
 import { serveLogFiles } from './routes/logfileServer'
 import { servePublicFiles } from './routes/fileServer'
@@ -129,10 +131,6 @@ import { ensureFileIsPassed, handleZipFileUpload, checkUploadSize, checkFileType
 
 const app = express()
 const server = new http.Server(app)
-
-// errorhandler requires us from overwriting a string property on it's module which is a big no-no with esmodules :/
-
-const errorhandler = require('errorhandler')
 
 const startTime = Date.now()
 
@@ -536,6 +534,18 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
     } // vuln-code-snippet neutral-line registerAdminChallenge
     // vuln-code-snippet end registerAdminChallenge
 
+    for (const controller of Object.values<any>(resource.controllers)) {
+      const sendError = controller.error.bind(controller)
+      controller.error = (req: Request, res: Response, err: { status: number, message: string, cause?: Error }) => {
+        if (err.status >= 500) {
+          logger.warn(`Unhandled error: ${inspect(err.cause ?? err)}`)
+          sendError(req, res, { status: err.status, message: 'internal error' })
+        } else {
+          sendError(req, res, err)
+        }
+      }
+    }
+
     // translate challenge descriptions on-the-fly
     if (name === 'Challenge') {
       resource.list.fetch.after((req: Request, res: Response, context: { instance: string | any[], continue: any }) => {
@@ -698,7 +708,7 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
 
   /* Error Handling */
   app.use(verify.errorHandlingChallenge())
-  app.use(errorhandler())
+  app.use(errorHandler())
 }
 
 // Function called first to ensure that all the i18n files are reloaded successfully before other linked operations.
@@ -748,7 +758,6 @@ logger.info(`Entity models ${colors.bold(Object.keys(sequelize.models).length.to
 let metricsUpdateLoop: any
 const Metrics = metrics.observeMetrics() // vuln-code-snippet neutral-line exposedMetricsChallenge
 app.get('/metrics', utils.asyncHandler(metrics.serveMetrics())) // vuln-code-snippet vuln-line exposedMetricsChallenge
-errorhandler.title = `${config.get<string>('application.name')} (Express ${utils.version('express')})`
 
 export async function start (readyCallback?: () => void) {
   const datacreatorEnd = startupGauge.startTimer({ task: 'datacreator' })

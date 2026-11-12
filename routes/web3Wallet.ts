@@ -1,7 +1,6 @@
-import { type Request, type Response } from 'express'
+import { type NextFunction, type Request, type Response } from 'express'
 
 import logger from '../lib/logger'
-import * as utils from '../lib/utils'
 import { challenges } from '../data/datacache'
 import * as challengeUtils from '../lib/challengeUtils'
 import { web3WalletABI } from '../data/static/contractABIs'
@@ -11,7 +10,7 @@ const walletsConnected = new Set()
 let isEventListenerCreated = false
 
 export function contractExploitListener () {
-  return async (req: Request, res: Response) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     const metamaskAddress = req.body.walletAddress
     walletsConnected.add(metamaskAddress)
     try {
@@ -33,7 +32,7 @@ export function contractExploitListener () {
       }
       res.status(200).json({ success: true, message: 'Event Listener Created' })
     } catch (error) {
-      res.status(500).json(utils.getErrorMessage(error))
+      next(error)
     }
   }
 }

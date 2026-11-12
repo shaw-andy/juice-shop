@@ -156,7 +156,7 @@ void describe('/encryptionkeys', () => {
     const res = await request(app)
       .get('/encryptionkeys/%2fetc%2fos-release%2500.md')
     assert.equal(res.status, 403)
-    assert.ok(res.text.includes('Error: File names cannot contain forward slashes!'))
+    assert.equal(res.text.includes('Error: File names cannot contain forward slashes!'), false)
   })
 })
 

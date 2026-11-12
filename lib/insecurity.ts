@@ -177,8 +177,8 @@ export const appendUserId = () => {
     try {
       req.body.UserId = authenticatedUsers.tokenMap[utils.jwtFrom(req)].data.id
       next()
-    } catch (error: unknown) {
-      res.status(401).json({ status: 'error', message: utils.getErrorMessage(error) })
+    } catch {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' })
     }
   }
 }
