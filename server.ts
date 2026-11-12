@@ -93,7 +93,7 @@ import { serveAngularClient } from './routes/angular'
 import { resetPassword } from './routes/resetPassword'
 import { serveLogFiles } from './routes/logfileServer'
 import { servePublicFiles } from './routes/fileServer'
-import { addMemory, getMemories } from './routes/memory'
+import { addMemory, getMemories, memoryImageExtension } from './routes/memory'
 import { changePassword } from './routes/changePassword'
 import { countryMapping } from './routes/countryMapping'
 import { retrieveAppVersion } from './routes/appVersion'
@@ -328,7 +328,7 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.post('/file-upload', uploadToMemory.single('file'), ensureFileIsPassed, metrics.observeFileUploadMetricsMiddleware(), checkUploadSize, checkFileType, handleZipFileUpload, handleXmlUpload, handleYamlUpload)
   app.post('/profile/image/file', uploadToMemory.single('file'), ensureFileIsPassed, metrics.observeFileUploadMetricsMiddleware(), utils.asyncHandler(profileImageFileUpload()))
   app.post('/profile/image/url', uploadToMemory.single('file'), utils.asyncHandler(profileImageUrlUpload()))
-  app.post('/rest/memories', uploadToDisk.single('image'), ensureFileIsPassed, security.appendUserId(), metrics.observeFileUploadMetricsMiddleware(), utils.asyncHandler(addMemory()))
+  app.post('/rest/memories', security.bindAuthenticatedUserId(), uploadMemoryImage.single('image'), ensureFileIsPassed, metrics.observeFileUploadMetricsMiddleware(), utils.asyncHandler(addMemory()))
 
   app.use(bodyParser.text({ type: '*/*' }))
   app.use(function jsonParser (req: Request, res: Response, next: NextFunction) {
@@ -711,30 +711,16 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 const uploadToMemory = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200000 } })
-const mimeTypeMap: any = {
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/jpg': 'jpg'
-}
-const uploadToDisk = multer({
-  storage: multer.diskStorage({
-    destination: (req: Request, file: any, cb: any) => {
-      const isValid = mimeTypeMap[file.mimetype]
-      let error: Error | null = new Error('Invalid mime type')
-      if (isValid) {
-        error = null
-      }
-      cb(error, path.resolve('frontend/dist/frontend/assets/public/images/uploads/'))
-    },
-    filename: (req: Request, file: any, cb: any) => {
-      const name = security.sanitizeFilename(file.originalname)
-        .toLowerCase()
-        .split(' ')
-        .join('-')
-      const ext = mimeTypeMap[file.mimetype]
-      cb(null, name + '-' + Date.now() + '.' + ext)
+const uploadMemoryImage = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 200000, files: 1 },
+  fileFilter: (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+    if (memoryImageExtension(file.mimetype) === undefined) {
+      cb(new Error('Invalid mime type'))
+      return
     }
-  })
+    cb(null, true)
+  }
 })
 
 const expectedModels = ['Address', 'Basket', 'BasketItem', 'Captcha', 'Card', 'Challenge', 'ChallengeDependency', 'Complaint', 'Delivery', 'Feedback', 'ImageCaptcha', 'Memory', 'PrivacyRequestModel', 'Product', 'Quantity', 'Recycle', 'SecurityAnswer', 'SecurityQuestion', 'User', 'Wallet', 'Hint']
