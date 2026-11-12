@@ -145,6 +145,9 @@ void describe('order', () => {
     mock.method(QuantityModel, 'findOne', async () => ({ quantity: 10 }))
     mock.method(QuantityModel, 'update', async () => [1])
     req.body.UserId = 1
+    req.body.orderDetails = { paymentId: 'wallet' }
+    mock.method(WalletModel, 'findOne', async () => ({ balance: 1000 }))
+    mock.method(WalletModel, 'decrement', async () => [1])
     const error = new Error('Wallet increment error')
     mock.method(WalletModel, 'increment', async () => { throw error })
 

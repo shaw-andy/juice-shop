@@ -131,11 +131,13 @@ export function placeOrder () {
           }
           const deliveryAmount = security.isDeluxe(req) ? deliveryMethod.deluxePrice : deliveryMethod.price
           totalPrice += deliveryAmount
+          const paidFromWallet = Boolean(req.body.UserId) && req.body.orderDetails?.paymentId === 'wallet'
+          const bonusPoints = paidFromWallet ? calculateBonusPoints(totalPoints, discount, totalPrice) : 0
           doc.text(`${req.__('Delivery Price')}: ${deliveryAmount.toFixed(2)}¤`)
           doc.moveDown()
           doc.font('Helvetica-Bold').fontSize(20).text(`${req.__('Total Price')}: ${totalPrice.toFixed(2)}¤`)
           doc.moveDown()
-          doc.font('Helvetica-Bold').fontSize(15).text(`${req.__('Bonus Points Earned')}: ${totalPoints}`)
+          doc.font('Helvetica-Bold').fontSize(15).text(`${req.__('Bonus Points Earned')}: ${bonusPoints}`)
           doc.font('Times-Roman').fontSize(15).text(`(${req.__('The bonus points from this order will be added 1:1 to your wallet ¤-fund for future purchases!')}`)
           doc.moveDown()
           doc.moveDown()
@@ -143,21 +145,21 @@ export function placeOrder () {
 
           challengeUtils.solveIf(challenges.negativeOrderChallenge, () => { return totalPrice < 0 })
 
-          if (req.body.UserId) {
-            if (req.body.orderDetails && req.body.orderDetails.paymentId === 'wallet') {
-              const wallet = await WalletModel.findOne({ where: { UserId: req.body.UserId } })
-              if ((wallet != null) && wallet.balance >= totalPrice) {
-                await WalletModel.decrement({ balance: totalPrice }, { where: { UserId: req.body.UserId } })
-              } else {
-                next(new Error('Insufficient wallet balance.'))
+          if (paidFromWallet) {
+            const wallet = await WalletModel.findOne({ where: { UserId: req.body.UserId } })
+            if ((wallet != null) && wallet.balance >= totalPrice) {
+              await WalletModel.decrement({ balance: totalPrice }, { where: { UserId: req.body.UserId } })
+            } else {
+              next(new Error('Insufficient wallet balance.'))
+              return
+            }
+            if (bonusPoints > 0) {
+              try {
+                await WalletModel.increment({ balance: bonusPoints }, { where: { UserId: req.body.UserId } })
+              } catch (error: unknown) {
+                next(error)
                 return
               }
-            }
-            try {
-              await WalletModel.increment({ balance: totalPoints }, { where: { UserId: req.body.UserId } })
-            } catch (error: unknown) {
-              next(error)
-              return
             }
           }
 
@@ -170,7 +172,7 @@ export function placeOrder () {
             email: (email ? email.replace(/[aeiou]/gi, '*') : undefined),
             totalPrice,
             products: basketProducts,
-            bonus: totalPoints,
+            bonus: bonusPoints,
             deliveryPrice: deliveryAmount,
             eta: deliveryMethod.eta.toString()
           }).then(() => {
@@ -191,7 +193,7 @@ function calculateApplicableDiscount (basket: BasketModel, req: Request) {
   const discount = security.discountFromCoupon(basket.coupon ?? undefined)
   if (discount) {
     challengeUtils.solveIf(challenges.forgedCouponChallenge, () => { return (discount ?? 0) >= 80 })
-    return discount
+    return Math.min(discount, 100)
   } else if (req.body.couponData) {
     const couponData = Buffer.from(req.body.couponData, 'base64').toString().split('-')
     const couponCode = couponData[0]
@@ -204,6 +206,12 @@ function calculateApplicableDiscount (basket: BasketModel, req: Request) {
     }
   }
   return 0
+}
+
+// Bonus is credited 1:1 to the wallet, so it must follow the discount and never exceed what was actually charged
+function calculateBonusPoints (catalogPoints: number, discount: number, amountCharged: number) {
+  const discountedPoints = Math.round(catalogPoints * (100 - discount) / 100)
+  return Math.max(0, Math.min(discountedPoints, Math.floor(amountCharged)))
 }
 
 const campaigns = {
