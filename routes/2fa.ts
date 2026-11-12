@@ -55,13 +55,21 @@ export async function verify (req: Request, res: Response) {
  *
  * When 2FA is not set up, the result will include data required to start the setup.
  */
+async function loggedInUserModel (req: Request) {
+  const data = security.authenticatedUsers.from(req)
+  if (!data) {
+    throw new Error('You need to be logged in to see this')
+  }
+  const userModel = await UserModel.findByPk(data.data.id)
+  if (userModel == null) {
+    throw new Error('No such user found!')
+  }
+  return userModel
+}
+
 export async function status (req: Request, res: Response) {
   try {
-    const data = security.authenticatedUsers.from(req)
-    if (!data) {
-      throw new Error('You need to be logged in to see this')
-    }
-    const { data: user } = data
+    const user = await loggedInUserModel(req)
 
     if (user.totpSecret === '') {
       const secret = generateSecret()
@@ -96,19 +104,15 @@ export async function status (req: Request, res: Response) {
  */
 export async function setup (req: Request, res: Response) {
   try {
-    const data = security.authenticatedUsers.from(req)
-    if (!data) {
-      throw new Error('Need to login before setting up 2FA')
-    }
-    const { data: user } = data
+    const userModel = await loggedInUserModel(req)
 
     const { password, setupToken, initialToken } = req.body
 
-    if (user.password !== security.hash(password)) {
+    if (userModel.password !== security.hash(password)) {
       throw new Error('Password doesnt match stored password')
     }
 
-    if (user.totpSecret !== '') {
+    if (userModel.totpSecret !== '') {
       throw new Error('User has 2fa already setup')
     }
 
@@ -118,12 +122,6 @@ export async function setup (req: Request, res: Response) {
     }
     if (!verifySync({ secret, token: initialToken, epochTolerance: 30 }).valid) {
       throw new Error('Initial token doesnt match the secret from the setupToken')
-    }
-
-    // Update db model and cached object
-    const userModel = await UserModel.findByPk(user.id)
-    if (userModel == null) {
-      throw new Error('No such user found!')
     }
 
     userModel.totpSecret = secret
@@ -141,22 +139,12 @@ export async function setup (req: Request, res: Response) {
  */
 export async function disable (req: Request, res: Response) {
   try {
-    const data = security.authenticatedUsers.from(req)
-    if (!data) {
-      throw new Error('Need to login before setting up 2FA')
-    }
-    const { data: user } = data
+    const userModel = await loggedInUserModel(req)
 
     const { password } = req.body
 
-    if (user.password !== security.hash(password)) {
+    if (userModel.password !== security.hash(password)) {
       throw new Error('Password doesnt match stored password')
-    }
-
-    // Update db model and cached object
-    const userModel = await UserModel.findByPk(user.id)
-    if (userModel == null) {
-      throw new Error('No such user found!')
     }
 
     userModel.totpSecret = ''
