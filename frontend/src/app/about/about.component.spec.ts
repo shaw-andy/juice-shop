@@ -173,13 +173,12 @@ describe('AboutComponent', () => {
 
         component.populateSlideshowFromFeedbacks()
 
-        expect(sanitizer.bypassSecurityTrustHtml).toHaveBeenCalledTimes(1)
-        const sanitizedHtml = sanitizer.bypassSecurityTrustHtml.mock.calls[0][0]
-        expect(sanitizedHtml).toContain('<p class="feedback-comment">Great!</p>')
-        expect(sanitizedHtml).toContain('feedback-stars')
-        expect((sanitizedHtml.match(/fas fa-star/g) ?? []).length).toBe(3)
-        expect((sanitizedHtml.match(/far fa-star/g) ?? []).length).toBe(2)
         expect(galleryRef.addImage).toHaveBeenCalledTimes(1)
+        const html = galleryRef.addImage.mock.calls[0][0].args
+        expect(html).toContain('<p class="feedback-comment">Great!</p>')
+        expect(html).toContain('feedback-stars')
+        expect((html.match(/fas fa-star/g) ?? []).length).toBe(3)
+        expect((html.match(/far fa-star/g) ?? []).length).toBe(2)
         expect(galleryRef.addImage.mock.calls[0][0].src).toBe('assets/public/images/carousel/1.jpg')
     })
 
