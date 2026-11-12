@@ -69,7 +69,7 @@ export class DataExportComponent implements OnInit {
         this.error = null
         this.confirmation = data.confirmation
         this.userData = data.userData
-        window.open('', '_blank', 'width=500')?.document.write(this.userData)
+        this.downloadUserData()
         this.lastSuccessfulTry = new Date()
         localStorage.setItem('lstdtxprt', JSON.stringify(this.lastSuccessfulTry))
         this.ngOnInit()
@@ -81,6 +81,15 @@ export class DataExportComponent implements OnInit {
         this.resetFormError()
       }
     })
+  }
+
+  downloadUserData () {
+    const url = URL.createObjectURL(new Blob([this.userData], { type: 'application/json' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'juice-shop-data-export.json'
+    link.click()
+    setTimeout(() => { URL.revokeObjectURL(url) })
   }
 
   resetForm () {
