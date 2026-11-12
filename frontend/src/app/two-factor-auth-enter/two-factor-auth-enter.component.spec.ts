@@ -122,6 +122,14 @@ describe('TwoFactorAuthEnterComponent', () => {
         expect(sessionStorage.getItem('bid')).toBe('42')
     })
 
+    it('should remove the interim two-factor token after a successful check', () => {
+        localStorage.setItem('totp_tmp_token', 'placeholder-interim-token')
+        twoFactorAuthService.verify.mockReturnValue(of({ token: 'TOKEN', bid: 42 }))
+        component.verify()
+
+        expect(localStorage.getItem('totp_tmp_token')).toBeNull()
+    })
+
     it('should notice error when 2FA verification fails', () => {
         twoFactorAuthService.verify.mockReturnValue(throwError({ error: 'Error' }))
         component.verify()
