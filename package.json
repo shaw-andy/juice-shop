@@ -94,6 +94,7 @@
     "@ai-sdk/openai-compatible": "^2.0.35",
     "@fontsource/roboto": "^5.2.9",
     "ai": "^6.0.116",
+    "bcryptjs": "^3.0.3",
     "beercss": "^4.0.19",
     "body-parser": "^1.20.4",
     "check-dependencies": "^2.0.0",
