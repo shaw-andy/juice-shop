@@ -83,7 +83,7 @@ void describe('/file-upload', () => {
         .post('/file-upload')
         .attach('file', file)
       assert.equal(res.status, 410)
-      assert.ok(res.text.includes('Maximum entity amplification factor exceeded'))
+      assert.equal(res.text.includes('Maximum entity amplification factor exceeded'), false)
     })
 
     void it('POST file type XML with Quadratic Blowup attack', async () => {

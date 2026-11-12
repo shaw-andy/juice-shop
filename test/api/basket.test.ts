@@ -137,7 +137,7 @@ void describe('/rest/basket/:id/checkout', () => {
   void it('POST placing an order for a non-existing basket fails', async () => {
     const res = await request(app).post('/rest/basket/42/checkout').set(authHeader)
     assert.equal(res.status, 500)
-    assert.ok(res.text.includes('Error: Basket with id=42 does not exist.'))
+    assert.equal(res.text.includes('Error: Basket with id=42 does not exist.'), false)
   })
 
   void it('POST placing an order for a basket with a negative total cost is possible', async () => {
@@ -174,7 +174,7 @@ void describe('/rest/basket/:id/checkout', () => {
       t.mock.method(QuantityModel, 'findOne', () => { throw new Error('Quantity error') })
       const res = await request(app).post('/rest/basket/4/checkout').set(authHeader)
       assert.equal(res.status, 500)
-      assert.match(res.text, /Quantity error/)
+      assert.doesNotMatch(res.text, /Quantity error/)
     })
 
     void it('should return 500 if WalletModel.findOne fails during checkout', async (t) => {
@@ -185,7 +185,7 @@ void describe('/rest/basket/:id/checkout', () => {
 
       const res = await request(app).post('/rest/basket/1/checkout').set(adminAuthHeader).send({ orderDetails: { paymentId: 'wallet' }, UserId: 1 })
       assert.equal(res.status, 500)
-      assert.match(res.text, /Wallet error/)
+      assert.doesNotMatch(res.text, /Wallet error/)
     })
 
     void it('should return 500 if ordersCollection.insert fails during checkout', async (t) => {
@@ -196,7 +196,7 @@ void describe('/rest/basket/:id/checkout', () => {
       t.mock.method(db.ordersCollection, 'insert', async () => { throw new Error('Insert error') })
       const res = await request(app).post('/rest/basket/1/checkout').set(authHeader)
       assert.equal(res.status, 500)
-      assert.match(res.text, /Insert error/)
+      assert.doesNotMatch(res.text, /Insert error/)
     })
   })
 })

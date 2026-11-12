@@ -30,6 +30,6 @@ void describe('/ftp/quarantine/:file', () => {
 
     assert.equal(res.status, 403)
     assert.ok(res.headers['content-type']?.includes('text/html'))
-    assert.ok(res.text.includes('Error: File names cannot contain forward slashes!'))
+    assert.equal(res.text.includes('Error: File names cannot contain forward slashes!'), false)
   })
 })

@@ -1,7 +1,6 @@
 /* Serve metrics */
 const Metrics = metrics.observeMetrics()
 app.get('/metrics', utils.asyncHandler(metrics.serveMetrics()))
-errorhandler.title = `${config.get<string>('application.name')} (Express ${utils.version('express')})`
 
 export async function start (readyCallback?: () => void) {
   const datacreatorEnd = startupGauge.startTimer({ task: 'datacreator' })

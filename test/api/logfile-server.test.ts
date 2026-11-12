@@ -31,6 +31,6 @@ void describe('/support/logs/:file', () => {
       .get('/support/logs/%2fetc%2fpasswd')
 
     assert.equal(res.status, 403)
-    assert.ok(res.text.includes('Error: File names cannot contain forward slashes!'))
+    assert.equal(res.text.includes('Error: File names cannot contain forward slashes!'), false)
   })
 })

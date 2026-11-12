@@ -4,7 +4,7 @@ describe('/redirect', () => {
       cy.visit('/redirect?to=http://kimminich.de', {
         failOnStatusCode: false
       })
-      cy.contains('Unrecognized target URL for redirect: http://kimminich.de')
+      cy.contains('406 Not Acceptable')
     })
   })
 
