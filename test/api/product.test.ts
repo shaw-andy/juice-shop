@@ -10,9 +10,7 @@ import type { Express } from 'express'
 import config from 'config'
 import { createTestApp } from './helpers/setup'
 import type { Product as ProductConfig } from '../../lib/config.schema'
-import { challenges } from '../../data/datacache'
 import * as security from '../../lib/insecurity'
-import * as utils from '../../lib/utils'
 
 const tamperingProductId = config.get<ProductConfig[]>('products').findIndex((product) => !!product.urlForProductTamperingChallenge) + 1
 
@@ -54,21 +52,18 @@ void describe('/api/Products', () => {
     assert.equal(res.status, 401)
   })
 
-  if (utils.isChallengeEnabled(challenges.restfulXssChallenge)) {
-    void it('POST new product does not filter XSS attacks', async () => {
-      const res = await request(app)
-        .post('/api/Products')
-        .set(authHeader)
-        .send({
-          name: 'XSS Juice (42ml)',
-          description: '<iframe src="javascript:alert(`xss`)">',
-          price: 9999.99,
-          image: 'xss3juice.jpg'
-        })
-      assert.ok(res.headers['content-type']?.includes('application/json'))
-      assert.equal(res.body.data.description, '<iframe src="javascript:alert(`xss`)">')
-    })
-  }
+  void it('POST new product is forbidden via API even when authenticated', async () => {
+    const res = await request(app)
+      .post('/api/Products')
+      .set(authHeader)
+      .send({
+        name: 'XSS Juice (42ml)',
+        description: '<iframe src="javascript:alert(`xss`)">',
+        price: 9999.99,
+        image: 'xss3juice.jpg'
+      })
+    assert.equal(res.status, 401)
+  })
 })
 
 void describe('/api/Products/:id', () => {
@@ -96,16 +91,24 @@ void describe('/api/Products/:id', () => {
     assert.equal(res.body.message, 'Not Found')
   })
 
-  void it('PUT update existing product is possible due to Missing Function-Level Access Control vulnerability', async () => {
+  void it('PUT update existing product is forbidden via public API', async () => {
     const res = await request(app)
       .put('/api/Products/' + tamperingProductId)
       .set(jsonHeader)
       .send({
         description: '<a href="http://kimminich.de" target="_blank">More...</a>'
       })
-    assert.equal(res.status, 200)
-    assert.ok(res.headers['content-type']?.includes('application/json'))
-    assert.equal(res.body.data.description, '<a href="http://kimminich.de" target="_blank">More...</a>')
+    assert.equal(res.status, 401)
+  })
+
+  void it('PUT update existing product is forbidden via API even when authenticated', async () => {
+    const res = await request(app)
+      .put('/api/Products/' + tamperingProductId)
+      .set(authHeader)
+      .send({
+        description: '<a href="http://kimminich.de" target="_blank">More...</a>'
+      })
+    assert.equal(res.status, 401)
   })
 
   void it('DELETE existing product is forbidden via public API', async () => {
