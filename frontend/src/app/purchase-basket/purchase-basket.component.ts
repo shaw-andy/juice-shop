@@ -16,6 +16,7 @@ import { TranslateModule } from '@ngx-translate/core'
 import { MatIconButton } from '@angular/material/button'
 import { forkJoin, of } from 'rxjs'
 import { catchError, map } from 'rxjs/operators'
+import { productImageUrl } from '../product/product-image-url'
 
 import { MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatFooterCellDef, MatFooterCell, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow, MatFooterRowDef, MatFooterRow } from '@angular/material/table'
 
@@ -40,6 +41,7 @@ export class PurchaseBasketComponent implements OnInit {
   @Input() public totalPrice = true
   @Output() emitTotal = new EventEmitter()
   @Output() emitProductCount = new EventEmitter()
+  protected readonly productImageUrl = productImageUrl
   public tableColumns = ['image', 'product', 'quantity', 'price']
   public dataSource = []
   public bonus = 0

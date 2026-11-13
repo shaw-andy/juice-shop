@@ -24,6 +24,7 @@ import { MatButtonModule, MatIconButton } from '@angular/material/button'
 import { MatDivider } from '@angular/material/divider'
 import { MatTooltip } from '@angular/material/tooltip'
 import { AsyncPipe } from '@angular/common'
+import { productImageUrl } from '../product/product-image-url'
 
 library.add(faPaperPlane, faArrowCircleLeft, faUserEdit, faThumbsUp, faCrown)
 
@@ -44,6 +45,7 @@ export class ProductDetailsComponent implements OnInit, OnDestroy {
   private readonly snackBar = inject(MatSnackBar)
   private readonly snackBarHelperService = inject(SnackBarHelperService)
 
+  protected readonly productImageUrl = productImageUrl
   public author = 'Anonymous'
   public reviews$: any
   public userSubscription: any

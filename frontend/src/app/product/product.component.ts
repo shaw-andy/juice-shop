@@ -16,6 +16,7 @@ import { MatButton } from '@angular/material/button'
 import { MatIcon } from '@angular/material/icon'
 import { ProductDetailsComponent } from '../product-details/product-details.component'
 import { MatDialog } from '@angular/material/dialog'
+import { productImageUrl } from './product-image-url'
 
 @Component({
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -30,6 +31,7 @@ export class ProductComponent {
   private readonly translateService = inject(TranslateService)
   private readonly snackBarHelperService = inject(SnackBarHelperService)
   private readonly dialog = inject(MatDialog)
+  protected readonly productImageUrl = productImageUrl
 
 
   item = input.required<ProductTableEntry>()

@@ -32,12 +32,12 @@
       <div
         class="image-container"
         [style.background-image]="
-          'url(\'assets/public/images/products/' + product.image + '\')'
+          'url(\'' + productImageUrl(product.image) + '\')'
         "
       >
         <img
           mat-card-image
-          [src]="'assets/public/images/products/' + product.image"
+          [src]="productImageUrl(product.image)"
           alt="{{ product.name }}"
           class="img-thumbnail"
         />
