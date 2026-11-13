@@ -37,7 +37,7 @@ jobs:
           npm run bundle-visualizer
 
       - name: "Install Playwright for screenshot"
-        run: npm install playwright
+        run: npm install playwright@1.65.0 --ignore-scripts
 
       - name: "Take screenshot of bundle report"
         run: |
