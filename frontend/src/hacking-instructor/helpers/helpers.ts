@@ -186,7 +186,7 @@ export function waitForAdminLogIn () {
         const token: string = localStorage.getItem('token')
         const decodedToken = jwtDecode(token)
         const payload = decodedToken as any
-        role = payload.data.role
+        role = payload.role
       } catch {
         console.log('Role from token could not be accessed.')
       }

@@ -517,12 +517,12 @@ describe('NavbarComponent', () => {
         })
 
         it('should detect accounting role from the decoded token', () => {
-            loginGuard.tokenDecode.mockReturnValue({ data: { role: 'accounting' } })
+            loginGuard.tokenDecode.mockReturnValue({ role: 'accounting' })
             expect(component.isAccounting()).toBe(true)
         })
 
         it('should not flag non-accounting users as accounting', () => {
-            loginGuard.tokenDecode.mockReturnValue({ data: { role: 'customer' } })
+            loginGuard.tokenDecode.mockReturnValue({ role: 'customer' })
             expect(component.isAccounting()).toBe(false)
         })
 

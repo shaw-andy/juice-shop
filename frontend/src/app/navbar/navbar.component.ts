@@ -304,6 +304,6 @@ export class NavbarComponent implements OnInit {
 
   isAccounting () {
     const payload = this.loginGuard.tokenDecode()
-    return payload?.data && payload.data.role === roles.accounting
+    return payload?.role === roles.accounting
   }
 }

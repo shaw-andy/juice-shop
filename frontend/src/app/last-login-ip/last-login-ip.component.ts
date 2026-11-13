@@ -5,9 +5,9 @@
 
 import { Component, inject, OnInit, ChangeDetectionStrategy } from '@angular/core'
 import { DomSanitizer } from '@angular/platform-browser'
-import { jwtDecode } from 'jwt-decode'
 import { TranslateModule } from '@ngx-translate/core'
 import { MatCardModule } from '@angular/material/card'
+import { UserService } from '../Services/user.service'
 
 @Component({
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -19,26 +19,18 @@ import { MatCardModule } from '@angular/material/card'
 
 export class LastLoginIpComponent implements OnInit {
   private readonly sanitizer = inject(DomSanitizer)
+  private readonly userService = inject(UserService)
 
   lastLoginIp: any = '?'
 
   ngOnInit (): void {
-    try {
-      this.parseAuthToken()
-    } catch (err) {
-      console.log(err)
-    }
-  }
-
-  parseAuthToken () {
-    let payload = {} as any
-    const token = localStorage.getItem('token')
-    if (token) {
-      payload = jwtDecode(token)
-      if (payload.data.lastLoginIp) {
-
-        this.lastLoginIp = this.sanitizer.bypassSecurityTrustHtml(`<small>${payload.data.lastLoginIp}</small>`)
-      }
-    }
+    this.userService.whoAmI(['lastLoginIp']).subscribe({
+      next: (user: any) => {
+        if (user?.lastLoginIp) {
+          this.lastLoginIp = this.sanitizer.bypassSecurityTrustHtml(`<small>${user.lastLoginIp}</small>`)
+        }
+      },
+      error: (err) => { console.log(err) }
+    })
   }
 }
