@@ -54,7 +54,16 @@ const ProductModelInit = (sequelize: Sequelize) => {
       },
       price: DataTypes.DECIMAL,
       deluxePrice: DataTypes.DECIMAL,
-      image: DataTypes.STRING
+      image: {
+        type: DataTypes.STRING,
+        validate: {
+          isSingleFileName (image: unknown) {
+            if (image != null && !utils.isSingleFileName(image)) {
+              throw new Error('Product image must be a single file name')
+            }
+          }
+        }
+      }
     },
     {
       tableName: 'Products',

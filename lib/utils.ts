@@ -105,6 +105,11 @@ export const extractFilename = (url: string) => {
   return file
 }
 
+export const isSingleFileName = (name: unknown): name is string => {
+  // eslint-disable-next-line no-control-regex
+  return typeof name === 'string' && /^[^./\\?#%\u0000-\u001f\u007f][^/\\?#%\u0000-\u001f\u007f]*$/.test(name)
+}
+
 export const downloadToFile = async (url: string, dest: string) => {
   try {
     const data = await download(url)
