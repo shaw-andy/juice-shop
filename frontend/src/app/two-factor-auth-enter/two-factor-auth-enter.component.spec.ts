@@ -115,6 +115,15 @@ describe('TwoFactorAuthEnterComponent', () => {
         expect(localStorage.getItem('token')).toBe('TOKEN')
     })
 
+    it('should remove the interim two-factor token after verification succeeds', () => {
+        localStorage.setItem('totp_tmp_token', 'interim-placeholder')
+        twoFactorAuthService.verify.mockReturnValue(of({ token: 'TOKEN', bid: 7 }))
+        component.verify()
+
+        expect(localStorage.getItem('token')).toBe('TOKEN')
+        expect(localStorage.getItem('totp_tmp_token')).toBeNull()
+    })
+
     it('should store basket ID in session storage', () => {
         twoFactorAuthService.verify.mockReturnValue(of({ bid: 42 }))
         component.verify()

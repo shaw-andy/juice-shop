@@ -314,6 +314,14 @@ describe('LoginComponent', () => {
             expect(basketService.updateNumberOfCartItems).toHaveBeenCalled()
         })
 
+        it('should remove the interim two-factor token when login fails', () => {
+            localStorage.setItem('totp_tmp_token', 'interim-placeholder')
+            userService.login.mockReturnValue(throwError({ error: 'Error' }))
+            component.login()
+            expect(localStorage.getItem('token')).toBeNull()
+            expect(localStorage.getItem('totp_tmp_token')).toBeNull()
+        })
+
         it('should redirect to 2FA page when login requires a TOTP token', async () => {
             const router = (component as any).router
             const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true as any)

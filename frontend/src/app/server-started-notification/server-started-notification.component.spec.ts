@@ -175,4 +175,12 @@ describe('ServerStartedNotificationComponent', () => {
         expect(cookieService.get('continueCode')).toBeUndefined()
         expect(component.hackingProgress.cleared).toBe(true)
     })
+
+    it('should remove the interim two-factor token when clearing the progress', () => {
+        localStorage.setItem('totp_tmp_token', 'interim-placeholder')
+        localStorage.setItem('token', 'session-placeholder')
+        component.clearProgress()
+        expect(localStorage.getItem('token')).toBeNull()
+        expect(localStorage.getItem('totp_tmp_token')).toBeNull()
+    })
 })
