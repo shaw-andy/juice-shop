@@ -51,7 +51,7 @@ export class AdminGuard implements CanActivate {
 
   canActivate () {
     const payload = this.loginGuard.tokenDecode()
-    if (payload?.data && payload.data.role === roles.admin) {
+    if (payload?.role === roles.admin) {
       return true
     } else {
       this.loginGuard.forbidRoute()
@@ -67,7 +67,7 @@ export class AccountingGuard implements CanActivate {
 
   canActivate () {
     const payload = this.loginGuard.tokenDecode()
-    if (payload?.data && payload.data.role === roles.accounting) {
+    if (payload?.role === roles.accounting) {
       return true
     } else {
       this.loginGuard.forbidRoute()
@@ -83,6 +83,6 @@ export class DeluxeGuard {
 
   isDeluxe () {
     const payload = this.loginGuard.tokenDecode()
-    return payload?.data && payload.data.role === roles.deluxe
+    return payload?.role === roles.deluxe
   }
 }

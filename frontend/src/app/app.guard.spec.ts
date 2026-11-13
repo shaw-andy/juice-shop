@@ -97,14 +97,14 @@ describe('AdminGuard', () => {
     it('should open for admins', () => {
         const guard = TestBed.inject(AdminGuard)
 
-        loginGuard.tokenDecode.mockReturnValue({ data: { role: 'admin' } })
+        loginGuard.tokenDecode.mockReturnValue({ role: 'admin' })
         expect(guard.canActivate()).toBe(true)
     })
 
     it('should close for regular customers', () => {
         const guard = TestBed.inject(AdminGuard)
 
-        loginGuard.tokenDecode.mockReturnValue({ data: { role: 'customer' } })
+        loginGuard.tokenDecode.mockReturnValue({ role: 'customer' })
         expect(guard.canActivate()).toBe(false)
         expect(loginGuard.forbidRoute).toHaveBeenCalled()
     })
@@ -112,7 +112,7 @@ describe('AdminGuard', () => {
     it('should close for deluxe customers', () => {
         const guard = TestBed.inject(AdminGuard)
 
-        loginGuard.tokenDecode.mockReturnValue({ data: { role: 'deluxe' } })
+        loginGuard.tokenDecode.mockReturnValue({ role: 'deluxe' })
         expect(guard.canActivate()).toBe(false)
         expect(loginGuard.forbidRoute).toHaveBeenCalled()
     })
@@ -120,7 +120,7 @@ describe('AdminGuard', () => {
     it('should close for accountants', () => {
         const guard = TestBed.inject(AdminGuard)
 
-        loginGuard.tokenDecode.mockReturnValue({ data: { role: 'accounting' } })
+        loginGuard.tokenDecode.mockReturnValue({ role: 'accounting' })
         expect(guard.canActivate()).toBe(false)
         expect(loginGuard.forbidRoute).toHaveBeenCalled()
     })
@@ -157,14 +157,14 @@ describe('AccountingGuard', () => {
     it('should open for accountants', () => {
         const guard = TestBed.inject(AccountingGuard)
 
-        loginGuard.tokenDecode.mockReturnValue({ data: { role: 'accounting' } })
+        loginGuard.tokenDecode.mockReturnValue({ role: 'accounting' })
         expect(guard.canActivate()).toBe(true)
     })
 
     it('should close for regular customers', () => {
         const guard = TestBed.inject(AccountingGuard)
 
-        loginGuard.tokenDecode.mockReturnValue({ data: { role: 'customer' } })
+        loginGuard.tokenDecode.mockReturnValue({ role: 'customer' })
         expect(guard.canActivate()).toBe(false)
         expect(loginGuard.forbidRoute).toHaveBeenCalled()
     })
@@ -172,7 +172,7 @@ describe('AccountingGuard', () => {
     it('should close for deluxe customers', () => {
         const guard = TestBed.inject(AccountingGuard)
 
-        loginGuard.tokenDecode.mockReturnValue({ data: { role: 'deluxe' } })
+        loginGuard.tokenDecode.mockReturnValue({ role: 'deluxe' })
         expect(guard.canActivate()).toBe(false)
         expect(loginGuard.forbidRoute).toHaveBeenCalled()
     })
@@ -180,7 +180,7 @@ describe('AccountingGuard', () => {
     it('should close for admins', () => {
         const guard = TestBed.inject(AccountingGuard)
 
-        loginGuard.tokenDecode.mockReturnValue({ data: { role: 'admin' } })
+        loginGuard.tokenDecode.mockReturnValue({ role: 'admin' })
         expect(guard.canActivate()).toBe(false)
         expect(loginGuard.forbidRoute).toHaveBeenCalled()
     })
@@ -216,28 +216,28 @@ describe('DeluxeGuard', () => {
     it('should open for deluxe customers', () => {
         const guard = TestBed.inject(DeluxeGuard)
 
-        loginGuard.tokenDecode.mockReturnValue({ data: { role: 'deluxe' } })
+        loginGuard.tokenDecode.mockReturnValue({ role: 'deluxe' })
         expect(guard.isDeluxe()).toBe(true)
     })
 
     it('should close for regular customers', () => {
         const guard = TestBed.inject(DeluxeGuard)
 
-        loginGuard.tokenDecode.mockReturnValue({ data: { role: 'customer' } })
+        loginGuard.tokenDecode.mockReturnValue({ role: 'customer' })
         expect(guard.isDeluxe()).toBe(false)
     })
 
     it('should close for admins', () => {
         const guard = TestBed.inject(DeluxeGuard)
 
-        loginGuard.tokenDecode.mockReturnValue({ data: { role: 'admin' } })
+        loginGuard.tokenDecode.mockReturnValue({ role: 'admin' })
         expect(guard.isDeluxe()).toBe(false)
     })
 
     it('should close for accountants', () => {
         const guard = TestBed.inject(DeluxeGuard)
 
-        loginGuard.tokenDecode.mockReturnValue({ data: { role: 'accounting' } })
+        loginGuard.tokenDecode.mockReturnValue({ role: 'accounting' })
         expect(guard.isDeluxe()).toBe(false)
     })
 })

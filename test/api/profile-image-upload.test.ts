@@ -161,7 +161,7 @@ void describe('/profile/image/url (with local mock server)', () => {
       password: 'ncc-1701'
     })
     token = userToken
-    userId = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString()).data.id
+    userId = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString()).id
 
     const imageBuffer = fs.readFileSync(path.resolve(__dirname, '../files/validProfileImage.jpg'))
 

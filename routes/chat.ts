@@ -42,8 +42,8 @@ const appName = config.get<string>('application.name')
 export async function getUserId (req: Request): Promise<number | undefined> {
   const token = utils.jwtFrom(req)
   if (!token) return undefined
-  const decoded = security.decode(token) as { data?: { id?: number } } | undefined
-  return decoded?.data?.id
+  const decoded = security.decode(token) as { id?: number } | undefined
+  return decoded?.id
 }
 
 export async function getUserNameFromToken (req: Request): Promise<string | undefined> {
@@ -220,8 +220,8 @@ export function chat () {
           case 'tool-call':
             challengeUtils.solveIf(challenges.aiDebuggingChallenge, () => {
               const token = utils.jwtFrom(req)
-              const decoded = token ? security.decode(token) as { data?: { role?: string } } : undefined
-              const role = decoded?.data?.role
+              const decoded = token ? security.decode(token) as { role?: string } : undefined
+              const role = decoded?.role
               return req.cookies.show_tool_calls === 'true' && role !== roles.admin
             })
             metricToolCalls.labels({ tool: event.toolName }).inc()

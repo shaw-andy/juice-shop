@@ -6,7 +6,7 @@
 import fs from 'node:fs'
 import crypto from 'node:crypto'
 import { type Request, type Response, type NextFunction } from 'express'
-import { type UserModel } from '@juice-shop/models/user'
+import { UserModel } from '../models/user'
 import expressJwt from 'express-jwt'
 import jwt from 'jsonwebtoken'
 import jws from 'jws'
@@ -52,6 +52,7 @@ export const cutOffPoisonNullByte = (str: string) => {
 export const isAuthorized = () => expressJwt(({ secret: publicKey }) as any)
 export const denyAll = () => expressJwt({ secret: '' + Math.random() } as any)
 export const authorize = (user = {}) => jwt.sign(user, privateKey, { expiresIn: '6h', algorithm: 'RS256' })
+export const authorizeSession = (user: { id: number, role: string }, bid?: number) => authorize({ id: user.id, role: user.role, bid })
 export const verify = (token: string) => token ? (jws.verify as ((token: string, secret: string) => boolean))(token, publicKey) : false
 export const decode = (token: string) => { return jws.decode(token)?.payload }
 
@@ -154,7 +155,7 @@ export const deluxeToken = (email: string) => {
 export const isAccounting = () => {
   return (req: Request, res: Response, next: NextFunction) => {
     const decodedToken = verify(utils.jwtFrom(req)) && decode(utils.jwtFrom(req))
-    if (decodedToken?.data?.role === roles.accounting) {
+    if (decodedToken?.role === roles.accounting) {
       next()
     } else {
       res.status(403).json({ error: 'Malicious activity detected' })
@@ -163,13 +164,15 @@ export const isAccounting = () => {
 }
 
 export const isDeluxe = (req: Request) => {
-  const decodedToken = verify(utils.jwtFrom(req)) && decode(utils.jwtFrom(req))
-  return decodedToken?.data?.role === roles.deluxe && decodedToken?.data?.deluxeToken && decodedToken?.data?.deluxeToken === deluxeToken(decodedToken?.data?.email)
+  const token = utils.jwtFrom(req)
+  const decodedToken = verify(token) && decode(token)
+  const user = authenticatedUsers.get(token)?.data
+  return decodedToken?.role === roles.deluxe && !!user?.deluxeToken && user.deluxeToken === deluxeToken(user.email)
 }
 
 export const isCustomer = (req: Request) => {
   const decodedToken = verify(utils.jwtFrom(req)) && decode(utils.jwtFrom(req))
-  return decodedToken?.data?.role === roles.customer
+  return decodedToken?.role === roles.customer
 }
 
 export const appendUserId = () => {
@@ -190,8 +193,20 @@ export const updateAuthenticatedUsers = () => (req: Request, res: Response, next
       if (err === null && decoded?.data !== undefined) {
         authenticatedUsers.put(token, decoded)
         res.cookie('token', token)
+        next()
+      } else if (err === null && decoded?.id !== undefined) {
+        UserModel.findByPk(decoded.id).then((user) => {
+          if (user !== null) {
+            authenticatedUsers.put(token, { data: user, bid: decoded.bid })
+            res.cookie('token', token)
+          }
+          next()
+        }).catch(next)
+      } else {
+        next()
       }
     })
+  } else {
+    next()
   }
-  next()
 }

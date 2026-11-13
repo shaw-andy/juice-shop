@@ -124,13 +124,13 @@ describe('SidenavComponent', () => {
     })
 
     it('should show accounting functionality when user has according role', () => {
-        loginGuard.tokenDecode.mockReturnValue({ data: { role: roles.accounting } })
+        loginGuard.tokenDecode.mockReturnValue({ role: roles.accounting })
 
         expect(component.isAccounting()).toBe(true)
     })
 
     it('should set version number as retrieved with "v" prefix', () => {
-        loginGuard.tokenDecode.mockReturnValue({ data: { role: roles.accounting } })
+        loginGuard.tokenDecode.mockReturnValue({ role: roles.accounting })
 
         expect(component.isAccounting()).toBe(true)
     })
@@ -334,7 +334,7 @@ describe('SidenavComponent', () => {
         })
 
         it('should return false for a non-accounting role', () => {
-            loginGuard.tokenDecode.mockReturnValue({ data: { role: 'customer' } })
+            loginGuard.tokenDecode.mockReturnValue({ role: 'customer' })
             expect(component.isAccounting()).toBe(false)
         })
     })
@@ -389,7 +389,7 @@ describe('SidenavComponent', () => {
 
         it('should render the accounting entry only when user is logged in and has the accounting role', () => {
             localStorage.setItem('token', 'token')
-            loginGuard.tokenDecode.mockReturnValue({ data: { role: roles.accounting } })
+            loginGuard.tokenDecode.mockReturnValue({ role: roles.accounting })
             fixture.detectChanges()
             expect((fixture.nativeElement as HTMLElement).querySelector('a[aria-label="Go to accounting page"]')).toBeTruthy()
             localStorage.removeItem('token')
@@ -397,7 +397,7 @@ describe('SidenavComponent', () => {
 
         it('should not render the accounting entry for non-accounting users', () => {
             localStorage.setItem('token', 'token')
-            loginGuard.tokenDecode.mockReturnValue({ data: { role: 'customer' } })
+            loginGuard.tokenDecode.mockReturnValue({ role: 'customer' })
             fixture.detectChanges()
             expect((fixture.nativeElement as HTMLElement).querySelector('a[aria-label="Go to accounting page"]')).toBeNull()
             localStorage.removeItem('token')
