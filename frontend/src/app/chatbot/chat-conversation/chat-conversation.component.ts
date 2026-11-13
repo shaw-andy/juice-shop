@@ -22,6 +22,7 @@ import { type ChatMessage, type StoredConversation } from '../chat.model'
   templateUrl: './chat-conversation.component.html',
   styleUrls: ['./chat-conversation.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '(window:storage)': 'onStorageChanged()' },
   imports: [
     MatIconModule,
     ChatInputBoxComponent,
@@ -108,6 +109,12 @@ export class ChatConversationComponent implements OnInit {
       updatedAt: Date.now()
     }
     this.conversationStorage.save(conversation)
+  }
+
+  onStorageChanged () {
+    if (localStorage.getItem('token') !== this.sessionToken) {
+      this.messages.set([])
+    }
   }
 
   toggleToolCalls () {
