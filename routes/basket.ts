@@ -24,7 +24,7 @@ export function retrieveBasket () {
       })
       if (((basket?.Products) != null) && basket.Products.length > 0) {
         for (let i = 0; i < basket.Products.length; i++) {
-          basket.Products[i].name = req.__(basket.Products[i].name)
+          basket.Products[i].name = utils.translateIfKnown(req, basket.Products[i].name)
         }
       }
 

@@ -11,6 +11,7 @@ import download from 'download'
 import crypto from 'node:crypto'
 import clarinet from 'clarinet'
 import type { Challenge } from '@juice-shop/data/types'
+import type { Request } from 'express'
 
 import isHeroku from './is-heroku'
 import isDocker from './is-docker'
@@ -28,6 +29,13 @@ export const queryResultToJson = <T>(
     status,
     data
   }
+}
+
+// i18n adds every phrase it has not seen before to its catalog (and locale file), so stored data must only be passed to it when already known
+export const translateIfKnown = <T>(req: Request, text: T): T => {
+  if (typeof text !== 'string') return text
+  const catalog = req.getCatalog(req.getLocale())
+  return catalog && Object.prototype.hasOwnProperty.call(catalog, text) ? req.__(text) as T : text
 }
 
 export const isUrl = (url: string) => {
