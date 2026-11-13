@@ -30,8 +30,6 @@ export async function verify (req: Request, res: Response) {
 
     const isValid = verifySync({ secret: user.totpSecret, token: totpToken, epochTolerance: 30 }).valid
 
-    const plainUser = utils.queryResultToJson(user)
-
     if (!isValid) {
       return res.status(401).send()
     }
@@ -39,10 +37,9 @@ export async function verify (req: Request, res: Response) {
 
     const [basket] = await BasketModel.findOrCreate({ where: { UserId: userId } })
 
-    const token = security.authorize(plainUser)
-    // @ts-expect-error FIXME set new property for original basket
-    plainUser.bid = basket.id // keep track of original basket for challenge solution check
-    security.authenticatedUsers.put(token, plainUser)
+    const authenticatedUser = { data: user, bid: basket.id } // keep track of original basket for challenge solution check
+    const token = security.authorizeSession(user, basket.id)
+    security.authenticatedUsers.put(token, authenticatedUser)
 
     res.json({ authentication: { token, bid: basket.id, umail: user.email } })
   } catch (error) {
@@ -128,7 +125,7 @@ export async function setup (req: Request, res: Response) {
 
     userModel.totpSecret = secret
     await userModel.save()
-    security.authenticatedUsers.updateFrom(req, utils.queryResultToJson(userModel))
+    security.authenticatedUsers.updateFrom(req, { ...utils.queryResultToJson(userModel), bid: data.bid })
 
     res.status(200).send()
   } catch (error) {
@@ -161,7 +158,7 @@ export async function disable (req: Request, res: Response) {
 
     userModel.totpSecret = ''
     await userModel.save()
-    security.authenticatedUsers.updateFrom(req, utils.queryResultToJson(userModel))
+    security.authenticatedUsers.updateFrom(req, { ...utils.queryResultToJson(userModel), bid: data.bid })
 
     res.status(200).send()
   } catch (error) {

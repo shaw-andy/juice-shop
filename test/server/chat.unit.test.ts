@@ -52,7 +52,7 @@ void describe('chat', () => {
     })
 
     void it('should return user ID from decoded token', async () => {
-      const token = security.authorize({ data: { id: 42 } })
+      const token = security.authorize({ id: 42 })
       const req = { headers: { authorization: `Bearer ${token}` } }
       const userId = await chat.getUserId(req as any)
       assert.equal(userId, 42)
@@ -66,7 +66,7 @@ void describe('chat', () => {
     })
 
     void it('should return username from database', async () => {
-      const token = security.authorize({ data: { id: 42 } })
+      const token = security.authorize({ id: 42 })
       const req = { headers: { authorization: `Bearer ${token}` } }
       mock.method(UserModel, 'findByPk', async () => ({ username: 'jdoe' }))
       const userName = await chat.getUserNameFromToken(req as any)

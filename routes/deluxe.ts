@@ -44,8 +44,9 @@ export function upgradeToDeluxe () {
         challengeUtils.solveIf(challenges.freeDeluxeChallenge, () => {
           return security.verify(utils.jwtFrom(req)) && req.body.paymentMode !== 'wallet' && req.body.paymentMode !== 'card'
         })
-        const userWithStatus = utils.queryResultToJson(updatedUser)
-        const updatedToken = security.authorize(userWithStatus)
+        const bid = security.authenticatedUsers.from(req)?.bid
+        const userWithStatus = { ...utils.queryResultToJson(updatedUser), bid }
+        const updatedToken = security.authorizeSession(updatedUser, bid)
         security.authenticatedUsers.put(updatedToken, userWithStatus)
         res.status(200).json({ status: 'success', data: { confirmation: 'Congratulations! You are now a deluxe member!', token: updatedToken } })
       } catch (error) {

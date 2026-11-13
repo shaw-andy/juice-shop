@@ -5,10 +5,10 @@
 
 // @ts-expect-error FIXME no typescript definitions for z85 :(
 import z85 from 'z85'
-import { describe, it } from 'node:test'
+import { describe, it, mock } from 'node:test'
 import assert from 'node:assert/strict'
 import * as security from '../../lib/insecurity'
-import type { UserModel } from '@juice-shop/models/user'
+import { UserModel } from '../../models/user'
 import type { Request } from 'express'
 
 void describe('insecurity', () => {
@@ -212,14 +212,12 @@ void describe('insecurity', () => {
 
   void describe('isCustomer', () => {
     void it('returns true if decoded token has customer role', () => {
-      const user = { data: { role: 'customer' } }
-      const token = security.authorize(user)
+      const token = security.authorize({ role: 'customer' })
       assert.equal(security.isCustomer({ headers: { authorization: `Bearer ${token}` } } as unknown as Request), true)
     })
 
     void it('returns false if decoded token has other role', () => {
-      const user = { data: { role: 'admin' } }
-      const token = security.authorize(user)
+      const token = security.authorize({ role: 'admin' })
       assert.equal(security.isCustomer({ headers: { authorization: `Bearer ${token}` } } as unknown as Request), false)
     })
 
@@ -229,22 +227,38 @@ void describe('insecurity', () => {
   })
 
   void describe('isDeluxe', () => {
-    void it('returns true if decoded token has deluxe role and valid deluxe token', () => {
-      const user = { data: { email: 'deluxe@juice-sh.op', role: 'deluxe', deluxeToken: security.deluxeToken('deluxe@juice-sh.op') } }
-      const token = security.authorize(user)
+    void it('returns true if decoded token has deluxe role and session user has valid deluxe token', () => {
+      const token = security.authorize({ id: 41, role: 'deluxe' })
+      security.authenticatedUsers.put(token, { data: { id: 41, email: 'deluxe@juice-sh.op', role: 'deluxe', deluxeToken: security.deluxeToken('deluxe@juice-sh.op') } } as any)
       assert.equal(security.isDeluxe({ headers: { authorization: `Bearer ${token}` } } as unknown as Request), true)
     })
 
-    void it('returns false if decoded token has deluxe role but invalid deluxe token', () => {
-      const user = { data: { email: 'deluxe@juice-sh.op', role: 'deluxe', deluxeToken: 'invalid' } }
-      const token = security.authorize(user)
+    void it('returns false if decoded token has deluxe role but session user has invalid deluxe token', () => {
+      const token = security.authorize({ id: 42, role: 'deluxe' })
+      security.authenticatedUsers.put(token, { data: { id: 42, email: 'deluxe@juice-sh.op', role: 'deluxe', deluxeToken: 'invalid' } } as any)
+      assert.equal(security.isDeluxe({ headers: { authorization: `Bearer ${token}` } } as unknown as Request), false)
+    })
+
+    void it('returns false if decoded token has deluxe role but no session user is known', () => {
+      const token = security.authorize({ id: 43, role: 'deluxe' })
       assert.equal(security.isDeluxe({ headers: { authorization: `Bearer ${token}` } } as unknown as Request), false)
     })
 
     void it('returns false if decoded token has other role', () => {
-      const user = { data: { email: 'admin@juice-sh.op', role: 'admin' } }
-      const token = security.authorize(user)
+      const token = security.authorize({ id: 44, role: 'admin' })
+      security.authenticatedUsers.put(token, { data: { id: 44, email: 'admin@juice-sh.op', role: 'admin' } } as any)
       assert.equal(security.isDeluxe({ headers: { authorization: `Bearer ${token}` } } as unknown as Request), false)
+    })
+  })
+
+  void describe('authorizeSession', () => {
+    void it('signs only user id, role and basket id', () => {
+      const user = { id: 45, role: 'customer', email: 'session@juice-sh.op', password: 'placeholder-hash', totpSecret: 'placeholder-secret' }
+      const payload = security.decode(security.authorizeSession(user, 7))
+      assert.deepEqual(Object.keys(payload).filter(key => key !== 'iat' && key !== 'exp').sort(), ['bid', 'id', 'role'])
+      assert.equal(payload.id, 45)
+      assert.equal(payload.role, 'customer')
+      assert.equal(payload.bid, 7)
     })
   })
 
@@ -283,8 +297,7 @@ void describe('insecurity', () => {
 
   void describe('middlewares', () => {
     void it('isAccounting should allow next() for accounting role', () => {
-      const user = { data: { role: 'accounting' } }
-      const token = security.authorize(user)
+      const token = security.authorize({ role: 'accounting' })
       const req = { headers: { authorization: `Bearer ${token}` } } as any
       let nextCalled = false
       const next = () => { nextCalled = true }
@@ -293,8 +306,7 @@ void describe('insecurity', () => {
     })
 
     void it('isAccounting should return 403 for other roles', () => {
-      const user = { data: { role: 'admin' } }
-      const token = security.authorize(user)
+      const token = security.authorize({ role: 'admin' })
       const req = { headers: { authorization: `Bearer ${token}` } } as any
       let statusSet = 0
       const res = {
@@ -334,6 +346,36 @@ void describe('insecurity', () => {
       const next = () => { nextCalled = true }
       security.updateAuthenticatedUsers()(req, {} as any, next)
       assert.ok(nextCalled)
+    })
+
+    void it('updateAuthenticatedUsers should load the session user by id from the database', async () => {
+      const token = security.authorizeSession({ id: 46, role: 'customer' }, 8)
+      const user = { id: 46, email: 'reload@juice-sh.op', role: 'customer' }
+      const findByPk = mock.method(UserModel, 'findByPk', async () => user)
+      const req = { cookies: { token }, headers: {} } as any
+      const res = { cookie: mock.fn() } as any
+      try {
+        await new Promise<void>((resolve) => { security.updateAuthenticatedUsers()(req, res, () => { resolve() }) })
+        assert.equal(findByPk.mock.calls[0].arguments[0], 46)
+        assert.deepEqual(security.authenticatedUsers.get(token), { data: user, bid: 8 })
+        assert.equal(res.cookie.mock.callCount(), 1)
+      } finally {
+        findByPk.mock.restore()
+      }
+    })
+
+    void it('updateAuthenticatedUsers should not cache a session for an unknown user', async () => {
+      const token = security.authorizeSession({ id: 47, role: 'customer' }, 9)
+      const findByPk = mock.method(UserModel, 'findByPk', async () => null)
+      const req = { cookies: { token }, headers: {} } as any
+      const res = { cookie: mock.fn() } as any
+      try {
+        await new Promise<void>((resolve) => { security.updateAuthenticatedUsers()(req, res, () => { resolve() }) })
+        assert.equal(security.authenticatedUsers.get(token), undefined)
+        assert.equal(res.cookie.mock.callCount(), 0)
+      } finally {
+        findByPk.mock.restore()
+      }
     })
 
     void it('isAuthorized returns a middleware', () => {
