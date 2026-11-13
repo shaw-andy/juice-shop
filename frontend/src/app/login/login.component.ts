@@ -14,6 +14,7 @@ import { faEye, faEyeSlash, faKey } from '@fortawesome/free-solid-svg-icons'
 import { faGoogle } from '@fortawesome/free-brands-svg-icons'
 import { ConfigurationService } from '../Services/configuration.service'
 import { BasketService } from '../Services/basket.service'
+import { ConversationStorageService } from '../Services/conversation-storage.service'
 import { MatCheckbox } from '@angular/material/checkbox'
 import { MatIconModule } from '@angular/material/icon'
 import { MatTooltip } from '@angular/material/tooltip'
@@ -47,6 +48,7 @@ export class LoginComponent implements OnInit {
   private readonly route = inject(ActivatedRoute)
   private readonly basketService = inject(BasketService)
   private readonly ngZone = inject(NgZone)
+  private readonly conversationStorage = inject(ConversationStorageService)
 
   public emailControl = new UntypedFormControl('', [Validators.required])
 
@@ -99,6 +101,7 @@ export class LoginComponent implements OnInit {
     this.userService.login(this.user).subscribe({
       next: (authentication: any) => {
         const redirectUrl = this.route.snapshot.queryParamMap.get('redirectUrl') ?? '/search'
+        this.conversationStorage.deleteAll()
         localStorage.setItem('token', authentication.token)
         const expires = new Date()
         expires.setHours(expires.getHours() + 8)
@@ -125,6 +128,7 @@ export class LoginComponent implements OnInit {
         localStorage.removeItem('token')
         this.cookieService.remove('token')
         sessionStorage.removeItem('bid')
+        this.conversationStorage.deleteAll()
         this.error = error
         this.userService.isLoggedIn.next(false)
         this.emailControl.markAsPristine()

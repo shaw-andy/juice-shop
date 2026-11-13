@@ -12,6 +12,7 @@ import { Router, RouterLink } from '@angular/router'
 import { UserService } from '../Services/user.service'
 import { CookieService } from 'ngy-cookie'
 import { ConfigurationService } from '../Services/configuration.service'
+import { ConversationStorageService } from '../Services/conversation-storage.service'
 import { LoginGuard } from '../app.guard'
 import { roles } from '../roles'
 import { MatDivider } from '@angular/material/divider'
@@ -40,6 +41,7 @@ export class SidenavComponent implements OnInit {
   private readonly router = inject(Router)
   private readonly configurationService = inject(ConfigurationService)
   private readonly loginGuard = inject(LoginGuard)
+  private readonly conversationStorage = inject(ConversationStorageService)
 
   public applicationName = 'OWASP Juice Shop'
   public showGitHubLink = true
@@ -98,6 +100,7 @@ export class SidenavComponent implements OnInit {
     sessionStorage.removeItem('bid')
     sessionStorage.removeItem('itemTotal')
     sessionStorage.removeItem('guestBasket')
+    this.conversationStorage.deleteAll()
     this.userService.isLoggedIn.next(false)
     this.ngZone.run(async () => await this.router.navigate(['/']))
   }

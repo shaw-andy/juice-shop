@@ -8,6 +8,7 @@ import { UntypedFormControl, UntypedFormGroup, Validators, FormsModule, Reactive
 import { TwoFactorAuthService } from '../Services/two-factor-auth-service'
 import { CookieService } from 'ngy-cookie'
 import { UserService } from '../Services/user.service'
+import { ConversationStorageService } from '../Services/conversation-storage.service'
 import { Router } from '@angular/router'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { faUnlockAlt } from '@fortawesome/free-solid-svg-icons'
@@ -39,6 +40,7 @@ export class TwoFactorAuthEnterComponent {
   private readonly userService = inject(UserService)
   private readonly router = inject(Router)
   private readonly ngZone = inject(NgZone)
+  private readonly conversationStorage = inject(ConversationStorageService)
 
   public twoFactorForm: UntypedFormGroup = new UntypedFormGroup({
     token: new UntypedFormControl('', [Validators.minLength(6), Validators.maxLength(6), Validators.required, Validators.pattern('^[\\d]{6}$')])
@@ -51,6 +53,7 @@ export class TwoFactorAuthEnterComponent {
 
     this.twoFactorAuthService.verify(fields.token).subscribe({
       next: (authentication) => {
+        this.conversationStorage.deleteAll()
         localStorage.setItem('token', authentication.token)
         const expires = new Date()
         expires.setHours(expires.getHours() + 8)

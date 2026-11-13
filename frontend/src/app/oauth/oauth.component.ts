@@ -5,6 +5,7 @@
 
 import { ActivatedRoute, Router } from '@angular/router'
 import { UserService } from '../Services/user.service'
+import { ConversationStorageService } from '../Services/conversation-storage.service'
 import { CookieService } from 'ngy-cookie'
 import { Component, NgZone, type OnInit, inject, ChangeDetectionStrategy } from '@angular/core'
 import { TranslateModule } from '@ngx-translate/core'
@@ -23,6 +24,7 @@ export class OAuthComponent implements OnInit {
   private readonly router = inject(Router)
   private readonly route = inject(ActivatedRoute)
   private readonly ngZone = inject(NgZone)
+  private readonly conversationStorage = inject(ConversationStorageService)
 
 
   ngOnInit (): void {
@@ -48,6 +50,7 @@ export class OAuthComponent implements OnInit {
       next: (authentication) => {
         const expires = new Date()
         expires.setHours(expires.getHours() + 8)
+        this.conversationStorage.deleteAll()
         this.cookieService.put('token', authentication.token, { expires })
         localStorage.setItem('token', authentication.token)
         sessionStorage.setItem('bid', authentication.bid)
@@ -66,6 +69,7 @@ export class OAuthComponent implements OnInit {
     this.cookieService.remove('token')
     localStorage.removeItem('token')
     sessionStorage.removeItem('bid')
+    this.conversationStorage.deleteAll()
   }
 
   parseRedirectUrlParams () {
