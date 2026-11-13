@@ -1,29 +1,41 @@
 import type { Params } from '@angular/router'
 
-import { DEFAULT_FILTER_SETTING, type FilterSetting } from './FilterSetting'
+import { DEFAULT_FILTER_SETTING, type FilterSetting, type SolvedStatus } from './FilterSetting'
+
+// the router hands out repeated query parameters as arrays, so only the first value is used
+function singleValue (value: unknown): string | undefined {
+  const first = Array.isArray(value) ? value[0] : value
+  return typeof first === 'string' ? first : undefined
+}
 
 export function fromQueryParams (queryParams: Readonly<Params>): FilterSetting {
   const filterSetting: FilterSetting = { ...structuredClone(DEFAULT_FILTER_SETTING) }
-  if (queryParams.searchQuery) {
-    filterSetting.searchQuery = queryParams.searchQuery
+  const searchQuery = singleValue(queryParams.searchQuery)
+  if (searchQuery) {
+    filterSetting.searchQuery = searchQuery
   }
-  if (queryParams.difficulties) {
-    filterSetting.difficulties = queryParams.difficulties
+  const difficulties = singleValue(queryParams.difficulties)
+  if (difficulties) {
+    filterSetting.difficulties = difficulties
       .split(',')
       .map((difficulty) => parseInt(difficulty, 10))
-      .filter((difficulty) => !isNaN(difficulty))
+      .filter((difficulty) => !isNaN(difficulty)) as FilterSetting['difficulties']
   }
-  if (queryParams.tags) {
-    filterSetting.tags = queryParams.tags.split(',')
+  const tags = singleValue(queryParams.tags)
+  if (tags) {
+    filterSetting.tags = tags.split(',')
   }
-  if (queryParams.status) {
-    filterSetting.status = queryParams.status
+  const status = singleValue(queryParams.status)
+  if (status) {
+    filterSetting.status = status as SolvedStatus
   }
-  if (queryParams.categories) {
-    filterSetting.categories = queryParams.categories.split(',')
+  const categories = singleValue(queryParams.categories)
+  if (categories) {
+    filterSetting.categories = categories.split(',')
   }
-  if (queryParams.showDisabledChallenges !== undefined) {
-    filterSetting.showDisabledChallenges = queryParams.showDisabledChallenges === 'true'
+  const showDisabledChallenges = singleValue(queryParams.showDisabledChallenges)
+  if (showDisabledChallenges !== undefined) {
+    filterSetting.showDisabledChallenges = showDisabledChallenges === 'true'
   }
 
   return filterSetting
