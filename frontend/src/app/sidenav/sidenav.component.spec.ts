@@ -162,6 +162,14 @@ describe('SidenavComponent', () => {
         expect(removeItemSpy).toHaveBeenCalledWith('token')
     })
 
+    it('should remove the interim two-factor token from localStorage', () => {
+        localStorage.setItem('totp_tmp_token', 'interim-placeholder')
+        localStorage.setItem('token', 'session-placeholder')
+        component.logout()
+        expect(localStorage.getItem('token')).toBeNull()
+        expect(localStorage.getItem('totp_tmp_token')).toBeNull()
+    })
+
     it('should remove authentication token from cookies', () => {
         component.logout()
         expect(cookieService.remove).toHaveBeenCalledWith('token')

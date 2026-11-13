@@ -85,6 +85,14 @@ describe('OAuthComponent', () => {
         expect(sessionStorage.getItem('bid')).toBeNull()
     })
 
+    it('removes the interim two-factor token on failed OAuth login attempt', () => {
+        vi.spyOn(console, 'log').mockImplementation(() => {})
+        localStorage.setItem('totp_tmp_token', 'interim-placeholder')
+        userService.oauthLogin.mockReturnValue(throwError({ error: 'Error' }))
+        component.ngOnInit()
+        expect(localStorage.getItem('totp_tmp_token')).toBeNull()
+    })
+
     it('will create regular user account with base64 encoded reversed email as password', () => {
         userService.oauthLogin.mockReturnValue(of({ email: 'test@test.com' }))
         component.ngOnInit()
@@ -104,5 +112,13 @@ describe('OAuthComponent', () => {
         component.login({ email: '' })
         expect(localStorage.getItem('token')).toBeNull()
         expect(sessionStorage.getItem('bid')).toBeNull()
+    })
+
+    it('removes the interim two-factor token on failed subsequent regular login attempt', () => {
+        vi.spyOn(console, 'log').mockImplementation(() => {})
+        localStorage.setItem('totp_tmp_token', 'interim-placeholder')
+        userService.login.mockReturnValue(throwError({ error: 'Error' }))
+        component.login({ email: '' })
+        expect(localStorage.getItem('totp_tmp_token')).toBeNull()
     })
 })
