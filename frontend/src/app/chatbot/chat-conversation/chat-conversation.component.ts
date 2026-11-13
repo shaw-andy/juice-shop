@@ -16,6 +16,10 @@ import { LoginGuard } from '../../app.guard'
 import { ChatInputBoxComponent } from '../chat-input-box/chat-input-box.component'
 import { type ChatMessage, type StoredConversation } from '../chat.model'
 
+function hasTextContent (message: ChatMessage): boolean {
+  return typeof (message.content as unknown) === 'string'
+}
+
 @Component({
   standalone: true,
   selector: 'app-chat-conversation',
@@ -70,12 +74,13 @@ export class ChatConversationComponent implements OnInit {
     this.conversationId = this.route.snapshot.params['id']
     const existing = this.conversationStorage.getById(this.conversationId)
     if (existing) {
-      this.messages.set(existing.messages)
+      this.messages.set(existing.messages.filter(hasTextContent))
       this.scrollToBottom()
     }
 
-    const initialMessage = this.route.snapshot.queryParams['initialMessage']
-    if (initialMessage) {
+    // A repeated query parameter is parsed as an array, so only a single string value is accepted
+    const initialMessage: unknown = this.route.snapshot.queryParams['initialMessage']
+    if (typeof initialMessage === 'string' && initialMessage) {
       void this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true })
       void this.sendMessage(initialMessage)
     }
@@ -93,13 +98,14 @@ export class ChatConversationComponent implements OnInit {
   }
 
   private persistConversation () {
-    const msgs = this.messages()
+    const msgs = this.messages().filter(hasTextContent)
     const firstUserMsg = msgs.find(m => m.role === 'user')
     const title = firstUserMsg ? this.conversationStorage.generateTitle(firstUserMsg.content) : 'New conversation'
     const existing = this.conversationStorage.getById(this.conversationId)
+    const existingTitle: unknown = existing?.title
     const conversation: StoredConversation = {
       id: this.conversationId,
-      title: existing?.title || title,
+      title: typeof existingTitle === 'string' && existingTitle ? existingTitle : title,
       messages: msgs,
       createdAt: existing?.createdAt || Date.now(),
       updatedAt: Date.now()
@@ -111,8 +117,12 @@ export class ChatConversationComponent implements OnInit {
     this.isToolCallsCollapsed.update(prev => !prev)
   }
 
+  messageText (message: ChatMessage): string {
+    return hasTextContent(message) ? message.content.trim() : ''
+  }
+
   async sendMessage (content: string) {
-    if (!content || this.isLoading()) return
+    if (typeof content !== 'string' || !content || this.isLoading()) return
 
     this.messages.update(prev => [...prev, { role: 'user', content }])
     this.messageInput.set('')
