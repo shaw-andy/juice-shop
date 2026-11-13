@@ -8,6 +8,7 @@ import { ChallengeService } from '../Services/challenge.service'
 import { ChangeDetectorRef, Component, NgZone, type OnInit, inject, ChangeDetectionStrategy } from '@angular/core'
 import { CookieService } from 'ngy-cookie'
 import { SocketIoService } from '../Services/socket-io.service'
+import { ConversationStorageService } from '../Services/conversation-storage.service'
 import { MatIconModule } from '@angular/material/icon'
 import { MatButtonModule } from '@angular/material/button'
 import { MatCardModule, MatCardContent } from '@angular/material/card'
@@ -31,6 +32,7 @@ export class ServerStartedNotificationComponent implements OnInit {
   private readonly cookieService = inject(CookieService)
   private readonly ref = inject(ChangeDetectorRef)
   private readonly io = inject(SocketIoService)
+  private readonly conversationStorage = inject(ConversationStorageService)
 
   public hackingProgress: HackingProgress = {} as HackingProgress
 
@@ -105,6 +107,7 @@ export class ServerStartedNotificationComponent implements OnInit {
     localStorage.removeItem('showDisabledChallenges')
     localStorage.removeItem('showOnlyTutorialChallenges')
     localStorage.removeItem('displayedChallengeCategories')
+    this.conversationStorage.deleteAll()
     this.hackingProgress.cleared = true
   }
 }

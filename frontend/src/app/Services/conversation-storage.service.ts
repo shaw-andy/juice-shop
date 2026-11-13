@@ -4,9 +4,11 @@
  */
 
 import { Injectable } from '@angular/core'
-import { type StoredConversation } from '../chatbot/chat.model'
+import { type ChatMessage, type StoredConversation } from '../chatbot/chat.model'
 
 const STORAGE_KEY = 'juiceshop_chat_conversations'
+// Replies from these tools contain customer order data or coupon codes that must not outlive the session
+const SENSITIVE_TOOLS = new Set(['getOrderById', 'generateCoupon'])
 
 @Injectable({
   providedIn: 'root'
@@ -34,6 +36,7 @@ export class ConversationStorageService {
   }
 
   save (conversation: StoredConversation): void {
+    conversation = { ...conversation, messages: this.withoutSensitiveReplies(conversation.messages) }
     const all = this.getAll()
     const index = all.findIndex(c => c.id === conversation.id)
     if (index >= 0) {
@@ -51,5 +54,12 @@ export class ConversationStorageService {
 
   deleteAll (): void {
     localStorage.removeItem(STORAGE_KEY)
+  }
+
+  // Later replies can repeat what an earlier sensitive tool returned, so every assistant turn from then on is dropped
+  private withoutSensitiveReplies (messages: ChatMessage[]): ChatMessage[] {
+    const firstSensitive = messages.findIndex(m => m.role === 'assistant' && m.tool_calls?.some(t => SENSITIVE_TOOLS.has(t.function?.name)))
+    if (firstSensitive < 0) return messages
+    return messages.filter((m, i) => i < firstSensitive || m.role === 'user')
   }
 }

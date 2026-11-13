@@ -18,6 +18,7 @@ import { type StoredConversation } from '../chat.model'
   templateUrl: './chat-welcome-screen.component.html',
   styleUrls: ['./chat-welcome-screen.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '(window:storage)': 'onStorageChanged()' },
   imports: [
     MatIconModule,
     ChatInputBoxComponent,
@@ -82,6 +83,10 @@ export class ChatWelcomeScreenComponent implements OnInit {
       this.message.set(text)
       this.inputBox()?.focus()
     })
+  }
+
+  onStorageChanged () {
+    this.conversations.set(this.conversationStorage.getAll())
   }
 
   deleteConversation (event: Event, id: string) {

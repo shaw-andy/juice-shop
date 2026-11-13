@@ -22,6 +22,7 @@ import { type ChatMessage, type StoredConversation } from '../chat.model'
   templateUrl: './chat-conversation.component.html',
   styleUrls: ['./chat-conversation.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '(window:storage)': 'onStorageChanged()' },
   imports: [
     MatIconModule,
     ChatInputBoxComponent,
@@ -51,6 +52,8 @@ export class ChatConversationComponent implements OnInit {
   chatBotAvatar = signal('assets/public/images/JuicyBot.png')
 
   private conversationId = ''
+  // A reply can still be streaming after logout or an account switch; it must not be written back for the next session
+  private readonly sessionToken = localStorage.getItem('token')
 
   ngOnInit () {
     this.configurationService.getApplicationConfiguration().subscribe({
@@ -93,6 +96,7 @@ export class ChatConversationComponent implements OnInit {
   }
 
   private persistConversation () {
+    if (localStorage.getItem('token') !== this.sessionToken) return
     const msgs = this.messages()
     const firstUserMsg = msgs.find(m => m.role === 'user')
     const title = firstUserMsg ? this.conversationStorage.generateTitle(firstUserMsg.content) : 'New conversation'
@@ -105,6 +109,12 @@ export class ChatConversationComponent implements OnInit {
       updatedAt: Date.now()
     }
     this.conversationStorage.save(conversation)
+  }
+
+  onStorageChanged () {
+    if (localStorage.getItem('token') !== this.sessionToken) {
+      this.messages.set([])
+    }
   }
 
   toggleToolCalls () {
