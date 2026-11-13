@@ -20,7 +20,7 @@ void describe('order', () => {
   let next: any
 
   beforeEach(() => {
-    req = { params: { id: '1' }, body: {}, headers: {}, __: mock.fn((s) => s), socket: { remoteAddress: '127.0.0.1' } }
+    req = { params: { id: '1' }, body: {}, headers: {}, __: mock.fn((s) => s), getLocale: () => 'en', getCatalog: () => ({}), socket: { remoteAddress: '127.0.0.1' } }
     res = { json: mock.fn(), status: mock.fn(() => res) }
     next = mock.fn()
     // Reset mocks that might have been set globally or on models
