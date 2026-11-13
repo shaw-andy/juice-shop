@@ -49,6 +49,7 @@ export class OAuthComponent implements OnInit {
         const expires = new Date()
         expires.setHours(expires.getHours() + 8)
         this.cookieService.put('token', authentication.token, { expires })
+        localStorage.removeItem('totp_tmp_token')
         localStorage.setItem('token', authentication.token)
         sessionStorage.setItem('bid', authentication.bid)
         this.userService.isLoggedIn.next(true)
@@ -65,6 +66,7 @@ export class OAuthComponent implements OnInit {
     console.log(error)
     this.cookieService.remove('token')
     localStorage.removeItem('token')
+    localStorage.removeItem('totp_tmp_token')
     sessionStorage.removeItem('bid')
   }
 

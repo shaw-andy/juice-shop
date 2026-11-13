@@ -49,7 +49,23 @@ export const cutOffPoisonNullByte = (str: string) => {
   return str
 }
 
-export const isAuthorized = () => expressJwt(({ secret: publicKey }) as any)
+export const isAuthorized = () => {
+  const checkSignature = expressJwt(({ secret: publicKey }) as any)
+  return (req: Request, res: Response, next: NextFunction) => {
+    checkSignature(req, res, (err?: unknown) => {
+      if (err) {
+        next(err)
+        return
+      }
+      // Purpose-bound tokens (pre-2FA tmpToken, TOTP setupToken) share the session signing key and differ only by their `type` claim
+      if ((req as Request & { user?: { type?: unknown } }).user?.type !== undefined) {
+        next(Object.assign(new Error('Token is not a session token'), { name: 'UnauthorizedError', status: 401 }))
+        return
+      }
+      next()
+    })
+  }
+}
 export const denyAll = () => expressJwt({ secret: '' + Math.random() } as any)
 export const authorize = (user = {}) => jwt.sign(user, privateKey, { expiresIn: '6h', algorithm: 'RS256' })
 export const verify = (token: string) => token ? (jws.verify as ((token: string, secret: string) => boolean))(token, publicKey) : false
