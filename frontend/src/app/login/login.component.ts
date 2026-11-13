@@ -29,6 +29,12 @@ import { MatCardModule } from '@angular/material/card'
 library.add(faKey, faEye, faEyeSlash, faGoogle)
 
 const oauthProviderUrl = 'https://accounts.google.com/o/oauth2/v2/auth'
+const defaultRedirectUrl = '/search'
+const allowedRedirectUrls: readonly string[] = [defaultRedirectUrl, '/basket']
+
+function toAllowedRedirectUrl (redirectUrl: string | null): string {
+  return allowedRedirectUrls.find(allowed => allowed === redirectUrl) ?? defaultRedirectUrl
+}
 
 @Component({
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -98,7 +104,7 @@ export class LoginComponent implements OnInit {
     this.user.password = this.passwordControl.value
     this.userService.login(this.user).subscribe({
       next: (authentication: any) => {
-        const redirectUrl = this.route.snapshot.queryParamMap.get('redirectUrl') ?? '/search'
+        const redirectUrl = toAllowedRedirectUrl(this.route.snapshot.queryParamMap.get('redirectUrl'))
         localStorage.setItem('token', authentication.token)
         const expires = new Date()
         expires.setHours(expires.getHours() + 8)
