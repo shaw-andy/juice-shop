@@ -1,7 +1,7 @@
 FROM node:24 AS installer
 COPY . /juice-shop
 WORKDIR /juice-shop
-RUN npm install -g typescript@^6.0.3
+RUN npm install -g typescript@6.0.3 --ignore-scripts
 RUN npm install --omit=dev
 RUN npm dedupe --omit=dev
 RUN rm -rf frontend/node_modules
@@ -15,8 +15,8 @@ RUN rm ftp/legal.md || true
 RUN rm i18n/*.json || true
 
 # keep version in sync with package.json
-ARG CYCLONEDX_NPM_VERSION='^2.0.0||^3.0.0||^4.0.0'
-RUN npm install -g @cyclonedx/cyclonedx-npm@$CYCLONEDX_NPM_VERSION
+ARG CYCLONEDX_NPM_VERSION='4.2.1'
+RUN npm install -g @cyclonedx/cyclonedx-npm@$CYCLONEDX_NPM_VERSION --ignore-scripts
 RUN npm run sbom
 
 FROM gcr.io/distroless/nodejs24-debian13

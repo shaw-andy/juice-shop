@@ -20,7 +20,7 @@ function loadArchiver () {
     const globalRoot = execSync('npm root -g', { encoding: 'utf8' }).trim()
     return require(path.join(globalRoot, 'archiver'))
   } catch {
-    console.error('archiver is not installed. Run: npm install -g archiver')
+    console.error('archiver is not installed. Run: npm install -g archiver@8.0.0 --ignore-scripts')
     process.exit(1)
   }
 }
