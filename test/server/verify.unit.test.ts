@@ -256,6 +256,18 @@ void describe('verify', () => {
         assert.equal(challenges.changeProductChallenge.solved, false)
       })
 
+      void it('is not solved and does not reject when the O-Saft product description is null', async () => {
+        products.osaft = {
+          description: null,
+          reload () { return Promise.resolve() }
+        } as unknown as Product
+
+        verify.databaseRelatedChallenges()(req, res, next)
+        await new Promise((resolve) => setTimeout(resolve, 0))
+
+        assert.equal(challenges.changeProductChallenge.solved, false)
+      })
+
       void it('is not solved when the link in the O-Saft product remained unchanged', () => {
         let urlForProductTamperingChallenge = null
         for (const product of config.get<ProductConfig[]>('products')) {
