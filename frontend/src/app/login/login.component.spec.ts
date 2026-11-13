@@ -294,14 +294,24 @@ describe('LoginComponent', () => {
     })
 
     describe('login flow edge cases', () => {
-        it('should redirect to the URL provided via the redirectUrl query parameter', async () => {
+        it('should redirect to an allowed URL provided via the redirectUrl query parameter', async () => {
+            const router = (component as any).router
+            const navSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true as any)
+            ;(component as any).route = { snapshot: { queryParamMap: { get: () => '/basket' } } }
+            userService.login.mockReturnValue(of({ token: 't', bid: 1 }))
+            component.login()
+            await fixture.whenStable()
+            expect(navSpy).toHaveBeenCalledWith('/basket')
+        })
+
+        it('should redirect to /search when the redirectUrl query parameter is not allowed', async () => {
             const router = (component as any).router
             const navSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true as any)
             ;(component as any).route = { snapshot: { queryParamMap: { get: () => '/profile' } } }
             userService.login.mockReturnValue(of({ token: 't', bid: 1 }))
             component.login()
             await fixture.whenStable()
-            expect(navSpy).toHaveBeenCalledWith('/profile')
+            expect(navSpy).toHaveBeenCalledWith('/search')
         })
 
         it('should log and continue when merging guest basket fails', async () => {
