@@ -222,7 +222,7 @@ function changeProductChallenge (osaft: Product) {
         break
       }
     }
-    if (urlForProductTamperingChallenge) {
+    if (urlForProductTamperingChallenge && typeof osaft.description === 'string') {
       if (!osaft.description.includes(`${urlForProductTamperingChallenge}`)) {
         if (osaft.description.includes(`<a href="${config.get<string>('challenges.overwriteUrlForProductTamperingChallenge')}" target="_blank">`)) {
           challengeUtils.solve(challenges.changeProductChallenge)
