@@ -17,7 +17,7 @@ import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
 import { getLanguageExtension, readOnlyExtensions, detectLanguage } from '../../../shared/codemirror-extensions'
 import { juiceShopTheme } from '../../../shared/codemirror-theme'
 
-import { type CodeSnippet } from '../../../Services/code-snippet.service'
+import { hasSnippetText, type CodeSnippet } from '../../../Services/code-snippet.service'
 import { VulnLinesService, type result } from '../../../Services/vuln-lines.service'
 import { ChallengeService } from '../../../Services/challenge.service'
 import { ResultState } from '../../coding-challenge.types'
@@ -148,7 +148,10 @@ export class CodingChallengeFindItComponent implements OnInit, AfterViewInit, On
   }
 
   ngAfterViewInit (): void {
-    const lang = detectLanguage(this.snippet().snippet)
+    const snippet = this.snippet()
+    if (!hasSnippetText(snippet)) return
+    const code = snippet.snippet
+    const lang = detectLanguage(code)
     const findItTheme = EditorView.theme({
       '.cm-selected-line': {
         backgroundColor: 'rgba(255, 213, 79, 0.25) !important'
@@ -202,7 +205,7 @@ export class CodingChallengeFindItComponent implements OnInit, AfterViewInit, On
     this.editorView = new EditorView({
       parent: this.editorHost().nativeElement,
       state: EditorState.create({
-        doc: this.snippet().snippet,
+        doc: code,
         extensions: [
           gutterClickHandler,
           highlightSpecialChars(),

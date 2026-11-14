@@ -17,7 +17,7 @@ import { unifiedMergeView } from '@codemirror/merge'
 import { readOnlyExtensions, getLanguageExtension, detectLanguage } from '../../../shared/codemirror-extensions'
 import { juiceShopTheme } from '../../../shared/codemirror-theme'
 
-import { type CodeSnippet } from '../../../Services/code-snippet.service'
+import { hasSnippetText, type CodeSnippet } from '../../../Services/code-snippet.service'
 import { CodeFixesService } from '../../../Services/code-fixes.service'
 import { ChallengeService } from '../../../Services/challenge.service'
 import { ResultState, type RandomFixes } from '../../coding-challenge.types'
@@ -78,9 +78,11 @@ export class CodingChallengeFixItComponent implements OnInit, AfterViewInit, OnD
   private createDiffView (): void {
     this.diffView?.destroy()
     const fix = this.randomFixes[this.selectedFix]
-    if (!fix || !this.snippet()) return
+    const snippet = this.snippet()
+    if (!fix || !hasSnippetText(snippet)) return
+    const original = snippet.snippet
 
-    const lang = detectLanguage(this.snippet().snippet)
+    const lang = detectLanguage(original)
     this.diffView = new EditorView({
       parent: this.diffHost().nativeElement,
       state: EditorState.create({
@@ -90,7 +92,7 @@ export class CodingChallengeFixItComponent implements OnInit, AfterViewInit, OnD
           ...juiceShopTheme(),
           getLanguageExtension(lang),
           unifiedMergeView({
-            original: this.snippet().snippet,
+            original,
             highlightChanges: true,
             gutter: true,
             mergeControls: false,

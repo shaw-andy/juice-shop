@@ -52,6 +52,10 @@
   min-width: 0;
 }
 
+.error {
+  margin: 0;
+}
+
 .locked-section {
   background-color: var(--theme-background-darker);
   border: 1px dashed var(--theme-text-fade-20);
