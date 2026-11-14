@@ -107,6 +107,42 @@ describe('OrderCompletionComponent', () => {
         expect(component.orderDetails.products[1].name).toBe('Apple Pomace')
     })
 
+    it('should keep a product name inside the tweet text and not as an extra query parameter', () => {
+        const productName = 'Juice&url=https://attacker.example&'
+        trackOrderService.find.mockReturnValue(of({
+            data: [{
+                totalPrice: 1,
+                promotionalAmount: 0,
+                deliveryPrice: 0,
+                addressId: 1,
+                paymentId: 1,
+                products: [{ quantity: 1, name: productName, price: 1, total: 1, bonus: 0 }],
+                bonus: 0,
+                eta: '5'
+            }]
+        }))
+        configurationService.getApplicationConfiguration.mockReturnValue(of({
+            application: { social: { twitterUrl: 'https://twitter.com/owasp_juiceshop' } }
+        }))
+        component.ngOnInit()
+        fixture.detectChanges()
+
+        const anchor = (fixture.nativeElement as HTMLElement).querySelector('a[aria-label="Tweet"]') as HTMLAnchorElement
+        expect(anchor).toBeTruthy()
+        const parsed = new URL(anchor.href)
+        expect({
+            keys: [...parsed.searchParams.keys()].sort(),
+            url: parsed.searchParams.get('url'),
+            hashtags: parsed.searchParams.get('hashtags'),
+            text: parsed.searchParams.get('text')
+        }).toEqual({
+            keys: ['hashtags', 'text'],
+            url: null,
+            hashtags: 'security',
+            text: expect.stringContaining(productName)
+        })
+    })
+
     it('should have bullet point list of products in tweet', () => {
         trackOrderService.find.mockReturnValue(of({ data: [{ products: [{ name: 'A' }, { name: 'B' }] }] }))
         configurationService.getApplicationConfiguration.mockReturnValue(of({}))

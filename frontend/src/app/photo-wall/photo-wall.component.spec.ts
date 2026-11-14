@@ -253,6 +253,51 @@ describe('PhotoWallComponent', () => {
             expect((fixture.nativeElement as HTMLElement).querySelector('.emptyState')).toBeNull()
         })
 
+        it('should keep memory caption characters inside the share text and not as extra query parameters', () => {
+            const caption = 'Picnic&url=https://attacker.example&'
+            photoWallService.get.mockReturnValue(of([{ imagePath: 'a.png', caption }]))
+            configurationService.getApplicationConfiguration.mockReturnValue(of({
+                application: {
+                    social: {
+                        twitterUrl: 'https://twitter.com/owasp_juiceshop',
+                        blueSkyUrl: 'https://bsky.app/profile/owasp-juice.shop',
+                        mastodonUrl: 'https://fosstodon.org/@owasp_juiceshop'
+                    }
+                }
+            }))
+            component.ngOnInit()
+            fixture.detectChanges()
+
+            expect(shareSnapshots()).toEqual([
+                { label: 'Tweet', keys: ['hashtags', 'text'], url: null, hashtags: 'appsec', text: expect.stringContaining(caption) },
+                { label: 'BlueSky', keys: ['text'], url: null, hashtags: null, text: expect.stringContaining(caption) },
+                { label: 'Mastodon', keys: ['text'], url: null, hashtags: null, text: expect.stringContaining(caption) }
+            ])
+        })
+
+        it('should keep an uploader username inside the share text and not as extra query parameters', () => {
+            const username = 'bob&url=https://attacker.example&'
+            photoWallService.get.mockReturnValue(of([{ imagePath: 'a.png', caption: 'Picnic', User: { username } }]))
+            configurationService.getApplicationConfiguration.mockReturnValue(of({
+                application: {
+                    social: {
+                        twitterUrl: 'https://twitter.com/owasp_juiceshop',
+                        blueSkyUrl: 'https://bsky.app/profile/owasp-juice.shop',
+                        mastodonUrl: 'https://fosstodon.org/@owasp_juiceshop'
+                    }
+                }
+            }))
+            component.ngOnInit()
+            fixture.detectChanges()
+
+            const shared = `Picnic (© ${username})`
+            expect(shareSnapshots()).toEqual([
+                { label: 'Tweet', keys: ['hashtags', 'text'], url: null, hashtags: 'appsec', text: expect.stringContaining(shared) },
+                { label: 'BlueSky', keys: ['text'], url: null, hashtags: null, text: expect.stringContaining(shared) },
+                { label: 'Mastodon', keys: ['text'], url: null, hashtags: null, text: expect.stringContaining(shared) }
+            ])
+        })
+
         it('should render social share buttons only when matching handles are configured', () => {
             photoWallService.get.mockReturnValue(of([{ imagePath: 'a.png', caption: 'A' }]))
             configurationService.getApplicationConfiguration.mockReturnValue(of({
@@ -288,6 +333,22 @@ describe('PhotoWallComponent', () => {
             expect((fixture.nativeElement as HTMLElement).querySelector('#submitButton')).toBeTruthy()
             localStorage.removeItem('token')
         })
+
+        function shareSnapshots () {
+            return ['Tweet', 'BlueSky', 'Mastodon'].map(label => {
+                const button = (fixture.nativeElement as HTMLElement).querySelector(`button[aria-label="${label}"]`)
+                const anchor = button?.closest('a') as HTMLAnchorElement | null
+                expect(anchor, label).toBeTruthy()
+                const parsed = new URL(anchor.href)
+                return {
+                    label,
+                    keys: [...parsed.searchParams.keys()].sort(),
+                    url: parsed.searchParams.get('url'),
+                    hashtags: parsed.searchParams.get('hashtags'),
+                    text: parsed.searchParams.get('text')
+                }
+            })
+        }
 
         it('should keep the submit button disabled while the form is invalid', () => {
             localStorage.setItem('token', 'token')
