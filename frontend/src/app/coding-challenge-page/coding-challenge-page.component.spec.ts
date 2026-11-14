@@ -133,7 +133,28 @@ describe('CodingChallengePageComponent', () => {
     it('should handle snippet load error', () => {
         codeSnippetService.get.mockReturnValue(throwError({ error: 'Error' }))
         const { component } = createComponent()
-        expect(component.snippet).toEqual({ snippet: 'Error' })
+        expect(component.snippet).toBeNull()
+        expect(component.error).toBe('Error')
+    })
+
+    it('should show the error text and no editor when the snippet request fails', () => {
+        codeSnippetService.get.mockReturnValue(throwError({ error: { status: 'error', error: 'No code challenge for challenge key: unknown' } }))
+        const { component, fixture } = createComponent()
+        expect(component.snippet).toBeNull()
+        expect(fixture.nativeElement.querySelector('.error').textContent).toContain('No code challenge for challenge key: unknown')
+        expect(fixture.nativeElement.querySelector('coding-challenge-find-it')).toBeNull()
+        expect(fixture.nativeElement.querySelector('coding-challenge-fix-it')).toBeNull()
+    })
+
+    it('should not mount the editors when a successful response has no snippet text', () => {
+        codeSnippetService.get.mockReturnValue(of({ snippet: { not: 'text' } }))
+        challengeService.find.mockReturnValue(of([
+            { key: 'testChallenge', name: 'Test Challenge', codingChallengeStatus: 1 }
+        ]))
+        const { component, fixture } = createComponent()
+        expect(component.snippet).toBeNull()
+        expect(fixture.nativeElement.querySelector('coding-challenge-find-it')).toBeNull()
+        expect(fixture.nativeElement.querySelector('coding-challenge-fix-it')).toBeNull()
     })
 
     it('should handle fixes load error', () => {

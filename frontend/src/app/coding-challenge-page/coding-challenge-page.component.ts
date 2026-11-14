@@ -5,6 +5,7 @@
 
 import { Component, type OnInit, DestroyRef, type ElementRef, inject, viewChild, ChangeDetectionStrategy } from '@angular/core'
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop'
+import { type HttpErrorResponse } from '@angular/common/http'
 import { ActivatedRoute, RouterLink } from '@angular/router'
 import { MatButtonModule } from '@angular/material/button'
 import { MatIconModule } from '@angular/material/icon'
@@ -13,11 +14,19 @@ import { TranslateModule } from '@ngx-translate/core'
 import { forkJoin, of } from 'rxjs'
 import { catchError, switchMap } from 'rxjs/operators'
 
-import { CodeSnippetService, type CodeSnippet } from '../Services/code-snippet.service'
+import { CodeSnippetService, hasSnippetText, type CodeSnippet } from '../Services/code-snippet.service'
 import { CodeFixesService } from '../Services/code-fixes.service'
 import { ChallengeService } from '../Services/challenge.service'
 import { CodingChallengeFindItComponent } from './components/coding-challenge-find-it/coding-challenge-find-it.component'
 import { CodingChallengeFixItComponent } from './components/coding-challenge-fix-it/coding-challenge-fix-it.component'
+
+function snippetErrorMessage (response: unknown): string {
+  const body = (response as { error?: unknown } | null)?.error
+  if (typeof body === 'string') return body
+  const message = (body as { error?: unknown } | null)?.error
+  if (typeof message === 'string') return message
+  return 'Code snippet could not be loaded'
+}
 
 @Component({
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -38,6 +47,7 @@ export class CodingChallengePageComponent implements OnInit {
   public challengeKey: string
   public challengeName: string
   public snippet: CodeSnippet = null
+  public error: string = null
   public fixes: string[] = null
   public findItSolved = false
   public fixItSolved = false
@@ -51,7 +61,7 @@ export class CodingChallengePageComponent implements OnInit {
         return forkJoin({
           challenges: this.challengeService.find({ sort: 'name' }),
           snippet: this.codeSnippetService.get(this.challengeKey).pipe(
-            catchError((err) => of({ snippet: err.error } as CodeSnippet))
+            catchError((err: HttpErrorResponse) => of(err))
           ),
           fixes: this.codeFixesService.get(this.challengeKey).pipe(
             catchError(() => of(null))
@@ -66,7 +76,13 @@ export class CodingChallengePageComponent implements OnInit {
         this.findItSolved = challenge.codingChallengeStatus >= 1
         this.fixItSolved = challenge.codingChallengeStatus >= 2
       }
-      this.snippet = snippet
+      if (hasSnippetText(snippet)) {
+        this.snippet = snippet
+        this.error = null
+      } else {
+        this.snippet = null
+        this.error = snippetErrorMessage(snippet)
+      }
       this.fixes = fixes?.fixes ?? null
       this.isLoaded = true
     })

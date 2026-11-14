@@ -14,6 +14,10 @@ export interface CodeSnippet {
   snippet: string
 }
 
+export function hasSnippetText (value: unknown): value is CodeSnippet {
+  return typeof (value as CodeSnippet | null | undefined)?.snippet === 'string'
+}
+
 export interface Solved {
   challenges: string[]
 }

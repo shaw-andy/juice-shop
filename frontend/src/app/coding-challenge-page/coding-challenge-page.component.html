@@ -24,9 +24,11 @@
     </section>
   } @else if (!isLoaded) {
     <mat-spinner aria-label="Loading challenge"></mat-spinner>
+  } @else if (error) {
+    <p class="error" role="alert">{{error}}</p>
   }
 
-  @if (findItSolved && fixes !== null) {
+  @if (snippet !== null && findItSolved && fixes !== null) {
     <section class="challenge-section" #fixItSection>
       <coding-challenge-fix-it
         [challengeKey]="challengeKey"

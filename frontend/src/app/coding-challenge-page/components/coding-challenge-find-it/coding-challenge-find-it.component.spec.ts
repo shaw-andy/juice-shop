@@ -74,6 +74,18 @@ describe('CodingChallengeFindItComponent', () => {
         expect(component).toBeTruthy()
     })
 
+    it('should not create an editor when the snippet has no text', () => {
+        for (const snippet of [{ snippet: { status: 'error', error: 'No code challenge' } }, { snippet: undefined }, null]) {
+            const other = TestBed.createComponent(CodingChallengeFindItComponent)
+            other.componentRef.setInput('challengeKey', 'unknown')
+            other.componentRef.setInput('snippet', snippet)
+            expect(() => { other.detectChanges() }).not.toThrow()
+            expect(other.nativeElement.querySelector('.cm-editor')).toBeNull()
+            expect(() => { other.componentInstance.selectLines(1) }).not.toThrow()
+            other.destroy()
+        }
+    })
+
     it('should initialize line markers from snippet', () => {
         expect(component.markedLines.size).toBe(0)
         expect(component.selectedLines).toEqual([])
