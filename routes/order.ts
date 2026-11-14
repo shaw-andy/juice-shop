@@ -15,7 +15,7 @@ import { DeliveryModel } from '../models/delivery'
 import { QuantityModel } from '../models/quantity'
 import { ProductModel } from '../models/product'
 import { BasketModel } from '../models/basket'
-import { WalletModel } from '../models/wallet'
+import { WalletModel, debitWallet } from '../models/wallet'
 import * as security from '../lib/insecurity'
 import * as utils from '../lib/utils'
 import * as db from '../data/mongodb'
@@ -146,9 +146,7 @@ export function placeOrder () {
           if (req.body.UserId) {
             if (req.body.orderDetails && req.body.orderDetails.paymentId === 'wallet') {
               const wallet = await WalletModel.findOne({ where: { UserId: req.body.UserId } })
-              if ((wallet != null) && wallet.balance >= totalPrice) {
-                await WalletModel.decrement({ balance: totalPrice }, { where: { UserId: req.body.UserId } })
-              } else {
+              if (wallet == null || wallet.balance < totalPrice || !(await debitWallet(wallet, totalPrice))) {
                 next(new Error('Insufficient wallet balance.'))
                 return
               }
