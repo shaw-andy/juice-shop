@@ -7,6 +7,8 @@
 import z85 from 'z85'
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
+import crypto from 'node:crypto'
+import fs from 'node:fs'
 import * as security from '../../lib/insecurity'
 import type { UserModel } from '@juice-shop/models/user'
 import type { Request } from 'express'
@@ -205,8 +207,19 @@ void describe('insecurity', () => {
   })
 
   void describe('deluxeToken', () => {
-    void it('returns SHA-256 HMAC with private key as salt for email and deluxe role', () => {
-      assert.equal(security.deluxeToken('test@juice-sh.op'), '91e2b6493fda679d95ae05ac0d1cdce82c2ad4f7b518202a3ed54732531bc7e1')
+    void it('returns a stable SHA-256 HMAC per email', () => {
+      assert.match(security.deluxeToken('test@juice-sh.op'), /^[0-9a-f]{64}$/)
+      assert.equal(security.deluxeToken('test@juice-sh.op'), security.deluxeToken('test@juice-sh.op'))
+      assert.notEqual(security.deluxeToken('test@juice-sh.op'), security.deluxeToken('other@juice-sh.op'))
+    })
+
+    void it('is not keyed with the hardcoded JWT signing key', () => {
+      const email = 'test@juice-sh.op'
+      const source = fs.readFileSync('lib/insecurity.ts', 'utf8')
+      const embeddedKey = /const privateKey = '([^']+)'/.exec(source)?.[1].replace(/\\r\\n/g, '\r\n')
+      assert.ok(embeddedKey)
+      const forged = crypto.createHmac('sha256', embeddedKey).update(email + security.roles.deluxe).digest('hex')
+      assert.notEqual(security.deluxeToken(email), forged)
     })
   })
 

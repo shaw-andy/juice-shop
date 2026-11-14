@@ -473,6 +473,14 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.get('/api/Deliverys/:id', utils.asyncHandler(delivery.getDeliveryMethod()))
   // vuln-code-snippet end changeProductChallenge
 
+  /* Deluxe membership tokens are only issued server-side after payment */
+  app.post('/api/Users', (req: Request, res: Response, next: NextFunction) => {
+    if (req.body !== null && typeof req.body === 'object') {
+      delete req.body.deluxeToken
+    }
+    next()
+  })
+
   /* Verify the 2FA Token */
   app.post('/rest/2fa/verify',
     rateLimit({ windowMs: 5 * 60 * 1000, max: 100, validate: false }),
