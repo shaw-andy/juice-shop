@@ -12,9 +12,7 @@ export function orderHistory () {
   return async (req: Request, res: Response, next: NextFunction) => {
     const loggedInUser = security.authenticatedUsers.get(req.headers?.authorization?.replace('Bearer ', ''))
     if (loggedInUser?.data?.email && loggedInUser.data.id) {
-      const email = loggedInUser.data.email
-      const updatedEmail = email.replace(/[aeiou]/gi, '*')
-      const order = await ordersCollection.find({ email: updatedEmail })
+      const order = await ordersCollection.find({ UserId: loggedInUser.data.id })
       res.status(200).json({ status: 'success', data: order })
     } else {
       next(new Error('Blocked illegal activity by ' + req.socket.remoteAddress))

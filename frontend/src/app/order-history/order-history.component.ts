@@ -6,7 +6,7 @@
 import { Component, NgZone, type OnInit, inject, ChangeDetectionStrategy } from '@angular/core'
 import { OrderHistoryService } from '../Services/order-history.service'
 import { MatTableDataSource, MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow } from '@angular/material/table'
-import { BasketService } from '../Services/basket.service'
+import { TrackOrderService } from '../Services/track-order.service'
 import { ProductDetailsComponent } from '../product-details/product-details.component'
 import { MatDialog } from '@angular/material/dialog'
 import { type Product } from '../Models/product.model'
@@ -46,7 +46,7 @@ export class OrderHistoryComponent implements OnInit {
   private readonly router = inject(Router)
   private readonly dialog = inject(MatDialog)
   private readonly orderHistoryService = inject(OrderHistoryService)
-  private readonly basketService = inject(BasketService)
+  private readonly trackOrderService = inject(TrackOrderService)
   private readonly productService = inject(ProductService)
   private readonly ngZone = inject(NgZone)
 
@@ -112,8 +112,12 @@ export class OrderHistoryComponent implements OnInit {
   }
 
   openConfirmationPDF (orderId: string) {
-    const redirectUrl = `${this.basketService.hostServer}/ftp/order_${orderId}.pdf`
-    window.open(redirectUrl, '_blank')
+    this.trackOrderService.confirmation(orderId).subscribe({
+      next: (pdf: Blob) => {
+        window.open(URL.createObjectURL(pdf), '_blank')
+      },
+      error: (err) => { console.log(err) }
+    })
   }
 
   trackOrder (orderId) {

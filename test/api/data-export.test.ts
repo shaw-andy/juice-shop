@@ -10,7 +10,7 @@ import type { Express } from 'express'
 import config from 'config'
 import path from 'node:path'
 import { createTestApp } from './helpers/setup'
-import { login } from './helpers/auth'
+import { login, register } from './helpers/auth'
 import { MemoryModel } from '../../models/memory'
 import * as db from '../../data/mongodb'
 
@@ -313,6 +313,21 @@ void describe('/rest/user/data-export', () => {
     assert.equal(parsedData.email, 'jim@' + config.get<string>('application.domain'))
     assert.equal(parsedData.memories[0].caption, 'Valid Image')
     assert.ok(parsedData.memories[0].imageUrl.includes('assets/public/images/uploads/valid-image'))
+  })
+
+  void it('Export data excludes orders of a customer whose masked email is identical', async () => {
+    const email = ('admin@' + config.get<string>('application.domain')).replace(/[aeiou]/g, (vowel) => vowel === 'a' ? 'e' : 'a')
+    const password = 'placeholder-password'
+    await register(app, { email, password })
+    const { token } = await login(app, { email, password })
+
+    const res = await request(app)
+      .post('/rest/user/data-export')
+      .set({ Authorization: 'Bearer ' + token, 'content-type': 'application/json' })
+      .send({ format: '1' })
+
+    assert.equal(res.status, 200)
+    assert.deepEqual(JSON.parse(res.body.userData).orders, [])
   })
 
   void describe('error cases', () => {

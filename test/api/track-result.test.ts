@@ -8,6 +8,7 @@ import assert from 'node:assert/strict'
 import request from 'supertest'
 import type { Express } from 'express'
 import { createTestApp } from './helpers/setup'
+import { login, register } from './helpers/auth'
 
 let app: Express
 
@@ -23,25 +24,25 @@ void describe('/rest/track-order/:id', () => {
     assert.equal(res.status, 200)
   })
 
-  void it('GET all orders by injecting into orderId', async () => {
+  void it('GET no orders by injecting into orderId', async () => {
     const res = await request(app)
       .get('/rest/track-order/%27%20%7C%7C%20true%20%7C%7C%20%27')
     assert.equal(res.status, 200)
     assert.ok(res.headers['content-type']?.includes('application/json'))
-    assert.ok(Array.isArray(res.body.data))
-    for (const item of res.body.data) {
-      assert.equal(typeof item.orderId, 'string')
-      assert.equal(typeof item.email, 'string')
-      assert.equal(typeof item.totalPrice, 'number')
-      assert.ok(Array.isArray(item.products))
-      for (const product of item.products) {
-        assert.equal(typeof product.quantity, 'number')
-        assert.equal(typeof product.name, 'string')
-        assert.equal(typeof product.price, 'number')
-        assert.equal(typeof product.total, 'number')
-      }
-      assert.equal(typeof item.eta, 'string')
-      assert.equal(typeof item._id, 'string')
-    }
+    assert.equal(res.body.data.length, 1)
+    assert.deepEqual(Object.keys(res.body.data[0]), ['orderId'])
+  })
+
+  void it('GET no orders by injecting into orderId with a customer session', async () => {
+    const email = 'track-result-injection@example.test'
+    const password = 'placeholder-password'
+    await register(app, { email, password })
+    const { token } = await login(app, { email, password })
+    const res = await request(app)
+      .get('/rest/track-order/%27%20%7C%7C%20true%20%7C%7C%20%27')
+      .set('Authorization', 'Bearer ' + token)
+    assert.equal(res.status, 200)
+    assert.equal(res.body.data.length, 1)
+    assert.deepEqual(Object.keys(res.body.data[0]), ['orderId'])
   })
 })

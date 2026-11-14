@@ -749,6 +749,7 @@ async function createOrders () {
     {
       orderId: security.hash(adminEmail).slice(0, 4) + '-' + utils.randomHexString(16),
       email: (adminEmail.replace(/[aeiou]/gi, '*')),
+      UserId: datacache.users.admin?.id,
       totalPrice: basket1Products[0].total + basket1Products[1].total,
       bonus: basket1Products[0].bonus + basket1Products[1].bonus,
       products: basket1Products,
@@ -758,6 +759,7 @@ async function createOrders () {
     {
       orderId: security.hash(adminEmail).slice(0, 4) + '-' + utils.randomHexString(16),
       email: (adminEmail.replace(/[aeiou]/gi, '*')),
+      UserId: datacache.users.admin?.id,
       totalPrice: basket2Products[0].total,
       bonus: basket2Products[0].bonus,
       products: basket2Products,
@@ -767,6 +769,7 @@ async function createOrders () {
     {
       orderId: security.hash('demo').slice(0, 4) + '-' + utils.randomHexString(16),
       email: 'd*m*',
+      UserId: datacache.users.test?.id,
       totalPrice: basket3Products[0].total + basket3Products[1].total,
       bonus: basket3Products[0].bonus + basket3Products[1].bonus,
       products: basket3Products,
@@ -776,10 +779,11 @@ async function createOrders () {
   ]
 
   return await Promise.all(
-    orders.map(({ orderId, email, totalPrice, bonus, products, eta, delivered }) =>
+    orders.map(({ orderId, email, UserId, totalPrice, bonus, products, eta, delivered }) =>
       ordersCollection.insert({
         orderId,
         email,
+        UserId,
         totalPrice,
         bonus,
         products,

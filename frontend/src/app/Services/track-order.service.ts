@@ -21,4 +21,8 @@ export class TrackOrderService {
     params = encodeURIComponent(params)
     return this.http.get(`${this.host}/${params}`).pipe(map((response: any) => response), catchError((error) => { throw error }))
   }
+
+  confirmation (orderId: string) {
+    return this.http.get(`${this.hostServer}/rest/order-confirmation/${encodeURIComponent(orderId)}`, { responseType: 'blob' }).pipe(catchError((error) => { throw error }))
+  }
 }
