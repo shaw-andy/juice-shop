@@ -84,15 +84,19 @@ void describe('antiCheat', () => {
 
       antiCheat.reset()
 
-      const req: any = { url: '/ftp' }
-      const res: any = {}
-      const next = () => {}
-      antiCheat.checkForPreSolveInteractions()(req, res, next)
-
-      await new Promise(resolve => setTimeout(resolve, 100))
-      const scoreWithInteraction = antiCheat.calculateCheatScore(challenge)
+      const cookie = visit('/ftp')
+      const scoreWithInteraction = await solveInRequest(challenge, cookie)
 
       assert.ok(scoreWithInteraction < scoreWithoutInteraction, `Score with interaction (${scoreWithInteraction}) should be lower than without (${scoreWithoutInteraction})`)
+    })
+
+    void it('should not count interactions made by another client', async () => {
+      const challenge: Challenge = { key: 'directoryListingChallenge', difficulty: 1 } as any
+
+      visit('/ftp')
+      const score = await solveInRequest(challenge, visit('/infrastructure'))
+
+      assert.strictEqual(score, 1, 'Score should stay at 1.0 when only another client opened /ftp')
     })
   })
 
@@ -226,18 +230,33 @@ void describe('antiCheat', () => {
   })
 
   void describe('reset', () => {
-    void it('should reset solves and interactions', () => {
+    void it('should reset solves and interactions', async () => {
       const challenge: Challenge = { key: 'directoryListingChallenge', difficulty: 1 } as any
-      antiCheat.checkForPreSolveInteractions()({ url: '/ftp' } as any, {}, () => {})
+      const cookie = visit('/ftp')
 
-      antiCheat.calculateCheatScore(challenge)
+      await solveInRequest(challenge, cookie)
       assert.ok(antiCheat.totalCheatScore() > 0, 'Total cheat score should be > 0 after a solve')
 
       antiCheat.reset()
       assert.strictEqual(antiCheat.totalCheatScore(), 0, 'Total cheat score should be 0 after reset')
 
-      const scoreAfterReset = antiCheat.calculateCheatScore(challenge)
+      const scoreAfterReset = await solveInRequest(challenge, cookie)
       assert.strictEqual(scoreAfterReset, 1, 'Score after reset should be 1.0 again because interactions were reset')
     })
   })
+
+  function visit (url: string, cookie?: string): string | undefined {
+    let issued: string | undefined
+    const res: any = { cookie: (name: string, value: string) => { issued = `${name}=${value}` } }
+    antiCheat.checkForPreSolveInteractions()({ url, headers: { cookie } } as any, res, () => {})
+    return issued ?? cookie
+  }
+
+  async function solveInRequest (challenge: Challenge, cookie?: string): Promise<number> {
+    return await new Promise(resolve => {
+      antiCheat.checkForPreSolveInteractions()({ url: '/solve', headers: { cookie } } as any, { cookie: () => {} } as any, () => {
+        setImmediate(() => { resolve(antiCheat.calculateCheatScore(challenge)) })
+      })
+    })
+  }
 })
