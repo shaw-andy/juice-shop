@@ -58,7 +58,7 @@ describe('ChangePasswordComponent', () => {
         expect(component.passwordControl.valid).toBe(true)
     })
 
-    it('length of new password must be 5-40 characters', () => {
+    it('length of new password must be 12-30 characters', () => {
         component.newPasswordControl.setValue('old')
         expect(component.newPasswordControl.valid).toBeFalsy()
         component.newPasswordControl.setValue('new password')
@@ -72,8 +72,8 @@ describe('ChangePasswordComponent', () => {
     it('should be compulsory to repeat new password', () => {
         component.repeatNewPasswordControl.setValue('')
         expect(component.passwordControl.valid).toBeFalsy()
-        component.newPasswordControl.setValue('passed')
-        component.repeatNewPasswordControl.setValue('passed')
+        component.newPasswordControl.setValue('passed twelve')
+        component.repeatNewPasswordControl.setValue('passed twelve')
         expect(component.repeatNewPasswordControl.valid).toBe(true)
     })
 

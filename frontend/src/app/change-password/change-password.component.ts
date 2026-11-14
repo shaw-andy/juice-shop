@@ -57,16 +57,16 @@ export class ChangePasswordComponent {
 
   public newPasswordControl: UntypedFormControl = new UntypedFormControl('', [
     Validators.required,
-    Validators.minLength(5),
-    Validators.maxLength(40)
+    Validators.minLength(12),
+    Validators.maxLength(30)
   ])
 
   public repeatNewPasswordControl: UntypedFormControl = new UntypedFormControl(
     '',
     [
       Validators.required,
-      Validators.minLength(5),
-      Validators.maxLength(40),
+      Validators.minLength(12),
+      Validators.maxLength(30),
       matchValidator(this.newPasswordControl)
     ]
   )
@@ -78,12 +78,15 @@ export class ChangePasswordComponent {
     if (
       localStorage.getItem('email')?.match(/support@.*/) &&
       !this.newPasswordControl.value.match(
-        /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,30}/
+        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,30}$/
       )
     ) {
-      console.error(
-        'Parola echipei de asistență nu respectă politica corporativă pentru conturile privilegiate! Vă rugăm să schimbați parola în consecință!'
-      )
+      const policyViolation = 'Parola echipei de asistență nu respectă politica corporativă pentru conturile privilegiate! Vă rugăm să schimbați parola în consecință!'
+      console.error(policyViolation)
+      this.error = policyViolation
+      this.confirmation = undefined
+      this.resetPasswords()
+      return
     }
     this.userService
       .changePassword({
