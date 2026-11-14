@@ -123,6 +123,26 @@ export class PhotoWallComponent implements OnInit {
     })
   }
 
+  tweetUrl (caption: string) {
+    return this.shareUrl('https://twitter.com/intent/tweet', { text: `${caption} ${this.twitterHandle}`, hashtags: 'appsec' })
+  }
+
+  blueSkyUrl (caption: string) {
+    return this.shareUrl('https://bsky.app/intent/compose', { text: `${caption} ${this.blueSkyHandle} #appsec` })
+  }
+
+  mastodonUrl (caption: string) {
+    return this.shareUrl('https://mastodonshare.com/', { text: `${caption} ${this.mastodonHandle} #appsec` })
+  }
+
+  private shareUrl (base: string, params: Record<string, string>) {
+    const url = new URL(base)
+    for (const [key, value] of Object.entries(params)) {
+      url.searchParams.set(key, value)
+    }
+    return url.toString()
+  }
+
   isLoggedIn () {
     return localStorage.getItem('token')
   }

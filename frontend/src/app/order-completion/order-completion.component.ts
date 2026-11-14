@@ -63,14 +63,13 @@ export class OrderCompletionComponent implements OnInit {
             this.orderDetails.bonus = results.data[0].bonus
             this.dataSource = new MatTableDataSource<Element>(this.orderDetails.products)
             for (const product of this.orderDetails.products) {
-
-              this.tweetText += `%0a- ${product.name}`
+              this.tweetText += `\n- ${product.name}`
             }
             this.tweetText = this.truncateTweet(this.tweetText)
             this.configurationService.getApplicationConfiguration().subscribe({
               next: (config) => {
                 if (config?.application?.social) {
-                  this.tweetText += '%0afrom '
+                  this.tweetText += '\nfrom '
                   if (config.application.social.twitterUrl) {
                     this.tweetText += config.application.social.twitterUrl.replace('https://twitter.com/', '@')
                   } else {
@@ -92,6 +91,13 @@ export class OrderCompletionComponent implements OnInit {
       },
       error: (err) => { console.log(err) }
     })
+  }
+
+  get tweetUrl (): string {
+    const url = new URL('https://twitter.com/intent/tweet')
+    url.searchParams.set('text', this.tweetText ?? '')
+    url.searchParams.set('hashtags', 'security')
+    return url.toString()
   }
 
   openConfirmationPDF () {

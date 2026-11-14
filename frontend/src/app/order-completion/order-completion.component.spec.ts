@@ -111,42 +111,42 @@ describe('OrderCompletionComponent', () => {
         trackOrderService.find.mockReturnValue(of({ data: [{ products: [{ name: 'A' }, { name: 'B' }] }] }))
         configurationService.getApplicationConfiguration.mockReturnValue(of({}))
         component.ngOnInit()
-        expect(component.tweetText).toBe('I just purchased%0a- A%0a- B')
+        expect(component.tweetText).toBe('I just purchased\n- A\n- B')
     })
 
     it('should truncate tweet text if it exceeds 140 characters', () => {
         trackOrderService.find.mockReturnValue(of({ data: [{ products: [{ name: 'AAAAAAAAAAAAAAAAAAAA' }, { name: 'BBBBBBBBBBBBBBBBBBBB' }, { name: 'CCCCCCCCCCCCCCCCCCCC' }, { name: 'DDDDDDDDDDDDDDDDDDDD' }, { name: 'EEEEEEEEEEEEEEEEEEEE' }, { name: 'FFFFFFFFFFFFFFFFFFFF' }] }] }))
         configurationService.getApplicationConfiguration.mockReturnValue(of({}))
         component.ngOnInit()
-        expect(component.tweetText).toBe('I just purchased%0a- AAAAAAAAAAAAAAAAAAAA%0a- BBBBBBBBBBBBBBBBBBBB%0a- CCCCCCCCCCCCCCCCCCCC%0a- DDDDDDDDDDDDDDDDDDDD%0a- EEEEEEEEEEEEEEEEEEE...')
+        expect(component.tweetText).toBe('I just purchased\n- AAAAAAAAAAAAAAAAAAAA\n- BBBBBBBBBBBBBBBBBBBB\n- CCCCCCCCCCCCCCCCCCCC\n- DDDDDDDDDDDDDDDDDDDD\n- EEEEEEEEEEEEEEEEEEEE\n- FFFFFF...')
     })
 
     it('should derive twitter handle from twitter URL if configured', () => {
         trackOrderService.find.mockReturnValue(of({ data: [{ products: [] }] }))
         configurationService.getApplicationConfiguration.mockReturnValue(of({ application: { social: { twitterUrl: 'https://twitter.com/bkimminich' } } }))
         component.ngOnInit()
-        expect(component.tweetText).toBe('I just purchased%0afrom @bkimminich')
+        expect(component.tweetText).toBe('I just purchased\nfrom @bkimminich')
     })
 
     it('should append twitter handle to truncated tweet text', () => {
         trackOrderService.find.mockReturnValue(of({ data: [{ products: [{ name: 'AAAAAAAAAAAAAAAAAAAA' }, { name: 'BBBBBBBBBBBBBBBBBBBB' }, { name: 'CCCCCCCCCCCCCCCCCCCC' }, { name: 'DDDDDDDDDDDDDDDDDDDD' }, { name: 'EEEEEEEEEEEEEEEEEEEE' }, { name: 'FFFFFFFFFFFFFFFFFFFF' }] }] }))
         configurationService.getApplicationConfiguration.mockReturnValue(of({ application: { social: { twitterUrl: 'https://twitter.com/owasp_juiceshop' } } }))
         component.ngOnInit()
-        expect(component.tweetText).toBe('I just purchased%0a- AAAAAAAAAAAAAAAAAAAA%0a- BBBBBBBBBBBBBBBBBBBB%0a- CCCCCCCCCCCCCCCCCCCC%0a- DDDDDDDDDDDDDDDDDDDD%0a- EEEEEEEEEEEEEEEEEEE...%0afrom @owasp_juiceshop')
+        expect(component.tweetText).toBe('I just purchased\n- AAAAAAAAAAAAAAAAAAAA\n- BBBBBBBBBBBBBBBBBBBB\n- CCCCCCCCCCCCCCCCCCCC\n- DDDDDDDDDDDDDDDDDDDD\n- EEEEEEEEEEEEEEEEEEEE\n- FFFFFF...\nfrom @owasp_juiceshop')
     })
 
     it('should use configured URL as is if it is not a twitter URL', () => {
         trackOrderService.find.mockReturnValue(of({ data: [{ products: [] }] }))
         configurationService.getApplicationConfiguration.mockReturnValue(of({ application: { social: { twitterUrl: 'http://localhorst:42' } } }))
         component.ngOnInit()
-        expect(component.tweetText).toBe('I just purchased%0afrom http://localhorst:42')
+        expect(component.tweetText).toBe('I just purchased\nfrom http://localhorst:42')
     })
 
     it('should use configured application name as a fallback for missing twitter URL', () => {
         trackOrderService.find.mockReturnValue(of({ data: [{ products: [] }] }))
         configurationService.getApplicationConfiguration.mockReturnValue(of({ application: { name: 'OWASP Juice Shop', social: { twitterUrl: null } } }))
         component.ngOnInit()
-        expect(component.tweetText).toBe('I just purchased%0afrom OWASP Juice Shop')
+        expect(component.tweetText).toBe('I just purchased\nfrom OWASP Juice Shop')
     })
 
     it('should log error while getting application configuration from backend API directly to browser console', () => {
