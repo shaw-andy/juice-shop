@@ -621,6 +621,7 @@
   "Current password is not correct.": "Current password is not correct.",
   "Password cannot be empty.": "Password cannot be empty.",
   "New and repeated password do not match.": "New and repeated password do not match.",
+  "Password does not meet the policy for privileged accounts.": "Password does not meet the policy for privileged accounts.",
   "Wrong answer to security question.": "Wrong answer to security question.",
   "Contains a random selection of 10 bottles (each 500ml) of our tastiest juices and an extra fan shirt for an unbeatable price! (Seasonal special offer! Limited availability!)": "Contains a random selection of 10 bottles (each 500ml) of our tastiest juices and an extra fan shirt for an unbeatable price! (Seasonal special offer! Limited availability!)",
   "Rippertuer Special Juice": "Rippertuer Special Juice",

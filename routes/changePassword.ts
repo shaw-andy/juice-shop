@@ -8,6 +8,7 @@ import * as challengeUtils from '../lib/challengeUtils'
 import { challenges } from '../data/datacache'
 import { UserModel } from '../models/user'
 import * as security from '../lib/insecurity'
+import { isAcceptablePassword } from '../lib/passwordPolicy'
 
 export function changePassword () {
   return async ({ query, headers, connection }: Request, res: Response, next: NextFunction) => {
@@ -45,6 +46,10 @@ export function changePassword () {
       const user = await UserModel.findByPk(loggedInUser.data.id)
       if (!user) {
         res.status(404).send(res.__('User not found.'))
+        return
+      }
+      if (!isAcceptablePassword(user.email, newPasswordInString)) {
+        res.status(400).send(res.__('Password does not meet the policy for privileged accounts.'))
         return
       }
 
