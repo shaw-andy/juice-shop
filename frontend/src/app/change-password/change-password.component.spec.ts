@@ -118,4 +118,78 @@ describe('ChangePasswordComponent', () => {
         expect(console.log).toHaveBeenCalledWith('Error')
         expect(component.resetPasswords).toHaveBeenCalled()
     })
+
+    describe('support administrator password policy', () => {
+        const supportEmail = 'support@juice-sh.op'
+        const fiveCharacters = 'aaaaa'
+        const missingCharacterClass = 'Placeholder1'
+        const compliantPassword = 'Placeholder1!'
+
+        afterEach(() => {
+            localStorage.removeItem('email')
+        })
+
+        function fillPasswords (current: string, next: string) {
+            component.passwordControl.setValue(current)
+            component.newPasswordControl.setValue(next)
+            component.repeatNewPasswordControl.setValue(next)
+        }
+
+        it('aligns the form length rule with the privileged password policy', () => {
+            fillPasswords('current-placeholder', 'a'.repeat(5))
+            expect(component.newPasswordControl.valid).toBe(false)
+            expect(component.repeatNewPasswordControl.valid).toBe(false)
+            fillPasswords('current-placeholder', 'a'.repeat(11))
+            expect(component.newPasswordControl.valid).toBe(false)
+            fillPasswords('current-placeholder', 'a'.repeat(12))
+            expect(component.newPasswordControl.valid).toBe(true)
+            expect(component.repeatNewPasswordControl.valid).toBe(true)
+            fillPasswords('current-placeholder', 'a'.repeat(30))
+            expect(component.newPasswordControl.valid).toBe(true)
+            fillPasswords('current-placeholder', 'a'.repeat(31))
+            expect(component.newPasswordControl.valid).toBe(false)
+            expect(component.repeatNewPasswordControl.valid).toBe(false)
+            fixture.detectChanges()
+            const button: HTMLButtonElement = fixture.nativeElement.querySelector('#changeButton')
+            expect(button.disabled).toBe(true)
+        })
+
+        it('does not submit a five-character password for the support account', () => {
+            localStorage.setItem('email', supportEmail)
+            fillPasswords('current-placeholder', fiveCharacters)
+            vi.spyOn(component, 'resetForm')
+            component.changePassword()
+            expect(userService.changePassword).not.toHaveBeenCalled()
+            expect(component.confirmation).toBeUndefined()
+            expect(component.error).toBeTruthy()
+            expect(component.resetForm).not.toHaveBeenCalled()
+        })
+
+        it('does not submit a password that misses a required character class', () => {
+            localStorage.setItem('email', supportEmail)
+            fillPasswords('current-placeholder', missingCharacterClass)
+            component.changePassword()
+            expect(userService.changePassword).not.toHaveBeenCalled()
+            expect(component.confirmation).toBeUndefined()
+            expect(component.error).toBeTruthy()
+        })
+
+        it('submits a password that meets the privileged account policy', () => {
+            localStorage.setItem('email', supportEmail)
+            fillPasswords('current-placeholder', compliantPassword)
+            component.changePassword()
+            expect(userService.changePassword).toHaveBeenCalledWith({
+                current: 'current-placeholder',
+                new: compliantPassword,
+                repeat: compliantPassword
+            })
+        })
+
+        it('still submits a short password for an account that is not support', () => {
+            localStorage.setItem('email', 'customer@juice-sh.op')
+            fillPasswords('current-placeholder', fiveCharacters)
+            component.changePassword()
+            expect(userService.changePassword).toHaveBeenCalled()
+        })
+    })
 })
