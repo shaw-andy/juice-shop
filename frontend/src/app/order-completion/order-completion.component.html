@@ -26,7 +26,7 @@
     <div class="heading-banner">
       <span class="heading-text">{{"ORDER_SUMMARY" | translate}}</span>
       <div class="order-links">
-        <a href="https://twitter.com/intent/tweet?text={{ tweetText }}&hashtags=security" mat-icon-button aria-label="Tweet">
+        <a [href]="tweetUrl" mat-icon-button aria-label="Tweet">
           <i class="fab fa-twitter fa-lg tweet-logo"></i>
         </a>
         <button mat-icon-button aria-label="Print order confirmation" [matTooltip]="'PRINT_ORDER_CONFIRMATION' | translate" matTooltipPosition="below"
