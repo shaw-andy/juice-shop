@@ -61,6 +61,7 @@ import customizeApplication from './lib/startup/customizeApplication'
 import validatePreconditions, { preconditionsReady } from './lib/startup/validatePreconditions'
 import registerWebsocketEvents from './lib/startup/registerWebsocketEvents'
 import restoreOverwrittenFilesWithOriginals from './lib/startup/restoreOverwrittenFilesWithOriginals'
+import { loadGlobalCatalog } from './lib/i18nCatalog'
 
 import datacreator from './data/datacreator'
 import locales from './data/static/locales.json'
@@ -315,11 +316,10 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
 
   /* Configure and enable backend-side i18n */
   i18n.configure({
-    locales: locales.map((locale: { key: string }) => locale.key),
-    directory: path.resolve('i18n'),
+    staticCatalog: loadGlobalCatalog(path.resolve('i18n'), locales.map((locale: { key: string }) => locale.key), process.env.NODE_ENV !== 'test'),
+    fallbacks: Object.create(null),
     cookie: 'language',
-    defaultLocale: 'en',
-    autoReload: process.env.NODE_ENV !== 'test'
+    defaultLocale: 'en'
   })
   app.use(i18n.init)
 
