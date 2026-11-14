@@ -599,6 +599,15 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
         context.instance.description = req.__(context.instance.description)
         return context.continue
       })
+
+      const rejectQueryDelimitersInName = (req: Request, res: Response, context: { error: any, continue: any }) => {
+        if (req.body?.name !== undefined && /[&?#]/.test(String(req.body.name))) {
+          return context.error(400, 'Product name must not contain &, ? or #')
+        }
+        return context.continue
+      }
+      resource.create.write.before(rejectQueryDelimitersInName)
+      resource.update.write.before(rejectQueryDelimitersInName)
     }
 
     // fix the api difference between finale (fka epilogue) and previously used sequlize-restful
