@@ -98,6 +98,18 @@ export class PhotoWallComponent implements OnInit {
     })
   }
 
+  twitterShareUrl (caption: string) {
+    return `https://twitter.com/intent/tweet?text=${encodeURIComponent(`${caption} ${this.twitterHandle}`)}&hashtags=appsec`
+  }
+
+  blueSkyShareUrl (caption: string) {
+    return `https://bsky.app/intent/compose?text=${encodeURIComponent(`${caption} ${this.blueSkyHandle} #appsec`)}`
+  }
+
+  mastodonShareUrl (caption: string) {
+    return `https://mastodonshare.com/?text=${encodeURIComponent(`${caption} ${this.mastodonHandle} #appsec`)}`
+  }
+
   onImagePicked (event: Event) {
     const file = (event.target as HTMLInputElement).files[0]
     this.form.patchValue({ image: file })

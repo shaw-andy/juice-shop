@@ -18,7 +18,7 @@
                 <div>{{ image.caption }}</div>
                 @if (twitterHandle) {
                   <a
-                    href="https://twitter.com/intent/tweet?text={{ image.caption }} {{ twitterHandle }}&hashtags=appsec"
+                    [href]="twitterShareUrl(image.caption)"
                     target="_blank">
                     <button mat-icon-button aria-label="Tweet">
                       <i class="fab fa-twitter fa-lg"></i>
@@ -27,7 +27,7 @@
                 }
                 @if (blueSkyHandle) {
                   <a
-                    href="https://bsky.app/intent/compose?text={{ image.caption }} {{ blueSkyHandle }} %23appsec"
+                    [href]="blueSkyShareUrl(image.caption)"
                     target="_blank">
                     <button mat-icon-button aria-label="BlueSky">
                       <i class="fas fa-bold fa-lg"></i>
@@ -36,7 +36,7 @@
                 }
                 @if (mastodonHandle) {
                   <a
-                    href="https://mastodonshare.com/?text={{ image.caption }} {{ mastodonHandle }} %23appsec"
+                    [href]="mastodonShareUrl(image.caption)"
                     target="_blank">
                     <button mat-icon-button aria-label="Mastodon">
                       <i class="fab fa-mastodon fa-lg"></i>
