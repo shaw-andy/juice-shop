@@ -146,8 +146,10 @@ export const roles = {
   admin: 'admin'
 }
 
+const deluxeTokenKey = crypto.randomBytes(32)
+
 export const deluxeToken = (email: string) => {
-  const hmac = crypto.createHmac('sha256', privateKey)
+  const hmac = crypto.createHmac('sha256', deluxeTokenKey)
   return hmac.update(email + roles.deluxe).digest('hex')
 }
 
@@ -164,7 +166,7 @@ export const isAccounting = () => {
 
 export const isDeluxe = (req: Request) => {
   const decodedToken = verify(utils.jwtFrom(req)) && decode(utils.jwtFrom(req))
-  return decodedToken?.data?.role === roles.deluxe && decodedToken?.data?.deluxeToken && decodedToken?.data?.deluxeToken === deluxeToken(decodedToken?.data?.email)
+  return decodedToken?.data?.role === roles.deluxe && !!decodedToken?.data?.deluxeToken && decodedToken?.data?.deluxeToken === deluxeToken(decodedToken?.data?.email)
 }
 
 export const isCustomer = (req: Request) => {
