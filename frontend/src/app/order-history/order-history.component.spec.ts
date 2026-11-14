@@ -25,7 +25,7 @@ import { MatTooltipModule } from '@angular/material/tooltip'
 import { MatDialog, MatDialogModule } from '@angular/material/dialog'
 import { MatExpansionModule } from '@angular/material/expansion'
 import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http'
-import { BasketService } from '../Services/basket.service'
+import { TrackOrderService } from '../Services/track-order.service'
 import { Router } from '@angular/router'
 
 describe('AccountingComponent', () => {
@@ -34,7 +34,7 @@ describe('AccountingComponent', () => {
     let productService
     let orderHistoryService
     let dialog: any
-    let basketService: any
+    let trackOrderService: any
     let router: any
 
     beforeEach(async () => {
@@ -50,7 +50,7 @@ describe('AccountingComponent', () => {
             get: vi.fn().mockName("OrderHistoryService.get")
         }
         orderHistoryService.get.mockReturnValue(of([]))
-        basketService = { hostServer: 'http://host.example' }
+        trackOrderService = { confirmation: vi.fn().mockName("TrackOrderService.confirmation") }
         router = { navigate: vi.fn().mockName("Router.navigate").mockResolvedValue(true) }
 
         TestBed.configureTestingModule({
@@ -71,7 +71,7 @@ describe('AccountingComponent', () => {
                 { provide: ProductService, useValue: productService },
                 { provide: OrderHistoryService, useValue: orderHistoryService },
                 { provide: MatDialog, useValue: dialog },
-                { provide: BasketService, useValue: basketService },
+                { provide: TrackOrderService, useValue: trackOrderService },
                 { provide: Router, useValue: router },
                 provideHttpClient(withInterceptorsFromDi()),
                 provideHttpClientTesting()
@@ -157,11 +157,27 @@ describe('AccountingComponent', () => {
         expect(passed.deluxePrice).toBe(15)
     })
 
-    it('should open the order confirmation PDF in a new tab using the basket host server', () => {
+    it('should open the order confirmation PDF fetched for the order in a new tab', () => {
+        const pdf = new Blob(['%PDF'], { type: 'application/pdf' })
+        trackOrderService.confirmation.mockReturnValue(of(pdf))
+        const createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:confirmation')
         const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
         component.openConfirmationPDF('abc123')
-        expect(openSpy).toHaveBeenCalledWith('http://host.example/ftp/order_abc123.pdf', '_blank')
+        expect(trackOrderService.confirmation).toHaveBeenCalledWith('abc123')
+        expect(createObjectURLSpy).toHaveBeenCalledWith(pdf)
+        expect(openSpy).toHaveBeenCalledWith('blob:confirmation', '_blank')
         openSpy.mockRestore()
+        createObjectURLSpy.mockRestore()
+    })
+
+    it('should not open a tab when the order confirmation PDF cannot be fetched', () => {
+        trackOrderService.confirmation.mockReturnValue(throwError(() => new Error('Not Found')))
+        const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => { })
+        component.openConfirmationPDF('abc123')
+        expect(openSpy).not.toHaveBeenCalled()
+        openSpy.mockRestore()
+        logSpy.mockRestore()
     })
 
     it('should navigate to /track-result with the order id as a query parameter when tracking an order', async () => {

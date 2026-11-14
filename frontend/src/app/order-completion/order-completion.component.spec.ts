@@ -46,7 +46,8 @@ describe('OrderCompletionComponent', () => {
         }
         configurationService.getApplicationConfiguration.mockReturnValue(of({}))
         trackOrderService = {
-            find: vi.fn().mockName("TrackOrderService.find")
+            find: vi.fn().mockName("TrackOrderService.find"),
+            confirmation: vi.fn().mockName("TrackOrderService.confirmation")
         }
         trackOrderService.find.mockReturnValue(of({ data: [{ products: [] }] }))
         activatedRoute = new MockActivatedRoute()
@@ -162,5 +163,18 @@ describe('OrderCompletionComponent', () => {
         console.log = vi.fn()
         component.ngOnInit()
         expect(console.log).toHaveBeenCalledWith('Error')
+    })
+
+    it('should open the order confirmation PDF fetched for the current order in a new tab', () => {
+        const pdf = new Blob(['%PDF'], { type: 'application/pdf' })
+        trackOrderService.confirmation.mockReturnValue(of(pdf))
+        const createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:confirmation')
+        const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+        component.orderId = 'ad9b-96017e7cb1ae7bf9'
+        component.openConfirmationPDF()
+        expect(trackOrderService.confirmation).toHaveBeenCalledWith('ad9b-96017e7cb1ae7bf9')
+        expect(openSpy).toHaveBeenCalledWith('blob:confirmation', '_blank')
+        openSpy.mockRestore()
+        createObjectURLSpy.mockRestore()
     })
 })

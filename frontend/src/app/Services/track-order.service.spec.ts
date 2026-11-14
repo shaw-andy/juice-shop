@@ -36,6 +36,21 @@ describe('TrackOrderService', () => {
         httpMock.verify()
     })
 
+    it('should get the order confirmation PDF as a blob via the rest api', () => {
+        const service = TestBed.inject(TrackOrderService)
+        const httpMock = TestBed.inject(HttpTestingController)
+
+        let res: any
+        service.confirmation('5267-f9cd5882f54c75a3').subscribe((data) => (res = data))
+        const req = httpMock.expectOne('http://localhost:3000/rest/order-confirmation/5267-f9cd5882f54c75a3')
+        const pdf = new Blob(['%PDF'], { type: 'application/pdf' })
+        req.flush(pdf)
+        expect(req.request.method).toBe('GET')
+        expect(req.request.responseType).toBe('blob')
+        expect(res).toEqual(pdf)
+        httpMock.verify()
+    })
+
     it('should handle error when getting tracking order results', () => {
         const service = TestBed.inject(TrackOrderService)
         const httpMock = TestBed.inject(HttpTestingController)
