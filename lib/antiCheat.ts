@@ -7,6 +7,8 @@ import config from 'config'
 import colors from 'colors/safe'
 import path from 'path'
 import fs from 'fs'
+import { AsyncLocalStorage } from 'node:async_hooks'
+import { randomUUID } from 'node:crypto'
 import { retrieveCodeSnippet } from '../routes/vulnCodeSnippet'
 import { readFixes } from '../routes/vulnCodeFixes'
 import { type Challenge } from '../data/types'
@@ -38,19 +40,56 @@ const trivialChallenges = ['errorHandlingChallenge', 'privacyPolicyChallenge', '
 
 const solves: Array<{ challenge: any, phase: string, timestamp: Date, cheatScore: number }> = [{ challenge: {}, phase: 'server start', timestamp: new Date(), cheatScore: 0 }] // seed with server start timestamp
 
-const preSolveInteractions: Array<{ challengeKey: ChallengeKey, urlFragments: string[], interactions: boolean[] }> = [
-  { challengeKey: 'missingEncodingChallenge', urlFragments: ['/assets/public/images/uploads/%F0%9F%98%BC-'], interactions: [false] },
-  { challengeKey: 'directoryListingChallenge', urlFragments: ['/ftp'], interactions: [false] },
-  { challengeKey: 'easterEggLevelOneChallenge', urlFragments: ['/ftp', '/ftp/eastere.gg'], interactions: [false, false] },
-  { challengeKey: 'easterEggLevelTwoChallenge', urlFragments: ['/ftp', '/gur/qrif/ner/fb/shaal/gurl/uvq/na/rnfgre/rtt/jvguva/gur/rnfgre/rtt'], interactions: [false, false] },
-  { challengeKey: 'forgottenDevBackupChallenge', urlFragments: ['/ftp', '/ftp/package.json.bak'], interactions: [false, false] },
-  { challengeKey: 'forgottenBackupChallenge', urlFragments: ['/ftp', '/ftp/coupons_2013.md.bak'], interactions: [false, false] },
-  { challengeKey: 'loginSupportChallenge', urlFragments: ['/ftp', '/ftp/incident-support.kdbx'], interactions: [false, false] },
-  { challengeKey: 'misplacedSignatureFileChallenge', urlFragments: ['/ftp', '/ftp/suspicious_errors.yml'], interactions: [false, false] },
-  { challengeKey: 'misplacedIacFiles', urlFragments: ['/infrastructure'], interactions: [false] },
-  { challengeKey: 'rceChallenge', urlFragments: ['/api-docs', '/b2b/v2/orders'], interactions: [false, false] },
-  { challengeKey: 'rceOccupyChallenge', urlFragments: ['/api-docs', '/b2b/v2/orders'], interactions: [false, false] }
+const preSolveInteractions: Array<{ challengeKey: ChallengeKey, urlFragments: string[] }> = [
+  { challengeKey: 'missingEncodingChallenge', urlFragments: ['/assets/public/images/uploads/%F0%9F%98%BC-'] },
+  { challengeKey: 'directoryListingChallenge', urlFragments: ['/ftp'] },
+  { challengeKey: 'easterEggLevelOneChallenge', urlFragments: ['/ftp', '/ftp/eastere.gg'] },
+  { challengeKey: 'easterEggLevelTwoChallenge', urlFragments: ['/ftp', '/gur/qrif/ner/fb/shaal/gurl/uvq/na/rnfgre/rtt/jvguva/gur/rnfgre/rtt'] },
+  { challengeKey: 'forgottenDevBackupChallenge', urlFragments: ['/ftp', '/ftp/package.json.bak'] },
+  { challengeKey: 'forgottenBackupChallenge', urlFragments: ['/ftp', '/ftp/coupons_2013.md.bak'] },
+  { challengeKey: 'loginSupportChallenge', urlFragments: ['/ftp', '/ftp/incident-support.kdbx'] },
+  { challengeKey: 'misplacedSignatureFileChallenge', urlFragments: ['/ftp', '/ftp/suspicious_errors.yml'] },
+  { challengeKey: 'misplacedIacFiles', urlFragments: ['/infrastructure'] },
+  { challengeKey: 'rceChallenge', urlFragments: ['/api-docs', '/b2b/v2/orders'] },
+  { challengeKey: 'rceOccupyChallenge', urlFragments: ['/api-docs', '/b2b/v2/orders'] }
 ]
+
+export const ANTI_CHEAT_CLIENT_COOKIE = 'antiCheatClient'
+const CLIENT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+const MAX_TRACKED_CLIENTS = 10000
+
+// Interactions are keyed by client so one visitor's requests never count toward another visitor's solve.
+// Evicting a client only drops that client's own interactions, which can only raise its own cheat score.
+const interactionsByClient = new Map<string, Map<ChallengeKey, boolean[]>>()
+const requestClient = new AsyncLocalStorage<string | undefined>()
+
+function clientIdFromCookieHeader (cookieHeader: string | undefined): string | undefined {
+  if (!cookieHeader) return undefined
+  for (const pair of cookieHeader.split(';')) {
+    const separator = pair.indexOf('=')
+    if (separator === -1) continue
+    if (pair.slice(0, separator).trim() === ANTI_CHEAT_CLIENT_COOKIE) {
+      const value = pair.slice(separator + 1).trim()
+      return CLIENT_ID_PATTERN.test(value) ? value : undefined
+    }
+  }
+  return undefined
+}
+
+function interactionsOf (clientId: string, create: boolean) {
+  let interactions = interactionsByClient.get(clientId)
+  if (interactions) {
+    interactionsByClient.delete(clientId)
+    interactionsByClient.set(clientId, interactions)
+  } else if (create) {
+    interactions = new Map()
+    interactionsByClient.set(clientId, interactions)
+    if (interactionsByClient.size > MAX_TRACKED_CLIENTS) {
+      interactionsByClient.delete(interactionsByClient.keys().next().value!)
+    }
+  }
+  return interactions
+}
 
 const challengeSourceFiles: Record<string, string[]> = {
   knownVulnerableComponentChallenge: ['ftp/package.json.bak'],
@@ -60,15 +99,26 @@ const challengeSourceFiles: Record<string, string[]> = {
   vulnerableDockerImageChallenge: ['infrastructure/docker-compose.yml']
 }
 
-export const checkForPreSolveInteractions = () => ({ url }: Request, res: Response, next: NextFunction) => {
+export const checkForPreSolveInteractions = () => (req: Request, res: Response, next: NextFunction) => {
+  let clientId = clientIdFromCookieHeader(req.headers?.cookie)
   preSolveInteractions.forEach((preSolveInteraction) => {
     for (let i = 0; i < preSolveInteraction.urlFragments.length; i++) {
-      if (url.endsWith(preSolveInteraction.urlFragments[i])) {
-        preSolveInteraction.interactions[i] = true
+      if (req.url.endsWith(preSolveInteraction.urlFragments[i])) {
+        if (clientId === undefined) {
+          clientId = randomUUID()
+          res.cookie(ANTI_CHEAT_CLIENT_COOKIE, clientId, { httpOnly: true, sameSite: 'lax' })
+        }
+        const interactions = interactionsOf(clientId, true)!
+        let flags = interactions.get(preSolveInteraction.challengeKey)
+        if (!flags) {
+          flags = new Array(preSolveInteraction.urlFragments.length).fill(false)
+          interactions.set(preSolveInteraction.challengeKey, flags)
+        }
+        flags[i] = true
       }
     }
   })
-  next()
+  requestClient.run(clientId, next)
 }
 
 export const calculateCheatScore = (challenge: Challenge, isCheating = false) => {
@@ -95,7 +145,9 @@ export const calculateCheatScore = (challenge: Challenge, isCheating = false) =>
     const preSolveInteraction = preSolveInteractions.find((preSolveInteraction) => preSolveInteraction.challengeKey === challenge.key)
     let percentPrecedingInteraction = -1
     if (preSolveInteraction) {
-      percentPrecedingInteraction = preSolveInteraction.interactions.filter(Boolean).length / (preSolveInteraction.interactions.length)
+      const clientId = requestClient.getStore()
+      const flags = clientId !== undefined ? interactionsOf(clientId, false)?.get(preSolveInteraction.challengeKey) : undefined
+      percentPrecedingInteraction = (flags?.filter(Boolean).length ?? 0) / preSolveInteraction.urlFragments.length
       const multiplierForMissingExpectedInteraction = 1 + Math.max(0, 1 - percentPrecedingInteraction) / 2
       cheatScore *= multiplierForMissingExpectedInteraction
     }
@@ -181,9 +233,7 @@ function previous () {
 export const reset = () => {
   solves.length = 0
   solves.push({ challenge: {}, phase: 'server start', timestamp: new Date(), cheatScore: 0 })
-  preSolveInteractions.forEach((preSolveInteraction) => {
-    preSolveInteraction.interactions.fill(false)
-  })
+  interactionsByClient.clear()
 }
 
 const sourceFileCache = new Map<string, string>()
