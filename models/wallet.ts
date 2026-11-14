@@ -9,7 +9,8 @@ import {
   type InferCreationAttributes,
   DataTypes,
   type CreationOptional,
-  type Sequelize
+  type Sequelize,
+  Op
 } from 'sequelize'
 
 class Wallet extends Model<
@@ -47,4 +48,11 @@ const WalletModelInit = (sequelize: Sequelize) => {
   )
 }
 
-export { Wallet as WalletModel, WalletModelInit }
+// On SQLite, Model.decrement resolves to [[result, affectedCount]]
+const debitWallet = async (wallet: Wallet, amount: number) => {
+  const [result] = await Wallet.decrement({ balance: amount }, { where: { id: wallet.id, UserId: wallet.UserId, balance: { [Op.gte]: amount } } })
+  const [, affectedCount] = result as unknown as [unknown, number]
+  return affectedCount === 1
+}
+
+export { Wallet as WalletModel, WalletModelInit, debitWallet }
