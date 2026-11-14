@@ -12,6 +12,7 @@ import * as challengeUtils from '../lib/challengeUtils'
 import { challenges, users } from '../data/datacache'
 import * as security from '../lib/insecurity'
 import { UserModel } from '../models/user'
+import { isAcceptablePassword } from '../lib/passwordPolicy'
 
 export function resetPassword () {
   return async ({ body, connection }: Request, res: Response, next: NextFunction) => {
@@ -41,6 +42,10 @@ export function resetPassword () {
       if ((data != null) && security.hmac(answer) === data.answer) {
         const user = await UserModel.findByPk(data.UserId)
         if (user) {
+          if (!isAcceptablePassword(user.email, newPassword)) {
+            res.status(400).send(res.__('Password does not meet the policy for privileged accounts.'))
+            return
+          }
           const updatedUser = await user.update({ password: newPassword })
           verifySecurityAnswerChallenges(updatedUser, answer)
           res.json({ user: updatedUser })
