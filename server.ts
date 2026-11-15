@@ -657,7 +657,15 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.post('/rest/chat', utils.asyncHandler(chat()))
 
   /* Web3 API endpoints */
-  app.post('/rest/web3/submitKey', utils.asyncHandler(checkKeys()))
+  app.post('/rest/web3/submitKey',
+    rateLimit({
+      windowMs: 60 * 1000,
+      max: 5,
+      keyGenerator: (req: Request) => req.socket.remoteAddress ?? '',
+      validate: false
+    }),
+    utils.asyncHandler(checkKeys())
+  )
   app.get('/rest/web3/nftUnlocked', nftUnlocked())
   app.get('/rest/web3/nftMintListen', utils.asyncHandler(nftMintListener()))
   app.post('/rest/web3/walletNFTVerify', walletNFTVerify())
