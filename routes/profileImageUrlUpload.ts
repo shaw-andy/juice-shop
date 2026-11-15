@@ -18,8 +18,14 @@ export function profileImageUrlUpload () {
     if (req.body.imageUrl !== undefined) {
       const url = req.body.imageUrl
       if (url.match(/(.)*solve\/challenges\/server-side(.)*/) !== null) req.app.locals.abused_ssrf_bug = true
-      const loggedInUser = security.authenticatedUsers.get(req.cookies.token)
+      const sessionToken = req.cookies.token
+      const loggedInUser = security.authenticatedUsers.get(sessionToken)
       if (loggedInUser) {
+        if (!security.isValidCsrfToken(sessionToken, req.body._csrf)) {
+          res.status(403)
+          next(new Error('Invalid CSRF token'))
+          return
+        }
         try {
           const response = await fetch(url)
           if (!response.ok || !response.body) {

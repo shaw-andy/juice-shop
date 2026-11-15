@@ -33,6 +33,7 @@
             you to request complete erasure of your account and any associated data.</p>
         <h5>Request Data Erasure</h5>
         <form action="/dataerasure" method="POST">
+            <input type="hidden" name="_csrf" value="{{csrfToken}}">
             <div class="form-field">
                 <label for="email">Confirm Email Address</label>
                 <input type="email" required placeholder={{userEmail}} name="email" id="email">

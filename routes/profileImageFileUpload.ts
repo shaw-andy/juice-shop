@@ -31,9 +31,15 @@ export function profileImageFileUpload () {
       next(new Error(`Profile image upload does not accept this file type${uploadedFileType ? (': ' + uploadedFileType.mime) : '.'}`))
       return
     }
-    const loggedInUser = security.authenticatedUsers.get(req.cookies.token)
+    const sessionToken = req.cookies.token
+    const loggedInUser = security.authenticatedUsers.get(sessionToken)
     if (!loggedInUser) {
       next(new Error('Blocked illegal activity by ' + req.socket.remoteAddress))
+      return
+    }
+    if (!security.isValidCsrfToken(sessionToken, req.body._csrf)) {
+      res.status(403)
+      next(new Error('Invalid CSRF token'))
       return
     }
 

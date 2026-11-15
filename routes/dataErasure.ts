@@ -23,7 +23,8 @@ const router = express.Router()
 
 router.get('/', (req: Request, res: Response, next: NextFunction) => {
   void (async () => {
-    const loggedInUser = security.authenticatedUsers.get(req.cookies.token)
+    const sessionToken = req.cookies.token
+    const loggedInUser = security.authenticatedUsers.get(sessionToken)
     if (!loggedInUser) {
       next(new Error('Blocked illegal activity by ' + req.socket.remoteAddress))
       return
@@ -50,6 +51,7 @@ router.get('/', (req: Request, res: Response, next: NextFunction) => {
       res.render('dataErasureForm', {
         userEmail: email,
         securityQuestion: question.question,
+        csrfToken: security.csrfTokenFor(sessionToken),
         _title_: entities.encode(config.get<string>('application.name')),
         _favicon_: utils.extractFilename(config.get('application.favicon')),
         _bgColor_: theme.bgColor,
@@ -69,13 +71,20 @@ interface DataErasureRequestParams {
   layout?: string
   email: string
   securityAnswer: string
+  _csrf?: string
 }
 
 router.post('/', (req: Request<Record<string, unknown>, Record<string, unknown>, DataErasureRequestParams>, res: Response, next: NextFunction): void => {
   void (async () => {
-    const loggedInUser = security.authenticatedUsers.get(req.cookies.token)
+    const sessionToken = req.cookies.token
+    const loggedInUser = security.authenticatedUsers.get(sessionToken)
     if (!loggedInUser) {
       next(new Error('Blocked illegal activity by ' + req.socket.remoteAddress))
+      return
+    }
+    if (!security.isValidCsrfToken(sessionToken, req.body._csrf)) {
+      res.status(403)
+      next(new Error('Invalid CSRF token'))
       return
     }
 

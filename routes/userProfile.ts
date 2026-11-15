@@ -31,7 +31,8 @@ export function getUserProfile () {
       return
     }
 
-    const loggedInUser = security.authenticatedUsers.get(req.cookies.token)
+    const sessionToken = req.cookies.token
+    const loggedInUser = security.authenticatedUsers.get(sessionToken)
     if (!loggedInUser) {
       next(new Error('Blocked illegal activity by ' + req.socket.remoteAddress)); return
     }
@@ -75,6 +76,7 @@ export function getUserProfile () {
     } else {
       template = template.replace(/_username_/g, '#{username}')
     }
+    template = template.replace(/_csrfToken_/g, security.csrfTokenFor(sessionToken))
     template = template.replace(/_emailHash_/g, security.hash(user?.email))
     template = template.replace(/_title_/g, entities.encode(config.get<string>('application.name')))
     template = template.replace(/_favicon_/g, favicon())
