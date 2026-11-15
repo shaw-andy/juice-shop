@@ -19,17 +19,11 @@ interface RequestWithRawBody extends Request {
 export function addBasketItem () {
   return async (req: Request, res: Response, next: NextFunction) => {
     const result = utils.parseJsonCustom((req as RequestWithRawBody).rawBody)
-    const productIds = []
     const basketIds = []
-    const quantities = []
 
     for (let i = 0; i < result.length; i++) {
-      if (result[i].key === 'ProductId') {
-        productIds.push(result[i].value)
-      } else if (result[i].key === 'BasketId') {
+      if (result[i].key === 'BasketId') {
         basketIds.push(result[i].value)
-      } else if (result[i].key === 'quantity') {
-        quantities.push(result[i].value)
       }
     }
 
@@ -38,9 +32,10 @@ export function addBasketItem () {
       res.status(401).send('{\'error\' : \'Invalid BasketId\'}')
     } else {
       const basketItem = {
-        ProductId: productIds[productIds.length - 1],
+        // must be the same values quantityCheckBeforeBasketItemAddition validated
+        ProductId: req.body.ProductId,
         BasketId: basketIds[basketIds.length - 1],
-        quantity: quantities[quantities.length - 1]
+        quantity: req.body.quantity
       }
       challengeUtils.solveIf(challenges.basketManipulateChallenge, () => { return user && basketItem.BasketId && basketItem.BasketId !== 'undefined' && user.bid != basketItem.BasketId }) // eslint-disable-line eqeqeq
 
@@ -72,7 +67,7 @@ export function quantityCheckBeforeBasketItemUpdate () {
         if (item == null) {
           throw new Error('No such item found!')
         }
-        void quantityCheck(req, res, next, item.ProductId, req.body.quantity)
+        await quantityCheck(req, res, next, item.ProductId, req.body.quantity)
       } else {
         next()
       }
