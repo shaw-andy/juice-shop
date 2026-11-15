@@ -22,6 +22,7 @@ import { MatFormFieldModule, MatLabel } from '@angular/material/form-field'
 import { MatButtonModule } from '@angular/material/button'
 import { MatCardModule } from '@angular/material/card'
 import { MatIconModule } from '@angular/material/icon'
+import { sendOnSepolia, sepoliaProvider } from '../shared/sepolia-wallet'
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const client = createClient({
@@ -108,7 +109,7 @@ export class FaucetComponent implements OnInit {
 
   async fetchMyBeeBalance () {
     try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum)
+      const provider = sepoliaProvider()
       const signer = provider.getSigner()
 
       const contract = new ethers.Contract(
@@ -135,7 +136,7 @@ export class FaucetComponent implements OnInit {
 
   async fetchBeeBalance () {
     try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum)
+      const provider = sepoliaProvider()
       const signer = provider.getSigner()
 
       const contract = new ethers.Contract(
@@ -156,6 +157,7 @@ export class FaucetComponent implements OnInit {
   }
 
   async handleAuth () {
+    this.session = false
     try {
       const { isConnected } = getAccount()
 
@@ -215,7 +217,7 @@ export class FaucetComponent implements OnInit {
       return
     }
     try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum)
+      const provider = sepoliaProvider()
       const signer = provider.getSigner()
       const userAddress = await signer.getAddress()
 
@@ -233,7 +235,7 @@ export class FaucetComponent implements OnInit {
         BeeFaucetABI,
         signer
       )
-      const tx = await contract.withdraw(amount)
+      const tx = await sendOnSepolia(signer, await contract.populateTransaction.withdraw(amount))
       await tx.wait()
 
       console.log('BEE tokens extracted successfully')
@@ -254,7 +256,7 @@ export class FaucetComponent implements OnInit {
       this.nftMintText = translatedString
     })
     try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum)
+      const provider = sepoliaProvider()
       const signer = provider.getSigner()
       const amountToApprove = ethers.utils.parseUnits('1000', '18')
       const BeeTokenContract = new ethers.Contract(
@@ -262,10 +264,10 @@ export class FaucetComponent implements OnInit {
         BeeTokenABI,
         signer
       )
-      const approvalTx = await BeeTokenContract.approve(
+      const approvalTx = await sendOnSepolia(signer, await BeeTokenContract.populateTransaction.approve(
         nftAddress,
         amountToApprove
-      )
+      ))
 
       await approvalTx.wait()
       this.translateService.get('NFT_MINT_TEXT_CONFIRM').subscribe((translatedString: string) => {
@@ -274,7 +276,7 @@ export class FaucetComponent implements OnInit {
 
       const contract = new ethers.Contract(nftAddress, nftABI, signer)
 
-      const transaction = await contract.mintNFT()
+      const transaction = await sendOnSepolia(signer, await contract.populateTransaction.mintNFT())
       console.log(transaction)
       this.translateService.get('NFT_MINT_TEXT_IN_PROGRESS').subscribe((translatedString: string) => {
         this.nftMintText = translatedString
