@@ -14,6 +14,7 @@ import fs from 'node:fs'
 import { type AddressInfo } from 'node:net'
 import { createTestApp } from './helpers/setup'
 import { login } from './helpers/auth'
+import * as security from '../../lib/insecurity'
 
 let app: Express
 
@@ -34,6 +35,7 @@ void describe('/profile/image/file', () => {
     const res = await request(app)
       .post('/profile/image/file')
       .set('Cookie', `token=${token}`)
+      .field('_csrf', security.csrfTokenFor(token))
       .attach('file', file)
       .redirects(0)
 
@@ -51,6 +53,7 @@ void describe('/profile/image/file', () => {
     const res = await request(app)
       .post('/profile/image/file')
       .set('Cookie', `token=${token}`)
+      .field('_csrf', security.csrfTokenFor(token))
       .attach('file', file)
 
     assert.equal(res.status, 415)
@@ -80,6 +83,7 @@ void describe('/profile/image/file', () => {
     const res = await request(app)
       .post('/profile/image/file')
       .set('Cookie', `token=${token}`)
+      .field('_csrf', security.csrfTokenFor(token))
       .attach('file', Buffer.from('not an image, just plain text content'), 'random.bin')
 
     assert.equal(res.status, 500)
@@ -98,6 +102,7 @@ void describe('/profile/image/url', () => {
     const res = await request(app)
       .post('/profile/image/url')
       .set('Cookie', `token=${token}`)
+      .field('_csrf', security.csrfTokenFor(token))
       .field('imageUrl', 'cataas.com/cat')
       .redirects(0)
 
@@ -113,6 +118,7 @@ void describe('/profile/image/url', () => {
     const res = await request(app)
       .post('/profile/image/url')
       .set('Cookie', `token=${token}`)
+      .field('_csrf', security.csrfTokenFor(token))
       .field('imageUrl', 'https://notanimage.here/100/100')
       .redirects(0)
 
@@ -141,6 +147,7 @@ void describe('/profile/image/url', () => {
       .post('/profile/image/file')
       .set('Cookie', `token=${token}`)
       .set('Content-Length', '42')
+      .field('_csrf', security.csrfTokenFor(token))
       .attach('file', file)
       .redirects(0)
 
@@ -192,6 +199,7 @@ void describe('/profile/image/url (with local mock server)', () => {
     const res = await request(app)
       .post('/profile/image/url')
       .set('Cookie', `token=${token}`)
+      .field('_csrf', security.csrfTokenFor(token))
       .field('imageUrl', `http://localhost:${mockPort}/non-ok.jpg`)
       .redirects(0)
 
@@ -202,6 +210,7 @@ void describe('/profile/image/url (with local mock server)', () => {
     const res = await request(app)
       .post('/profile/image/url')
       .set('Cookie', `token=${token}`)
+      .field('_csrf', security.csrfTokenFor(token))
       .field('imageUrl', `http://localhost:${mockPort}/no-body.jpg`)
       .redirects(0)
 
@@ -212,6 +221,7 @@ void describe('/profile/image/url (with local mock server)', () => {
     const res = await request(app)
       .post('/profile/image/url')
       .set('Cookie', `token=${token}`)
+      .field('_csrf', security.csrfTokenFor(token))
       .field('imageUrl', `http://localhost:${mockPort}/photo.jpg`)
       .redirects(0)
 
@@ -223,6 +233,7 @@ void describe('/profile/image/url (with local mock server)', () => {
     await request(app)
       .post('/profile/image/url')
       .set('Cookie', `token=${token}`)
+      .field('_csrf', security.csrfTokenFor(token))
       .field('imageUrl', `http://localhost:${mockPort}/photo.png`)
       .redirects(0)
 
@@ -236,6 +247,7 @@ void describe('/profile/image/url (with local mock server)', () => {
     await request(app)
       .post('/profile/image/url')
       .set('Cookie', `token=${token}`)
+      .field('_csrf', security.csrfTokenFor(token))
       .field('imageUrl', `http://localhost:${mockPort}/photo.bmp`)
       .redirects(0)
 

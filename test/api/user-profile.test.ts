@@ -11,15 +11,18 @@ import config from 'config'
 import { createTestApp } from './helpers/setup'
 import { login } from './helpers/auth'
 import * as datacache from '../../data/datacache'
+import * as security from '../../lib/insecurity'
 
 let app: Express
 let authHeader: { Cookie: string }
+let csrfToken: string
 
 before(async () => {
   const result = await createTestApp()
   app = result.app
   const { token } = await login(app, { email: 'jim@juice-sh.op', password: 'ncc-1701' })
   authHeader = { Cookie: `token=${token}` }
+  csrfToken = security.csrfTokenFor(token)
 }, { timeout: 60000 })
 
 void describe('/profile', () => {
@@ -41,6 +44,7 @@ void describe('/profile', () => {
     assert.equal(res.status, 200)
     assert.ok(res.headers['content-type']?.includes('text/html'))
     assert.ok(res.text.includes('id="email" type="email" name="email" value="jim@juice-sh.op"'))
+    assert.equal(res.text.split(`name="_csrf" value="${csrfToken}"`).length - 1, 3)
   })
 
   void it('GET user profile contains role and deluxe membership link if user is customer', async () => {
@@ -70,7 +74,8 @@ void describe('/profile', () => {
     const res = await request(app)
       .post('/profile')
       .set('Cookie', authHeader.Cookie)
-      .field('username', 'Localhorst')
+      .type('form')
+      .send({ username: 'Localhorst', _csrf: csrfToken })
       .redirects(0)
 
     assert.equal(res.status, 302)
@@ -90,7 +95,7 @@ void describe('/profile', () => {
       .post('/profile')
       .set('Cookie', authHeader.Cookie)
       .type('form')
-      .send({ username: '#{7*7}' })
+      .send({ username: '#{7*7}', _csrf: csrfToken })
       .redirects(0)
 
     const res = await request(app)
@@ -107,7 +112,7 @@ void describe('/profile', () => {
       .post('/profile')
       .set('Cookie', authHeader.Cookie)
       .type('form')
-      .send({ username: '#{not_a_defined_symbol}' })
+      .send({ username: '#{not_a_defined_symbol}', _csrf: csrfToken })
       .redirects(0)
 
     const res = await request(app)
@@ -124,7 +129,7 @@ void describe('/profile', () => {
       .post('/profile')
       .set('Cookie', authHeader.Cookie)
       .type('form')
-      .send({ username: 'A#{7*7}' })
+      .send({ username: 'A#{7*7}', _csrf: csrfToken })
       .redirects(0)
 
     const res = await request(app)
@@ -153,7 +158,7 @@ void describe('/profile', () => {
         .post('/profile')
         .set('Cookie', authHeader.Cookie)
         .type('form')
-        .send({ username: 'A#{7*7}' })
+        .send({ username: 'A#{7*7}', _csrf: csrfToken })
         .redirects(0)
 
       const res = await request(app)
@@ -169,7 +174,7 @@ void describe('/profile', () => {
     }
   })
 
-  void it('should be solved when origin header matches configured CSRF URL', async () => {
+  void it('should be solved without applying the forged update when origin header matches configured CSRF URL', async () => {
     const csrfUrl = config.get<string>('challenges.overwriteUrlForCsrfChallenge')
     datacache.challenges.csrfChallenge.solved = false
     await request(app)
@@ -177,8 +182,12 @@ void describe('/profile', () => {
       .set('Cookie', authHeader.Cookie)
       .set('Origin', csrfUrl)
       .send({ username: 'CSRF_Victim' })
-      .expect(302)
+      .expect(403)
     assert.equal(datacache.challenges.csrfChallenge.solved, true)
+    const res = await request(app)
+      .get('/profile')
+      .set(authHeader)
+    assert.ok(!res.text.includes('CSRF_Victim'))
   })
 
   void it('should have the configured CSRF URL in the challenge description', async () => {
@@ -193,7 +202,7 @@ void describe('/profile', () => {
       .set('Cookie', authHeader.Cookie)
       .set('Origin', 'http://attacker.com')
       .send({ username: 'No_CSRF' })
-      .expect(302)
+      .expect(403)
     assert.equal(datacache.challenges.csrfChallenge.solved, false)
   })
 })

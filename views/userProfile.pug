@@ -42,6 +42,7 @@ html(lang='en')
                   img.img-rounded(src=profileImage, alt='profile picture', width='90%', height='236', style='margin-right: 5%; margin-left: 5%;')
                   p(style='margin-top: 8px; color: _textColor_; text-align: center;') _username_
                   form(action='./profile/image/file', style='margin-top: 16px; width: 90%; margin-right: auto; margin-left: auto;', method='post', enctype='multipart/form-data')
+                    input(type='hidden', name='_csrf', value='_csrfToken_')
                     .profile-field
                       label(for='picture') File Upload:
                       input#picture(type='file', accept='image/*', name='file', size='150', aria-label='Input for selecting the profile picture')
@@ -55,6 +56,7 @@ html(lang='en')
                       div
 
                   form(action='./profile/image/url', style='margin-top: 8px; width: 90%; margin-right: auto; margin-left: auto;', method='post')
+                    input(type='hidden', name='_csrf', value='_csrfToken_')
                     .profile-field
                       label(for='url') Image URL:
                       input#url(type='text', name='imageUrl', placeholder='e.g. https://www.gravatar.com/avatar/_emailHash_', aria-label='Text field for the image link')
@@ -62,6 +64,7 @@ html(lang='en')
 
                div.s12.m12.l6
                  form(action='./profile', method='post', style='width: 90%; margin-right: auto; margin-left: auto;')
+                   input(type='hidden', name='_csrf', value='_csrfToken_')
                    .profile-field
                      label(for='email') Email:
                      input#email(type='email', name='email', value=email, disabled=true, style='opacity: 0.7;', aria-label='Disabled - Text field for the email')

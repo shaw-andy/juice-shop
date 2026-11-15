@@ -14,7 +14,8 @@ import config from 'config'
 
 export function updateUserProfile () {
   return async (req: Request, res: Response, next: NextFunction) => {
-    const loggedInUser = security.authenticatedUsers.get(req.cookies.token)
+    const sessionToken = req.cookies.token
+    const loggedInUser = security.authenticatedUsers.get(sessionToken)
 
     if (!loggedInUser) {
       next(new Error('Blocked illegal activity by ' + req.socket.remoteAddress))
@@ -28,12 +29,17 @@ export function updateUserProfile () {
         return
       }
 
-      challengeUtils.solveIf(challenges.csrfChallenge, () => {
-        const url = config.get<string>('challenges.overwriteUrlForCsrfChallenge')
-        return ((req.headers.origin?.includes('://' + url.replace(/^https?:\/\//, ''))) ??
-          (req.headers.referer?.includes('://' + url.replace(/^https?:\/\//, '')))) &&
-          req.body.username !== user.username
-      })
+      if (!security.isValidCsrfToken(sessionToken, req.body._csrf)) {
+        challengeUtils.solveIf(challenges.csrfChallenge, () => {
+          const url = config.get<string>('challenges.overwriteUrlForCsrfChallenge')
+          return ((req.headers.origin?.includes('://' + url.replace(/^https?:\/\//, ''))) ??
+            (req.headers.referer?.includes('://' + url.replace(/^https?:\/\//, '')))) &&
+            req.body.username !== user.username
+        })
+        res.status(403)
+        next(new Error('Invalid CSRF token'))
+        return
+      }
 
       const savedUser = await user.update({ username: req.body.username })
       const userWithStatus = utils.queryResultToJson(savedUser)

@@ -41,6 +41,17 @@ interface IAuthenticatedUsers {
 export const hash = (data: string) => crypto.createHash('md5').update(data).digest('hex')
 export const hmac = (data: string) => crypto.createHmac('sha256', 'pa4qacea4VK9t9nGv7yZtwmj').update(data).digest('hex')
 
+const csrfSecret = crypto.randomBytes(32)
+export const csrfTokenFor = (sessionToken: string) => crypto.createHmac('sha256', csrfSecret).update(utils.unquote(sessionToken)).digest('hex')
+export const isValidCsrfToken = (sessionToken: unknown, submittedToken: unknown) => {
+  if (typeof sessionToken !== 'string' || sessionToken === '' || typeof submittedToken !== 'string') {
+    return false
+  }
+  const expected = Buffer.from(csrfTokenFor(sessionToken))
+  const actual = Buffer.from(submittedToken)
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual)
+}
+
 export const cutOffPoisonNullByte = (str: string) => {
   const nullByte = '%00'
   if (str.includes(nullByte)) {

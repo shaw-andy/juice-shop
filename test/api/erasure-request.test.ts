@@ -11,6 +11,7 @@ import { createTestApp } from './helpers/setup'
 import { login } from './helpers/auth'
 import { challenges } from '../../data/datacache'
 import * as utils from '../../lib/utils'
+import * as security from '../../lib/insecurity'
 
 let app: Express
 
@@ -30,6 +31,7 @@ void describe('/dataerasure', () => {
     assert.equal(res.status, 200)
     assert.ok(res.text.includes('bjoern@owasp.org'))
     assert.ok(res.text.includes('Name of your favorite pet?'))
+    assert.ok(res.text.includes(`name="_csrf" value="${security.csrfTokenFor(token)}"`))
   })
 
   void it('GET erasure form rendering fails for users without assigned security answer', async () => {
@@ -57,7 +59,8 @@ void describe('/dataerasure', () => {
     const res = await request(app)
       .post('/dataerasure/')
       .set({ Cookie: 'token=' + token })
-      .field('email', 'bjoern.kimminich@gmail.com')
+      .type('form')
+      .send({ email: 'bjoern.kimminich@gmail.com', _csrf: security.csrfTokenFor(token) })
 
     assert.equal(res.status, 200)
     assert.ok(res.headers['content-type']?.includes('text/html'))
@@ -84,7 +87,7 @@ void describe('/dataerasure', () => {
     const res = await request(app)
       .post('/dataerasure/')
       .set({ Cookie: 'token=' + token })
-      .send({ layout: null })
+      .send({ layout: null, _csrf: security.csrfTokenFor(token) })
 
     assert.equal(res.status, 200)
   })
@@ -96,7 +99,7 @@ void describe('/dataerasure', () => {
       const res = await request(app)
         .post('/dataerasure/')
         .set({ Cookie: 'token=' + token })
-        .send({ layout: '../this/file/does/not/exist' })
+        .send({ layout: '../this/file/does/not/exist', _csrf: security.csrfTokenFor(token) })
 
       assert.equal(res.status, 500)
       assert.ok(res.text.includes('no such file or directory'))
@@ -108,7 +111,7 @@ void describe('/dataerasure', () => {
       const res = await request(app)
         .post('/dataerasure/')
         .set({ Cookie: 'token=' + token })
-        .send({ layout: '../package.json' })
+        .send({ layout: '../package.json', _csrf: security.csrfTokenFor(token) })
 
       assert.equal(res.status, 200)
       assert.ok(res.text.includes('juice-shop'))

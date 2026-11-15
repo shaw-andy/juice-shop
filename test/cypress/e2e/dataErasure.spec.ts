@@ -8,7 +8,9 @@ describe('/dataerasure', () => {
       cy.task('isDocker').then((isDocker) => {
         if (!isDocker) {
           cy.window().then(async () => {
-            const params = 'layout=../package.json'
+            const form = await (await fetch(`${Cypress.config('baseUrl')}/dataerasure`)).text()
+            const csrfToken = new DOMParser().parseFromString(form, 'text/html').querySelector<HTMLInputElement>('input[name="_csrf"]')?.value ?? ''
+            const params = `layout=../package.json&_csrf=${csrfToken}`
 
             const response = await fetch(`${Cypress.config('baseUrl')}/dataerasure`, {
               method: 'POST',
