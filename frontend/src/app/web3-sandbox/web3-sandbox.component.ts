@@ -22,6 +22,7 @@ import { EditorView, basicSetup } from 'codemirror'
 import { EditorState } from '@codemirror/state'
 import { getLanguageExtension } from '../shared/codemirror-extensions'
 import { juiceShopTheme } from '../shared/codemirror-theme'
+import { sendOnSepolia, sepoliaProvider } from '../shared/sepolia-wallet'
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const client = createClient({
@@ -154,7 +155,7 @@ contract HelloWorld {
         return
       }
 
-      const provider = new ethers.providers.Web3Provider(window.ethereum)
+      const provider = sepoliaProvider()
       const signer = provider.getSigner()
 
       const contractBytecode = selectedContract.evm.bytecode.object
@@ -172,9 +173,9 @@ contract HelloWorld {
           'gwei'
         )
       }
-      const contract = await factory.deploy(transactionOptions)
-      await contract.deployed()
-      this.deployedContractAddress = contract.address
+      const deployment = await sendOnSepolia(signer, factory.getDeployTransaction(transactionOptions))
+      await deployment.wait()
+      this.deployedContractAddress = ethers.ContractFactory.getContractAddress(deployment)
 
       this.contractFunctions = contractAbi
         .filter((item) => item.type === 'function')
@@ -218,7 +219,7 @@ contract HelloWorld {
       const selectedContract =
         this.compiledContracts[this.selectedContractName]
 
-      const provider = new ethers.providers.Web3Provider(window.ethereum)
+      const provider = sepoliaProvider()
       const signer = provider.getSigner()
       const contract = new ethers.Contract(
         this.deployedContractAddress,
@@ -240,10 +241,9 @@ contract HelloWorld {
           'gwei'
         )
       }
-      const transaction = await contract.functions[func.name](
-        ...inputs,
-        transactionOptions
-      )
+      const transaction = contract.interface.getFunction(func.name).constant
+        ? await contract.functions[func.name](...inputs, transactionOptions)
+        : await sendOnSepolia(signer, await contract.populateTransaction[func.name](...inputs, transactionOptions))
       console.log(transaction)
 
       if (
@@ -285,6 +285,7 @@ contract HelloWorld {
   }
 
   async handleAuth () {
+    this.session = false
     try {
       const { isConnected } = getAccount()
 

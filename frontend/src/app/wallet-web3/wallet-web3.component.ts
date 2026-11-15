@@ -18,6 +18,7 @@ import { TranslateModule } from '@ngx-translate/core'
 
 import { MatButtonModule } from '@angular/material/button'
 import { MatCardModule } from '@angular/material/card'
+import { sendOnSepolia, sepoliaProvider } from '../shared/sepolia-wallet'
 const { ethereum } = window
 const BankAddress = '0x413744D59d31AFDC2889aeE602636177805Bd7b0'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -60,14 +61,14 @@ export class WalletWeb3Component implements OnInit {
 
   async depositETH () {
     try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum)
+      const provider = sepoliaProvider()
       const signer = provider.getSigner()
 
       const contract = new ethers.Contract(BankAddress, web3WalletABI, signer)
       const depositAmount = this.inputAmount.toString()
-      const transaction = await contract.ethdeposit(this.metamaskAddress, {
+      const transaction = await sendOnSepolia(signer, await contract.populateTransaction.ethdeposit(this.metamaskAddress, {
         value: ethers.utils.parseEther(depositAmount)
-      })
+      }))
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const txConfirmation = await transaction.wait()
       this.getUserEthBalance()
@@ -78,14 +79,14 @@ export class WalletWeb3Component implements OnInit {
 
   async withdrawETH () {
     try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum)
+      const provider = sepoliaProvider()
       const signer = provider.getSigner()
 
       const contract = new ethers.Contract(BankAddress, web3WalletABI, signer)
       const withdrawalAmount = this.inputAmount.toString()
-      const transaction = await contract.withdraw(
+      const transaction = await sendOnSepolia(signer, await contract.populateTransaction.withdraw(
         ethers.utils.parseEther(withdrawalAmount)
-      )
+      ))
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const txConfirmation = await transaction.wait()
       this.getUserEthBalance()
@@ -96,7 +97,7 @@ export class WalletWeb3Component implements OnInit {
 
   async getUserEthBalance () {
     try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum)
+      const provider = sepoliaProvider()
       const signer = provider.getSigner()
       const contract = new ethers.Contract(BankAddress, web3WalletABI, signer)
       const userBalance = await contract.balanceOf(this.metamaskAddress)
@@ -108,6 +109,7 @@ export class WalletWeb3Component implements OnInit {
   }
 
   async handleAuth () {
+    this.session = false
     try {
       const { isConnected } = getAccount()
 
