@@ -3,15 +3,26 @@ import * as challengeUtils from '../lib/challengeUtils'
 import * as utils from '../lib/utils'
 import { challenges } from '../data/datacache'
 
+interface WalletKeys {
+  privateKey: string
+  publicKey: string
+  address: string
+}
+
+let walletKeys: Promise<WalletKeys> | undefined
+
+async function deriveWalletKeys (): Promise<WalletKeys> {
+  const { HDNodeWallet } = await import('ethers')
+  const mnemonic = 'purpose betray marriage blame crunch monitor spin slide donate sport lift clutch'
+  const { privateKey, publicKey, address } = HDNodeWallet.fromPhrase(mnemonic)
+  return { privateKey, publicKey, address }
+}
+
 export function checkKeys () {
   return async (req: Request, res: Response) => {
     try {
-      const { HDNodeWallet } = await import('ethers')
-      const mnemonic = 'purpose betray marriage blame crunch monitor spin slide donate sport lift clutch'
-      const mnemonicWallet = HDNodeWallet.fromPhrase(mnemonic)
-      const privateKey = mnemonicWallet.privateKey
-      const publicKey = mnemonicWallet.publicKey
-      const address = mnemonicWallet.address
+      walletKeys ??= deriveWalletKeys()
+      const { privateKey, publicKey, address } = await walletKeys
       challengeUtils.solveIf(challenges.nftUnlockChallenge, () => {
         return req.body.privateKey === privateKey
       })
