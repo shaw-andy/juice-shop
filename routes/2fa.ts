@@ -13,6 +13,31 @@ import { challenges } from '../data/datacache'
 import { generateSecret, verifySync } from 'otplib'
 import * as security from '../lib/insecurity'
 
+const totpPeriod = 30
+const usedTotpSteps = new Map<string, number>()
+
+// Must stay synchronous so that concurrent requests cannot both pass the check before the step is recorded.
+function verifyTotpOnce (userId: number, secret: string, token: string) {
+  const result = verifySync({ secret, token, period: totpPeriod, epochTolerance: totpPeriod })
+  if (!result.valid || !('timeStep' in result)) {
+    return false
+  }
+
+  const oldestAcceptedStep = Math.floor(Date.now() / 1000 / totpPeriod) - 1
+  for (const [key, step] of usedTotpSteps) {
+    if (step < oldestAcceptedStep) {
+      usedTotpSteps.delete(key)
+    }
+  }
+
+  const key = `${userId}:${result.timeStep}`
+  if (usedTotpSteps.has(key)) {
+    return false
+  }
+  usedTotpSteps.set(key, result.timeStep)
+  return true
+}
+
 export async function verify (req: Request, res: Response) {
   const { tmpToken, totpToken } = req.body
 
@@ -28,7 +53,7 @@ export async function verify (req: Request, res: Response) {
       throw new Error('No such user found!')
     }
 
-    const isValid = verifySync({ secret: user.totpSecret, token: totpToken, epochTolerance: 30 }).valid
+    const isValid = verifyTotpOnce(user.id, user.totpSecret, totpToken)
 
     const plainUser = utils.queryResultToJson(user)
 
@@ -116,7 +141,7 @@ export async function setup (req: Request, res: Response) {
     if (type !== 'totp_setup_secret') {
       throw new Error('SetupToken is of wrong type')
     }
-    if (!verifySync({ secret, token: initialToken, epochTolerance: 30 }).valid) {
+    if (!verifyTotpOnce(user.id, secret, initialToken)) {
       throw new Error('Initial token doesnt match the secret from the setupToken')
     }
 
