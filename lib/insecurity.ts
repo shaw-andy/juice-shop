@@ -31,11 +31,14 @@ interface ResponseWithUser {
 interface IAuthenticatedUsers {
   tokenMap: Record<string, ResponseWithUser>
   idMap: Record<string, string>
+  revokedTokens: Set<string>
   put: (token: string, user: ResponseWithUser) => void
   get: (token?: string) => ResponseWithUser | undefined
   tokenOf: (user: UserModel) => string | undefined
   from: (req: Request) => ResponseWithUser | undefined
   updateFrom: (req: Request, user: ResponseWithUser) => any
+  isRevoked: (token?: string) => boolean
+  revokeOtherSessionsOf: (userId: number, currentToken: string) => void
 }
 
 export const hash = (data: string) => crypto.createHash('md5').update(data).digest('hex')
@@ -70,12 +73,16 @@ export const sanitizeSecure = (html: string): string => {
 export const authenticatedUsers: IAuthenticatedUsers = {
   tokenMap: {},
   idMap: {},
+  revokedTokens: new Set<string>(),
   put: function (token: string, user: ResponseWithUser) {
+    if (this.isRevoked(token)) {
+      return
+    }
     this.tokenMap[token] = user
     this.idMap[user.data.id] = token
   },
   get: function (token?: string) {
-    return token ? this.tokenMap[utils.unquote(token)] : undefined
+    return token && !this.isRevoked(token) ? this.tokenMap[utils.unquote(token)] : undefined
   },
   tokenOf: function (user: UserModel) {
     return user ? this.idMap[user.id] : undefined
@@ -87,6 +94,20 @@ export const authenticatedUsers: IAuthenticatedUsers = {
   updateFrom: function (req: Request, user: ResponseWithUser) {
     const token = utils.jwtFrom(req)
     this.put(token, user)
+  },
+  isRevoked: function (token?: string) {
+    return token ? this.revokedTokens.has(utils.unquote(token)) : false
+  },
+  revokeOtherSessionsOf: function (userId: number, currentToken: string) {
+    for (const [token, session] of Object.entries(this.tokenMap)) {
+      if (session.data?.id === userId && token !== currentToken) {
+        this.revokedTokens.add(token)
+        delete this.tokenMap[token]
+      }
+    }
+    if (this.idMap[userId] !== currentToken) {
+      this.idMap[userId] = currentToken
+    }
   }
 }
 
@@ -185,7 +206,7 @@ export const appendUserId = () => {
 
 export const updateAuthenticatedUsers = () => (req: Request, res: Response, next: NextFunction) => {
   const token = req.cookies.token || utils.jwtFrom(req)
-  if (token && authenticatedUsers.get(token) === undefined) {
+  if (token && !authenticatedUsers.isRevoked(token) && authenticatedUsers.get(token) === undefined) {
     jwt.verify(token, publicKey, (err: Error | null, decoded: any) => {
       if (err === null && decoded?.data !== undefined) {
         authenticatedUsers.put(token, decoded)
