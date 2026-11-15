@@ -61,7 +61,11 @@ export async function status (req: Request, res: Response) {
     if (!data) {
       throw new Error('You need to be logged in to see this')
     }
-    const { data: user } = data
+
+    const user = await UserModel.findByPk(data.data.id)
+    if (user == null) {
+      throw new Error('No such user found!')
+    }
 
     if (user.totpSecret === '') {
       const secret = generateSecret()
@@ -100,7 +104,11 @@ export async function setup (req: Request, res: Response) {
     if (!data) {
       throw new Error('Need to login before setting up 2FA')
     }
-    const { data: user } = data
+
+    const user = await UserModel.findByPk(data.data.id)
+    if (user == null) {
+      throw new Error('No such user found!')
+    }
 
     const { password, setupToken, initialToken } = req.body
 
@@ -120,15 +128,17 @@ export async function setup (req: Request, res: Response) {
       throw new Error('Initial token doesnt match the secret from the setupToken')
     }
 
-    // Update db model and cached object
-    const userModel = await UserModel.findByPk(user.id)
-    if (userModel == null) {
-      throw new Error('No such user found!')
+    // Only write if the row still has no secret and the same password it was checked against
+    const [updatedRows] = await UserModel.update({ totpSecret: secret }, {
+      where: { id: user.id, totpSecret: '', password: user.password }
+    })
+    if (updatedRows !== 1) {
+      throw new Error('User changed while setting up 2fa')
     }
 
-    userModel.totpSecret = secret
-    await userModel.save()
-    security.authenticatedUsers.updateFrom(req, utils.queryResultToJson(userModel))
+    await user.reload()
+    security.authenticatedUsers.updateFrom(req, utils.queryResultToJson(user))
+    security.authenticatedUsers.revokeOtherSessionsOf(user.id, utils.jwtFrom(req))
 
     res.status(200).send()
   } catch (error) {
@@ -145,18 +155,16 @@ export async function disable (req: Request, res: Response) {
     if (!data) {
       throw new Error('Need to login before setting up 2FA')
     }
-    const { data: user } = data
+
+    const userModel = await UserModel.findByPk(data.data.id)
+    if (userModel == null) {
+      throw new Error('No such user found!')
+    }
 
     const { password } = req.body
 
-    if (user.password !== security.hash(password)) {
+    if (userModel.password !== security.hash(password)) {
       throw new Error('Password doesnt match stored password')
-    }
-
-    // Update db model and cached object
-    const userModel = await UserModel.findByPk(user.id)
-    if (userModel == null) {
-      throw new Error('No such user found!')
     }
 
     userModel.totpSecret = ''
