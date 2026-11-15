@@ -185,6 +185,20 @@ describe('SidenavComponent', () => {
         expect(removeItemSpy).toHaveBeenCalledWith('guestBasket')
     })
 
+    it('should remove checkout address, payment, delivery, and coupon session keys', () => {
+        sessionStorage.setItem('addressId', '4')
+        sessionStorage.setItem('paymentId', '1')
+        sessionStorage.setItem('deliveryMethodId', '1')
+        sessionStorage.setItem('couponDetails', 'coupon')
+        sessionStorage.setItem('couponDiscount', '10')
+        component.logout()
+        expect(sessionStorage.getItem('addressId')).toBeNull()
+        expect(sessionStorage.getItem('paymentId')).toBeNull()
+        expect(sessionStorage.getItem('deliveryMethodId')).toBeNull()
+        expect(sessionStorage.getItem('couponDetails')).toBeNull()
+        expect(sessionStorage.getItem('couponDiscount')).toBeNull()
+    })
+
     it('should set the login status to be false via UserService', () => {
         component.logout()
         expect(userService.isLoggedIn.next).toHaveBeenCalledWith(false)
