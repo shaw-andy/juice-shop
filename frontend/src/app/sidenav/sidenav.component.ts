@@ -98,6 +98,11 @@ export class SidenavComponent implements OnInit {
     sessionStorage.removeItem('bid')
     sessionStorage.removeItem('itemTotal')
     sessionStorage.removeItem('guestBasket')
+    sessionStorage.removeItem('addressId')
+    sessionStorage.removeItem('paymentId')
+    sessionStorage.removeItem('deliveryMethodId')
+    sessionStorage.removeItem('couponDetails')
+    sessionStorage.removeItem('couponDiscount')
     this.userService.isLoggedIn.next(false)
     this.ngZone.run(async () => await this.router.navigate(['/']))
   }

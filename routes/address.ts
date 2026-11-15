@@ -6,6 +6,17 @@
 import { type Request, type Response } from 'express'
 import { AddressModel } from '../models/address'
 
+function toAddressId (value: unknown): number | null {
+  const id = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value
+  return typeof id === 'number' && Number.isSafeInteger(id) ? id : null
+}
+
+export async function findAddressOfUser (addressId: unknown, userId: unknown) {
+  const id = toAddressId(addressId)
+  if (id === null || typeof userId !== 'number') return null
+  return await AddressModel.findOne({ where: { id, UserId: userId } })
+}
+
 export function getAddress () {
   return async (req: Request, res: Response) => {
     const addresses = await AddressModel.findAll({ where: { UserId: req.body.UserId } })

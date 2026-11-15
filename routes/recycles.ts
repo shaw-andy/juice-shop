@@ -3,10 +3,21 @@
  * SPDX-License-Identifier: MIT
  */
 
-import { type Request, type Response } from 'express'
+import { type Request, type Response, type NextFunction } from 'express'
 import { RecycleModel } from '../models/recycle'
+import { findAddressOfUser } from './address'
 
 import * as utils from '../lib/utils'
+
+export const verifyRecycleAddress = () => async (req: Request, res: Response, next: NextFunction) => {
+  const address = await findAddressOfUser(req.body.AddressId, req.body.UserId)
+  if (address == null) {
+    res.status(400).json({ status: 'error', data: 'Invalid pickup address.' })
+    return
+  }
+  req.body.AddressId = address.id
+  next()
+}
 
 export const getRecycleItem = () => (req: Request, res: Response) => {
   RecycleModel.findAll({

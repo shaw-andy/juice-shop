@@ -19,6 +19,7 @@ import { WalletModel } from '../models/wallet'
 import * as security from '../lib/insecurity'
 import * as utils from '../lib/utils'
 import * as db from '../data/mongodb'
+import { findAddressOfUser } from './address'
 
 interface Product {
   quantity: number
@@ -37,6 +38,15 @@ export function placeOrder () {
         if (basket != null) {
           const customer = security.authenticatedUsers.from(req)
           const email = customer ? customer.data ? customer.data.email : '' : ''
+          let addressId: number | null = null
+          if (req.body.orderDetails?.addressId != null) {
+            const address = await findAddressOfUser(req.body.orderDetails.addressId, customer?.data?.id)
+            if (address == null) {
+              res.status(400).json({ status: 'error', data: 'Invalid delivery address.' })
+              return
+            }
+            addressId = address.id
+          }
           const orderId = security.hash(email).slice(0, 4) + '-' + utils.randomHexString(16)
           const pdfFile = `order_${orderId}.pdf`
           const { default: PDFDocument } = await import('pdfkit')
@@ -164,7 +174,7 @@ export function placeOrder () {
           db.ordersCollection.insert({
             promotionalAmount: discountAmount,
             paymentId: req.body.orderDetails ? req.body.orderDetails.paymentId : null,
-            addressId: req.body.orderDetails ? req.body.orderDetails.addressId : null,
+            addressId,
             orderId,
             delivered: false,
             email: (email ? email.replace(/[aeiou]/gi, '*') : undefined),
