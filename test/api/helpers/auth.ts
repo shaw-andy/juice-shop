@@ -25,15 +25,21 @@ export async function login (app: Express, { email, password, totpSecret }: { em
       throw new Error('login with totp required but no totp secret provided to login function')
     }
 
-    const totpRes = await request(app)
-      .post('/rest/2fa/verify')
-      .set(jsonHeader)
-      .send({
-        tmpToken: loginRes.body.data.tmpToken,
-        totpToken: generateSync({ secret: totpSecret })
-      })
-
-    return totpRes.body.authentication
+    // Each time step is accepted only once per user, so fall back to the adjacent steps if the current one was already used
+    const now = Math.floor(Date.now() / 1000)
+    for (const epoch of [now, now - 30, now + 30]) {
+      const totpRes = await request(app)
+        .post('/rest/2fa/verify')
+        .set(jsonHeader)
+        .send({
+          tmpToken: loginRes.body.data.tmpToken,
+          totpToken: generateSync({ secret: totpSecret, epoch })
+        })
+      if (totpRes.status === 200) {
+        return totpRes.body.authentication
+      }
+    }
+    throw new Error(`Failed to verify second factor for '${email}'`)
   }
 
   return loginRes.body.authentication
