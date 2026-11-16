@@ -48,7 +48,7 @@ const FeedbackModelInit = (sequelize: Sequelize) => {
           } else {
             sanitizedComment = security.sanitizeSecure(comment)
           }
-          this.setDataValue('comment', sanitizedComment)
+          this.setDataValue('comment', utils.redactEmailAddresses(sanitizedComment))
         }
       },
       rating: {
