@@ -13,6 +13,7 @@ import * as utils from '../lib/utils'
 import { challenges } from '../data/datacache'
 import { generateSecret, verifySync } from 'otplib'
 import * as security from '../lib/insecurity'
+import { resetFailedLogins } from '../lib/loginThrottle'
 
 // Must stay unknown to clients, so it cannot come from the hardcoded keys in lib/insecurity
 const passwordProofKey = crypto.randomBytes(32)
@@ -69,6 +70,7 @@ export async function verify (req: Request, res: Response) {
     if (!isValid || !hasPasswordProof(userId, nonce, proof)) {
       return res.status(401).send()
     }
+    await resetFailedLogins(user.email)
     challengeUtils.solveIf(challenges.twoFactorAuthUnsafeSecretStorageChallenge, () => { return user.email === 'wurstbrot@' + config.get<string>('application.domain') })
 
     const [basket] = await BasketModel.findOrCreate({ where: { UserId: userId } })
