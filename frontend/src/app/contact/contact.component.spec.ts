@@ -176,6 +176,22 @@ describe('ContactComponent', () => {
         expect(component.authorControl.value).toBe('anonymous')
     })
 
+    it('does not submit the signed-in author email tail with the feedback comment', () => {
+        const email = 'privacy.customer.alpha@example.test'
+        userService.whoAmI.mockReturnValue(of({ id: 42, email }))
+        component.ngOnInit()
+        component.captchaId = 1
+        component.captchaControl.setValue('1')
+        component.feedbackControl.setValue('Fresh apples')
+        component.rating = 2
+        component.save()
+        const payload = feedbackService.save.mock.calls[0][0]
+        expect(payload.comment).toContain('Fresh apples')
+        expect(payload.UserId).toBe(42)
+        expect(payload.comment).not.toContain(email.slice(3))
+        expect(payload.comment).not.toContain(email)
+    })
+
     it('should populate the feedback object and send it via the feedback service on saving', () => {
         component.captchaId = 2
         component.captchaControl.setValue('2')
