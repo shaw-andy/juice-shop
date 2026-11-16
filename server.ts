@@ -479,7 +479,11 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
     utils.asyncHandler(twoFactorAuth.verify)
   )
   /* Check 2FA Status for the current User */
-  app.get('/rest/2fa/status', security.isAuthorized(), utils.asyncHandler(twoFactorAuth.status))
+  app.get('/rest/2fa/status',
+    rateLimit({ windowMs: 5 * 60 * 1000, max: 100, validate: false }),
+    security.isAuthorized(),
+    utils.asyncHandler(twoFactorAuth.status)
+  )
   /* Enable 2FA for the current User */
   app.post('/rest/2fa/setup',
     rateLimit({ windowMs: 5 * 60 * 1000, max: 100, validate: false }),

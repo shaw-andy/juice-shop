@@ -50,6 +50,31 @@ export async function verify (req: Request, res: Response) {
   }
 }
 
+// Must stay well below the 6h expiry of tokens issued by security.authorize
+const pendingSetupMaxAgeMs = 60 * 60 * 1000
+const pendingSetups = new Map<string, { userId: number, secret: string, setupToken: string, issuedAt: number }>()
+
+function sessionKeyFrom (req: Request) {
+  return utils.unquote(utils.jwtFrom(req))
+}
+
+function pendingSetupFor (req: Request, userId: number) {
+  const sessionKey = sessionKeyFrom(req)
+  const cached = pendingSetups.get(sessionKey)
+  if (cached?.userId === userId && Date.now() - cached.issuedAt < pendingSetupMaxAgeMs) {
+    return cached
+  }
+  const secret = generateSecret()
+  const pending = {
+    userId,
+    secret,
+    setupToken: security.authorize({ secret, type: 'totp_setup_secret' }),
+    issuedAt: Date.now()
+  }
+  pendingSetups.set(sessionKey, pending)
+  return pending
+}
+
 /**
  * Check the 2FA status of the currently signed-in user.
  *
@@ -64,16 +89,13 @@ export async function status (req: Request, res: Response) {
     const { data: user } = data
 
     if (user.totpSecret === '') {
-      const secret = generateSecret()
+      const { secret, setupToken } = pendingSetupFor(req, user.id)
 
       res.json({
         setup: false,
         secret,
         email: user.email,
-        setupToken: security.authorize({
-          secret,
-          type: 'totp_setup_secret'
-        })
+        setupToken
       })
     } else {
       res.json({
@@ -128,6 +150,7 @@ export async function setup (req: Request, res: Response) {
 
     userModel.totpSecret = secret
     await userModel.save()
+    pendingSetups.delete(sessionKeyFrom(req))
     security.authenticatedUsers.updateFrom(req, utils.queryResultToJson(userModel))
 
     res.status(200).send()
@@ -161,6 +184,7 @@ export async function disable (req: Request, res: Response) {
 
     userModel.totpSecret = ''
     await userModel.save()
+    pendingSetups.delete(sessionKeyFrom(req))
     security.authenticatedUsers.updateFrom(req, utils.queryResultToJson(userModel))
 
     res.status(200).send()
