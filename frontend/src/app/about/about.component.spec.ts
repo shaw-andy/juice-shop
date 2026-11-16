@@ -168,6 +168,19 @@ describe('AboutComponent', () => {
         expect(component.galleryRef).toBe(galleryRef)
     })
 
+    it('does not copy a weakly masked author email into the public carousel', () => {
+        const exposedTail = 'vacy.customer.alpha@example.test'
+        feedbackService.find.mockReturnValue(of([{ comment: `Fresh apples (***${exposedTail})`, rating: 2 }]))
+        sanitizer.bypassSecurityTrustHtml.mockClear()
+
+        component.populateSlideshowFromFeedbacks()
+
+        expect(sanitizer.bypassSecurityTrustHtml).toHaveBeenCalled()
+        const html = sanitizer.bypassSecurityTrustHtml.mock.calls[0][0] as string
+        expect(html).toContain('Fresh apples')
+        expect(html).not.toContain(exposedTail)
+    })
+
     it('should add an image to the gallery for each feedback with formatted comment and stars', () => {
         feedbackService.find.mockReturnValue(of([{ comment: 'Great!', rating: 3 }]))
 
