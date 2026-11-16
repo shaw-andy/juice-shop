@@ -11,6 +11,7 @@ import download from 'download'
 import crypto from 'node:crypto'
 import clarinet from 'clarinet'
 import type { Challenge } from '@juice-shop/data/types'
+import type { Request } from 'express'
 
 import isHeroku from './is-heroku'
 import isDocker from './is-docker'
@@ -40,6 +41,14 @@ export const containsEscaped = function (str: string, element: string) {
 
 export const containsOrEscaped = function (str: string, element: string) {
   return (str ? str.includes(element) : false) || containsEscaped(str, element)
+}
+
+// Database text must not go through req.__(), which renders {{...}} as a Mustache template and stores unknown keys in the locale files
+export const lookupTranslation = <T>(req: Request, text: T): T | string => {
+  if (typeof text !== 'string') return text
+  const catalog = req.getCatalog(req.getLocale())
+  const translation = catalog && Object.prototype.hasOwnProperty.call(catalog, text) ? catalog[text] : undefined
+  return typeof translation === 'string' ? translation : text
 }
 
 export const unquote = function (str: string) {
