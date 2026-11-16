@@ -146,7 +146,7 @@
     "semver": "^7.6.3",
     "sequelize": "^6.37.3",
     "serve-index": "^1.9.1",
-    "socket.io": "^3.1.2",
+    "socket.io": "^4.8.4",
     "sqlite3": "^5.1.7",
     "svg-captcha": "^1.4.0",
     "swagger-ui-express": "^5.0.1",
@@ -223,6 +223,11 @@
     "arm64",
     "arm"
   ],
+  "overrides": {
+    "socket.io": {
+      "socket.io-parser": "^4.2.7"
+    }
+  },
   "heroku-run-build-script": true,
   "allowScripts": {
     "sqlite3@5.1.7": true,
