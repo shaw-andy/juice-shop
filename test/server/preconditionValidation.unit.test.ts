@@ -12,8 +12,8 @@ import { checkIfRunningOnSupportedNodeVersion, checkIfPortIsAvailable, checkIfEn
 
 void describe('preconditionValidation', () => {
   void describe('checkIfRunningOnSupportedNodeVersion', () => {
-    void it('should define the supported semver range as 22 - 26', () => {
-      assert.equal(supportedEngines.node, '22 - 26')
+    void it('should define the supported semver range as 22.12 - 26', () => {
+      assert.equal(supportedEngines.node, '22.12 - 26')
       assert.notEqual(semver.validRange(supportedEngines.node), null)
     })
 
@@ -26,6 +26,7 @@ void describe('preconditionValidation', () => {
     })
 
     void it('should fail for an unsupported version', () => {
+      assert.equal(checkIfRunningOnSupportedNodeVersion('22.11.0'), false)
       assert.equal(checkIfRunningOnSupportedNodeVersion('21.7.3'), false)
       assert.equal(checkIfRunningOnSupportedNodeVersion('20.19.2'), false)
       assert.equal(checkIfRunningOnSupportedNodeVersion('19.9.0'), false)
