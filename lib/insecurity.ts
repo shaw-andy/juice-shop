@@ -58,13 +58,24 @@ export const decode = (token: string) => { return jws.decode(token)?.payload }
 export const sanitizeHtml = (html: string) => sanitizeHtmlLib(html)
 export const sanitizeLegacy = (input = '') => input.replace(/<(?:\w+)\W+?[\w]/gi, '')
 export const sanitizeFilename = (filename: string) => sanitizeFilenameLib(filename)
+const maxSanitizePasses = 10
+const escapeHtml = (text: string) => text
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;')
 export const sanitizeSecure = (html: string): string => {
-  const sanitized = sanitizeHtml(html)
-  if (sanitized === html) {
-    return html
-  } else {
-    return sanitizeSecure(sanitized)
+  let current = html
+  for (let pass = 0; pass < maxSanitizePasses; pass++) {
+    const sanitized = sanitizeHtml(current)
+    if (sanitized === current) {
+      return current
+    }
+    current = sanitized
   }
+  // Input that is still changing after the pass limit is deliberately nested; render it inert instead of trusting it as markup
+  return escapeHtml(current)
 }
 
 export const authenticatedUsers: IAuthenticatedUsers = {
