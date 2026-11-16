@@ -19,6 +19,7 @@ import { MatFormFieldModule, MatLabel, MatSuffix, MatHint, MatError } from '@ang
 
 import { TranslateModule } from '@ngx-translate/core'
 import { MatCardModule } from '@angular/material/card'
+import { TOTP_TMP_TOKEN_KEY } from '../shared/user-storage'
 
 library.add(faUnlockAlt)
 
@@ -51,6 +52,7 @@ export class TwoFactorAuthEnterComponent {
 
     this.twoFactorAuthService.verify(fields.token).subscribe({
       next: (authentication) => {
+        localStorage.removeItem(TOTP_TMP_TOKEN_KEY)
         localStorage.setItem('token', authentication.token)
         const expires = new Date()
         expires.setHours(expires.getHours() + 8)

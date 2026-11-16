@@ -9,6 +9,7 @@ import { CookieService } from 'ngy-cookie'
 import { Component, NgZone, type OnInit, inject, ChangeDetectionStrategy } from '@angular/core'
 import { TranslateModule } from '@ngx-translate/core'
 import { MatCardModule } from '@angular/material/card'
+import { clearUserScopedStorage } from '../shared/user-storage'
 
 @Component({
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -65,6 +66,7 @@ export class OAuthComponent implements OnInit {
     console.log(error)
     this.cookieService.remove('token')
     localStorage.removeItem('token')
+    clearUserScopedStorage()
     sessionStorage.removeItem('bid')
   }
 

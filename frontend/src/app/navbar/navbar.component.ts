@@ -57,6 +57,7 @@ import { MatTooltip } from '@angular/material/tooltip'
 import { MatButtonModule } from '@angular/material/button'
 
 import { MatToolbar, MatToolbarRow } from '@angular/material/toolbar'
+import { clearUserScopedStorage } from '../shared/user-storage'
 
 library.add(faLanguage, faSearch, faSignInAlt, faSignOutAlt, faComment, faBomb, faTrophy, faInfoCircle, faShoppingCart, faUserSecret, faRecycle, faMapMarker, faUserCircle, faGithub, faComments, faThermometerEmpty, faThermometerQuarter, faThermometerHalf, faThermometerThreeQuarters, faThermometerFull)
 
@@ -241,6 +242,7 @@ export class NavbarComponent implements OnInit {
   logout () {
     this.userService.saveLastLoginIp().subscribe({ next: () => { this.noop() }, error: (err) => { console.log(err) } })
     localStorage.removeItem('token')
+    clearUserScopedStorage()
     this.cookieService.remove('token')
     sessionStorage.removeItem('bid')
     sessionStorage.removeItem('itemTotal')

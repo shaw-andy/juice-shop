@@ -22,6 +22,7 @@ import { TranslateModule } from '@ngx-translate/core'
 import { MatButtonModule } from '@angular/material/button'
 import { MatNavList, MatListSubheaderCssMatStyler, MatListItem } from '@angular/material/list'
 import { MatToolbar, MatToolbarRow } from '@angular/material/toolbar'
+import { clearUserScopedStorage } from '../shared/user-storage'
 
 @Component({
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -94,6 +95,7 @@ export class SidenavComponent implements OnInit {
   logout () {
     this.userService.saveLastLoginIp().subscribe({ next: () => { this.noop() }, error: (err) => { console.log(err) } })
     localStorage.removeItem('token')
+    clearUserScopedStorage()
     this.cookieService.remove('token')
     sessionStorage.removeItem('bid')
     sessionStorage.removeItem('itemTotal')
