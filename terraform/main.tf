@@ -56,6 +56,10 @@ resource "aws_ecs_task_definition" "juice_shop" {
         {
           name  = "NODE_ENV"
           value = var.node_env
+        },
+        {
+          name  = "NODE_CONFIG"
+          value = jsonencode({ challenges = { safetyMode = var.safety_mode } })
         }
       ]
       mountPoints = [
