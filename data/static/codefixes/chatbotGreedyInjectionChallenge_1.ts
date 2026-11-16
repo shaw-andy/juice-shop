@@ -43,14 +43,15 @@ const chatTools = {
             { description: { [Op.like]: `%${query}%` } }
           ]
         },
-        attributes: ['id', 'name', 'description', 'price', 'image']
+        attributes: ['id', 'name', 'description', 'price', 'image'],
+        limit: maxProductSearchResults
       })
       return products.map(p => ({
         id: p.id,
-        name: p.name,
-        description: p.description,
+        name: p.name?.slice(0, maxProductFieldLength),
+        description: p.description?.slice(0, maxProductFieldLength),
         price: p.price,
-        image: p.image
+        image: p.image?.slice(0, maxProductFieldLength)
       }))
     }
   }),
