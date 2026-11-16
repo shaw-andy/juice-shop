@@ -544,15 +544,15 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
           if (description?.includes('<em>(This challenge is <strong>')) {
             const warning = description.substring(description.indexOf(' <em>(This challenge is <strong>'))
             description = description.substring(0, description.indexOf(' <em>(This challenge is <strong>'))
-            context.instance[i].description = req.__(description) + req.__(warning)
+            context.instance[i].description = utils.lookupTranslation(req, description) + utils.lookupTranslation(req, warning)
           } else {
-            context.instance[i].description = req.__(description)
+            context.instance[i].description = utils.lookupTranslation(req, description)
           }
         }
         return context.continue
       })
       resource.read.send.before((req: Request, res: Response, context: { instance: { description: string, hint: string }, continue: any }) => {
-        context.instance.description = req.__(context.instance.description)
+        context.instance.description = utils.lookupTranslation(req, context.instance.description)
         return context.continue
       })
     }
@@ -561,12 +561,12 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
     if (name === 'SecurityQuestion') {
       resource.list.fetch.after((req: Request, res: Response, context: { instance: string | any[], continue: any }) => {
         for (let i = 0; i < context.instance.length; i++) {
-          context.instance[i].question = req.__(context.instance[i].question)
+          context.instance[i].question = utils.lookupTranslation(req, context.instance[i].question)
         }
         return context.continue
       })
       resource.read.send.before((req: Request, res: Response, context: { instance: { question: string }, continue: any }) => {
-        context.instance.question = req.__(context.instance.question)
+        context.instance.question = utils.lookupTranslation(req, context.instance.question)
         return context.continue
       })
     }
@@ -575,12 +575,12 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
     if (name === 'Hint') {
       resource.list.fetch.after((req: Request, res: Response, context: { instance: string | any[], continue: any }) => {
         for (let i = 0; i < context.instance.length; i++) {
-          context.instance[i].text = req.__(context.instance[i].text)
+          context.instance[i].text = utils.lookupTranslation(req, context.instance[i].text)
         }
         return context.continue
       })
       resource.read.send.before((req: Request, res: Response, context: { instance: { text: string }, continue: any }) => {
-        context.instance.text = req.__(context.instance.text)
+        context.instance.text = utils.lookupTranslation(req, context.instance.text)
         return context.continue
       })
     }
@@ -589,14 +589,14 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
     if (name === 'Product') {
       resource.list.fetch.after((req: Request, res: Response, context: { instance: any[], continue: any }) => {
         for (let i = 0; i < context.instance.length; i++) {
-          context.instance[i].name = req.__(context.instance[i].name)
-          context.instance[i].description = req.__(context.instance[i].description)
+          context.instance[i].name = utils.lookupTranslation(req, context.instance[i].name)
+          context.instance[i].description = utils.lookupTranslation(req, context.instance[i].description)
         }
         return context.continue
       })
       resource.read.send.before((req: Request, res: Response, context: { instance: { name: string, description: string }, continue: any }) => {
-        context.instance.name = req.__(context.instance.name)
-        context.instance.description = req.__(context.instance.description)
+        context.instance.name = utils.lookupTranslation(req, context.instance.name)
+        context.instance.description = utils.lookupTranslation(req, context.instance.description)
         return context.continue
       })
     }
