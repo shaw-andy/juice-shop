@@ -7,6 +7,7 @@ import { environment } from '../../environments/environment'
 import { Injectable, inject } from '@angular/core'
 import { HttpClient } from '@angular/common/http'
 import { catchError, map } from 'rxjs/operators'
+import { pathSegment } from './path-segment'
 
 @Injectable({
   providedIn: 'root'
@@ -23,7 +24,7 @@ export class PaymentService {
 
   getById (id) {
 
-    return this.http.get(`${this.host}/${id}`).pipe(map((response: any) => response.data), catchError((err: Error) => { throw err }))
+    return this.http.get(`${this.host}/${pathSegment(id)}`).pipe(map((response: any) => response.data), catchError((err: Error) => { throw err }))
   }
 
   save (params) {
@@ -31,6 +32,6 @@ export class PaymentService {
   }
 
   del (id: number) {
-    return this.http.delete(`${this.host}/${id}`).pipe(map((response: any) => response.data), catchError((err) => { throw err }))
+    return this.http.delete(`${this.host}/${pathSegment(id)}`).pipe(map((response: any) => response.data), catchError((err) => { throw err }))
   }
 }

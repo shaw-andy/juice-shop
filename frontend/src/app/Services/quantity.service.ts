@@ -7,6 +7,7 @@ import { environment } from '../../environments/environment'
 import { Injectable, inject } from '@angular/core'
 import { HttpClient } from '@angular/common/http'
 import { catchError, map } from 'rxjs/operators'
+import { pathSegment } from './path-segment'
 
 @Injectable({
   providedIn: 'root'
@@ -22,6 +23,6 @@ export class QuantityService {
   }
 
   put (id: number, params) {
-    return this.http.put(`${this.host}/${id}`, params).pipe(map((response: any) => response.data), catchError((error) => { throw error }))
+    return this.http.put(`${this.host}/${pathSegment(id)}`, params).pipe(map((response: any) => response.data), catchError((error) => { throw error }))
   }
 }

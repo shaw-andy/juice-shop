@@ -7,6 +7,7 @@ import { environment } from '../../environments/environment'
 import { Injectable, inject } from '@angular/core'
 import { HttpClient } from '@angular/common/http'
 import { catchError, map } from 'rxjs/operators'
+import { pathSegment } from './path-segment'
 
 @Injectable({
   providedIn: 'root'
@@ -23,7 +24,7 @@ export class AddressService {
 
   getById (id) {
 
-    return this.http.get(`${this.host}/${id}`).pipe(map((response: any) => response.data), catchError((err: Error) => { throw err }))
+    return this.http.get(`${this.host}/${pathSegment(id)}`).pipe(map((response: any) => response.data), catchError((err: Error) => { throw err }))
   }
 
   save (params) {
@@ -32,10 +33,10 @@ export class AddressService {
 
   put (id, params) {
 
-    return this.http.put(`${this.host}/${id}`, params).pipe(map((response: any) => response.data), catchError((err) => { throw err }))
+    return this.http.put(`${this.host}/${pathSegment(id)}`, params).pipe(map((response: any) => response.data), catchError((err) => { throw err }))
   }
 
   del (id: number) {
-    return this.http.delete(`${this.host}/${id}`).pipe(map((response: any) => response.data), catchError((err) => { throw err }))
+    return this.http.delete(`${this.host}/${pathSegment(id)}`).pipe(map((response: any) => response.data), catchError((err) => { throw err }))
   }
 }

@@ -7,6 +7,7 @@ import { environment } from '../../environments/environment'
 import { Injectable, inject } from '@angular/core'
 import { HttpClient } from '@angular/common/http'
 import { catchError, map } from 'rxjs/operators'
+import { pathSegment } from './path-segment'
 import { Subject } from 'rxjs'
 
 interface Passwords {
@@ -31,7 +32,7 @@ export class UserService {
   }
 
   get (id: number) {
-    return this.http.get(`${this.host}/${id}`).pipe(map((response: any) => response.data), catchError((err) => { throw err }))
+    return this.http.get(`${this.host}/${pathSegment(id)}`).pipe(map((response: any) => response.data), catchError((err) => { throw err }))
   }
 
   save (params: any) {

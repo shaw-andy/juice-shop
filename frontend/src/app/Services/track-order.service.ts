@@ -7,6 +7,7 @@ import { Injectable, inject } from '@angular/core'
 import { HttpClient } from '@angular/common/http'
 import { environment } from '../../environments/environment'
 import { catchError, map } from 'rxjs/operators'
+import { pathSegment } from './path-segment'
 
 @Injectable({
   providedIn: 'root'
@@ -18,7 +19,6 @@ export class TrackOrderService {
   private readonly host = this.hostServer + '/rest/track-order'
 
   find (params: string) {
-    params = encodeURIComponent(params)
-    return this.http.get(`${this.host}/${params}`).pipe(map((response: any) => response), catchError((error) => { throw error }))
+    return this.http.get(`${this.host}/${pathSegment(params)}`).pipe(map((response: any) => response), catchError((error) => { throw error }))
   }
 }
