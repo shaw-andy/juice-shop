@@ -96,13 +96,13 @@ describe('ForgotPasswordComponent', () => {
         expect(component.passwordControl.valid).toBeFalsy()
     })
 
-    it('should have a password length of at least five characters', () => {
+    it('should have a password length of at least eight characters', () => {
         vi.useFakeTimers()
         component.emailControl.setValue('a@a')
         vi.advanceTimersByTime(component.timeoutDuration)
-        component.passwordControl.setValue('aaa')
+        component.passwordControl.setValue('aaaaaaa')
         expect(component.passwordControl.valid).toBeFalsy()
-        component.passwordControl.setValue('aaaaa')
+        component.passwordControl.setValue('aaaaaaaa')
         expect(component.passwordControl.valid).toBe(true)
         vi.useRealTimers()
     })

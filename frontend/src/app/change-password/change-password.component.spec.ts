@@ -72,8 +72,8 @@ describe('ChangePasswordComponent', () => {
     it('should be compulsory to repeat new password', () => {
         component.repeatNewPasswordControl.setValue('')
         expect(component.passwordControl.valid).toBeFalsy()
-        component.newPasswordControl.setValue('passed')
-        component.repeatNewPasswordControl.setValue('passed')
+        component.newPasswordControl.setValue('passed again')
+        component.repeatNewPasswordControl.setValue('passed again')
         expect(component.repeatNewPasswordControl.valid).toBe(true)
     })
 

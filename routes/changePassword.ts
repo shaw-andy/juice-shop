@@ -8,6 +8,7 @@ import * as challengeUtils from '../lib/challengeUtils'
 import { challenges } from '../data/datacache'
 import { UserModel } from '../models/user'
 import * as security from '../lib/insecurity'
+import { isPasswordTooShort, passwordTooShortMessage } from '../lib/passwordPolicy'
 
 export function changePassword () {
   return async ({ query, headers, connection }: Request, res: Response, next: NextFunction) => {
@@ -33,6 +34,11 @@ export function changePassword () {
     const loggedInUser = security.authenticatedUsers.get(token)
     if (!loggedInUser) {
       next(new Error('Blocked illegal activity by ' + connection.remoteAddress))
+      return
+    }
+
+    if (isPasswordTooShort(newPasswordInString)) {
+      res.status(400).send(passwordTooShortMessage)
       return
     }
 
