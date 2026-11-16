@@ -305,6 +305,31 @@ void describe('insecurity', () => {
       assert.equal(statusSet, 403)
     })
 
+    void it('isAdmin should allow next() for admin role', () => {
+      const user = { data: { role: 'admin' } }
+      const token = security.authorize(user)
+      const req = { headers: { authorization: `Bearer ${token}` } } as any
+      let nextCalled = false
+      const next = () => { nextCalled = true }
+      security.isAdmin()(req, {} as any, next)
+      assert.ok(nextCalled)
+    })
+
+    void it('isAdmin should return 403 for other roles', () => {
+      const user = { data: { role: 'customer' } }
+      const token = security.authorize(user)
+      const req = { headers: { authorization: `Bearer ${token}` } } as any
+      let statusSet = 0
+      let nextCalled = false
+      const res = {
+        status: (s: number) => { statusSet = s; return res },
+        json: () => {}
+      } as any
+      security.isAdmin()(req, res, () => { nextCalled = true })
+      assert.equal(statusSet, 403)
+      assert.equal(nextCalled, false)
+    })
+
     void it('appendUserId should append user id to req.body', () => {
       const token = '33333'
       const user = { data: { id: 3 } } as any

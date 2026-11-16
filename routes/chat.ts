@@ -39,6 +39,9 @@ export function summarizeLlmError (error: unknown): string {
 const botName = config.get<string>('application.chatBot.name')
 const appName = config.get<string>('application.name')
 
+const maxProductSearchResults = 5
+const maxProductFieldLength = 1000
+
 export async function getUserId (req: Request): Promise<number | undefined> {
   const token = utils.jwtFrom(req)
   if (!token) return undefined
@@ -127,14 +130,15 @@ export function chat () {
                 { description: { [Op.like]: `%${query}%` } }
               ]
             },
-            attributes: ['id', 'name', 'description', 'price', 'image']
+            attributes: ['id', 'name', 'description', 'price', 'image'],
+            limit: maxProductSearchResults
           })
           return products.map(p => ({
             id: p.id,
-            name: p.name,
-            description: p.description,
+            name: p.name?.slice(0, maxProductFieldLength),
+            description: p.description?.slice(0, maxProductFieldLength),
             price: p.price,
-            image: p.image
+            image: p.image?.slice(0, maxProductFieldLength)
           }))
         }
       }),

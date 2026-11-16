@@ -18,6 +18,7 @@ const tamperingProductId = config.get<ProductConfig[]>('products').findIndex((pr
 
 let app: Express
 const authHeader = { Authorization: 'Bearer ' + security.authorize(), 'content-type': 'application/json' }
+const adminAuthHeader = { Authorization: 'Bearer ' + security.authorize({ data: { role: security.roles.admin } }), 'content-type': 'application/json' }
 const jsonHeader = { 'content-type': 'application/json' }
 
 before(async () => {
@@ -58,7 +59,7 @@ void describe('/api/Products', () => {
     void it('POST new product does not filter XSS attacks', async () => {
       const res = await request(app)
         .post('/api/Products')
-        .set(authHeader)
+        .set(adminAuthHeader)
         .send({
           name: 'XSS Juice (42ml)',
           description: '<iframe src="javascript:alert(`xss`)">',
