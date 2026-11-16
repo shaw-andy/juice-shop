@@ -319,6 +319,7 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
     directory: path.resolve('i18n'),
     cookie: 'language',
     defaultLocale: 'en',
+    updateFiles: false,
     autoReload: process.env.NODE_ENV !== 'test'
   })
   app.use(i18n.init)
