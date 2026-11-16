@@ -13,13 +13,19 @@ import { UserModel } from '../models/user'
 import * as utils from '../lib/utils'
 import logger from '../lib/logger'
 
+const MAX_IMAGE_URL_LENGTH = 2048
+
 export function profileImageUrlUpload () {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (req.body.imageUrl !== undefined) {
-      const url = req.body.imageUrl
-      if (url.match(/(.)*solve\/challenges\/server-side(.)*/) !== null) req.app.locals.abused_ssrf_bug = true
       const loggedInUser = security.authenticatedUsers.get(req.cookies.token)
       if (loggedInUser) {
+        const url = req.body.imageUrl
+        if (typeof url !== 'string' || url.length > MAX_IMAGE_URL_LENGTH) {
+          res.status(400).send('Invalid image URL')
+          return
+        }
+        if (url.includes('solve/challenges/server-side')) req.app.locals.abused_ssrf_bug = true
         try {
           const response = await fetch(url)
           if (!response.ok || !response.body) {
