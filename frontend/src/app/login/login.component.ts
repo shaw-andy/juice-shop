@@ -23,6 +23,7 @@ import { TranslateModule } from '@ngx-translate/core'
 import { MatFormFieldModule, MatLabel, MatError, MatSuffix } from '@angular/material/form-field'
 import { of } from 'rxjs'
 import { catchError } from 'rxjs/operators'
+import { clearUserScopedStorage, TOTP_TMP_TOKEN_KEY } from '../shared/user-storage'
 
 import { MatCardModule } from '@angular/material/card'
 
@@ -118,11 +119,12 @@ export class LoginComponent implements OnInit {
       },
       error: ({ error }) => {
         if (error.status && error.data && error.status === 'totp_token_required') {
-          localStorage.setItem('totp_tmp_token', error.data.tmpToken)
+          localStorage.setItem(TOTP_TMP_TOKEN_KEY, error.data.tmpToken)
           this.ngZone.run(async () => await this.router.navigate(['/2fa/enter']))
           return
         }
         localStorage.removeItem('token')
+        clearUserScopedStorage()
         this.cookieService.remove('token')
         sessionStorage.removeItem('bid')
         this.error = error

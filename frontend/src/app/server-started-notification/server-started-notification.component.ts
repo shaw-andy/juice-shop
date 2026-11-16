@@ -11,6 +11,7 @@ import { SocketIoService } from '../Services/socket-io.service'
 import { MatIconModule } from '@angular/material/icon'
 import { MatButtonModule } from '@angular/material/button'
 import { MatCardModule, MatCardContent } from '@angular/material/card'
+import { clearUserScopedStorage } from '../shared/user-storage'
 
 interface HackingProgress {
   autoRestoreMessage: string | null
@@ -100,6 +101,7 @@ export class ServerStartedNotificationComponent implements OnInit {
     sessionStorage.removeItem('bid')
     sessionStorage.removeItem('itemTotal')
     localStorage.removeItem('token')
+    clearUserScopedStorage()
     localStorage.removeItem('displayedDifficulties')
     localStorage.removeItem('showSolvedChallenges')
     localStorage.removeItem('showDisabledChallenges')

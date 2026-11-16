@@ -6,7 +6,7 @@
 import { Injectable } from '@angular/core'
 import { type StoredConversation } from '../chatbot/chat.model'
 
-const STORAGE_KEY = 'juiceshop_chat_conversations'
+export const CHAT_CONVERSATIONS_STORAGE_KEY = 'juiceshop_chat_conversations'
 
 @Injectable({
   providedIn: 'root'
@@ -23,7 +23,7 @@ export class ConversationStorageService {
   }
 
   getAll (): StoredConversation[] {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(CHAT_CONVERSATIONS_STORAGE_KEY)
     if (!raw) return []
     const conversations: StoredConversation[] = JSON.parse(raw)
     return conversations.sort((a, b) => b.updatedAt - a.updatedAt)
@@ -41,15 +41,15 @@ export class ConversationStorageService {
     } else {
       all.push(conversation)
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(all))
+    localStorage.setItem(CHAT_CONVERSATIONS_STORAGE_KEY, JSON.stringify(all))
   }
 
   delete (id: string): void {
     const all = this.getAll().filter(c => c.id !== id)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(all))
+    localStorage.setItem(CHAT_CONVERSATIONS_STORAGE_KEY, JSON.stringify(all))
   }
 
   deleteAll (): void {
-    localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(CHAT_CONVERSATIONS_STORAGE_KEY)
   }
 }

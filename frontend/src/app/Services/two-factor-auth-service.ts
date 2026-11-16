@@ -8,6 +8,7 @@ import { HttpClient } from '@angular/common/http'
 import { catchError, map } from 'rxjs/operators'
 import { environment } from '../../environments/environment'
 import { type Observable } from 'rxjs'
+import { TOTP_TMP_TOKEN_KEY } from '../shared/user-storage'
 
 interface TwoFactorVerifyResponse {
   authentication: AuthenticationPayload
@@ -35,7 +36,7 @@ export class TwoFactorAuthService {
 
   verify (totpToken: string): Observable<AuthenticationPayload> {
     return this.http.post<TwoFactorVerifyResponse>(`${environment.hostServer}/rest/2fa/verify`, {
-      tmpToken: localStorage.getItem('totp_tmp_token'),
+      tmpToken: localStorage.getItem(TOTP_TMP_TOKEN_KEY),
       totpToken
     }).pipe(map((response: TwoFactorVerifyResponse) => response.authentication), catchError((error) => { throw error }))
   }
