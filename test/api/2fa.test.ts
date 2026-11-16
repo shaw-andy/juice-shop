@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 import request from 'supertest'
 import config from 'config'
 import jwt from 'jsonwebtoken'
-import { generateSync } from 'otplib'
+import { generateSecret, generateSync } from 'otplib'
 import type { Express } from 'express'
 import * as security from '../../lib/insecurity'
 import { createTestApp } from './helpers/setup'
@@ -34,19 +34,22 @@ before(async () => {
 
 void describe('/rest/2fa/verify', () => {
   void it('POST should return a valid authentication when a valid tmp token is passed', async () => {
-    const tmpTokenWurstbrot = security.authorize({
-      userId: 10,
-      type: 'password_valid_needs_second_factor_token'
-    })
+    const email = 'tmp-token-user@bar.com'
+    const password = 'PLACEHOLDER-password'
+    const totpSecret = generateSecret()
+    await register(app, { email, password, totpSecret })
 
-    const totpToken = generateSync({ secret: 'IFTXE3SPOEYVURT2MRYGI52TKJ4HC3KH' })
+    const loginRes = await request(app)
+      .post('/rest/user/login')
+      .set(jsonHeader)
+      .send({ email, password })
 
     const res = await request(app)
       .post('/rest/2fa/verify')
       .set(jsonHeader)
       .send({
-        tmpToken: tmpTokenWurstbrot,
-        totpToken
+        tmpToken: loginRes.body.data.tmpToken,
+        totpToken: generateSync({ secret: totpSecret })
       })
 
     assert.equal(res.status, 200)
@@ -54,7 +57,7 @@ void describe('/rest/2fa/verify', () => {
     assert.equal(typeof res.body.authentication.token, 'string')
     assert.equal(typeof res.body.authentication.umail, 'string')
     assert.equal(typeof res.body.authentication.bid, 'number')
-    assert.equal(res.body.authentication.umail, `wurstbrot@${config.get<string>('application.domain')}`)
+    assert.equal(res.body.authentication.umail, email)
   })
 
   void it('POST should fail if a invalid totp token is used', async () => {
