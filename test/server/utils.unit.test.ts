@@ -125,6 +125,7 @@ void describe('utils', () => {
   void describe('getChallengeEnablementStatus', () => {
     const defaultIsEnvironmentFunctions = {
       isDocker: () => false,
+      isContainer: () => false,
       isHeroku: () => false,
       isWindows: () => false
     }
@@ -165,6 +166,22 @@ void describe('utils', () => {
         assert.deepEqual(utils.getChallengeEnablementStatus(challenge, 'disabled', isEnvironmentFunctions), { enabled: true, disabledBecause: null })
       })
     }
+
+    for (const disabledEnv of ['Docker;Heroku', 'Windows']) {
+      void it(`safetyMode: 'auto': challenge with disabledOnEnv ${disabledEnv} should be marked as disabled by Safety Mode in a non-Docker container runtime`, () => {
+        const challenge: ChallengeModel = { disabledEnv } as unknown as ChallengeModel
+
+        const isEnvironmentFunctions = { ...defaultIsEnvironmentFunctions, isContainer: () => true }
+        assert.deepEqual(utils.getChallengeEnablementStatus(challenge, 'auto', isEnvironmentFunctions), { enabled: false, disabledBecause: 'Safety Mode' })
+      })
+    }
+
+    void it('safetyMode: \'disabled\': challenge with disabledOnEnv Docker should be marked as enabled in a non-Docker container runtime', () => {
+      const challenge: ChallengeModel = { disabledEnv: 'Docker;Heroku' } as unknown as ChallengeModel
+
+      const isEnvironmentFunctions = { ...defaultIsEnvironmentFunctions, isContainer: () => true }
+      assert.deepEqual(utils.getChallengeEnablementStatus(challenge, 'disabled', isEnvironmentFunctions), { enabled: true, disabledBecause: null })
+    })
   })
 
   void describe('toISO8601', () => {

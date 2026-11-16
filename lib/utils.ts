@@ -14,8 +14,10 @@ import type { Challenge } from '@juice-shop/data/types'
 
 import isHeroku from './is-heroku'
 import isDocker from './is-docker'
+import isContainer from './is-container'
 import isWindows from './is-windows'
 export { default as isDocker } from './is-docker'
+export { default as isContainer } from './is-container'
 export { default as isWindows } from './is-windows'
 
 const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
@@ -146,9 +148,10 @@ export function getChallengeEnablementStatus (challenge: Challenge,
   safetyModeSetting: SafetyModeSetting = config.get<SafetyModeSetting>('challenges.safetyMode'),
   isEnvironmentFunctions: {
     isDocker: isEnvironmentFunction
+    isContainer: isEnvironmentFunction
     isHeroku: isEnvironmentFunction
     isWindows: isEnvironmentFunction
-  } = { isDocker, isHeroku, isWindows }): ChallengeEnablementStatus {
+  } = { isDocker, isContainer, isHeroku, isWindows }): ChallengeEnablementStatus {
   if (!challenge?.disabledEnv) {
     return { enabled: true, disabledBecause: null }
   }
@@ -166,7 +169,7 @@ export function getChallengeEnablementStatus (challenge: Challenge,
   if (challenge.disabledEnv?.includes('Windows') && isEnvironmentFunctions.isWindows()) {
     return { enabled: false, disabledBecause: 'Windows' }
   }
-  if (challenge.disabledEnv && safetyModeSetting === 'enabled') {
+  if (challenge.disabledEnv && (safetyModeSetting === 'enabled' || isEnvironmentFunctions.isContainer())) {
     return { enabled: false, disabledBecause: 'Safety Mode' }
   }
 
