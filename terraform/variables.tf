@@ -52,6 +52,17 @@ variable "node_env" {
   default     = "production"
 }
 
+variable "safety_mode" {
+  description = "Juice Shop challenges.safetyMode; keep \"enabled\" for any internet-facing deployment"
+  type        = string
+  default     = "enabled"
+
+  validation {
+    condition     = contains(["enabled", "auto", "disabled"], var.safety_mode)
+    error_message = "safety_mode must be one of: enabled, auto, disabled."
+  }
+}
+
 variable "ecr_repository_url" {
   description = "ECR repository URL for the Docker image"
   type        = string

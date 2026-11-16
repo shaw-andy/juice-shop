@@ -138,6 +138,11 @@ async function createChallenges () {
     }
   }
 
+  const disabledChallengeCount = challengeRecords.filter(({ disabledEnv }) => disabledEnv).length
+  const disabledBecause = [...new Set(challengeRecords.map(({ disabledEnv }) => disabledEnv).filter(Boolean))].join(', ')
+  const safetyMode = config.get<string>('challenges.safetyMode')
+  logger.info(`Safety mode is ${safetyMode}${safetyMode === 'auto' && utils.isContainer() ? ' (container runtime detected)' : ''}: ${disabledChallengeCount} potentially harmful challenges are disabled${disabledBecause ? ` (${disabledBecause})` : ''}`)
+
   try {
     const createdChallenges = await ChallengeModel.bulkCreate(challengeRecords)
     for (const challenge of createdChallenges) {
