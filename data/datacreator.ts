@@ -202,7 +202,7 @@ async function createUsers () {
         })
         datacache.users[key] = user
         if (securityQuestion != null) await createSecurityAnswer(user.id, securityQuestion.id, securityQuestion.answer)
-        if (feedback != null) await createFeedback(user.id, feedback.comment, feedback.rating, user.email)
+        if (feedback != null) await createFeedback(user.id, feedback.comment, feedback.rating)
         if (deletedFlag) await deleteUser(user.id)
         if (address != null) await createAddresses(user.id, address)
         if (card != null) await createCards(user.id, card)
@@ -574,8 +574,8 @@ async function createAnonymousFeedback () {
   )
 }
 
-async function createFeedback (UserId: number | null, comment: string, rating: number, author?: string) {
-  const authoredComment = author ? `${comment} (***${author.slice(3)})` : `${comment} (anonymous)`
+async function createFeedback (UserId: number | null, comment: string, rating: number) {
+  const authoredComment = `${comment} (anonymous)`
   return await FeedbackModel.create({ UserId, comment: authoredComment, rating }).catch((err: unknown) => {
     logger.error(`Could not insert Feedback ${authoredComment} mapped to UserId ${UserId}: ${utils.getErrorMessage(err)}`)
   })

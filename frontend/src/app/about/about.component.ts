@@ -21,6 +21,13 @@ import { MatCardModule } from '@angular/material/card'
 
 library.add(faFacebook, faTwitter, faSlack, faReddit, faNewspaper, faStar, fasStar, faPalette, faMastodon, faBold)
 
+const emailAddressPattern = /(?:@|＠|%40|&#0*64;|&#x0*40;|&commat;)[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)*\.\p{L}{2,}/iu
+
+function redactEmailAddresses (text: string) {
+  if (typeof text !== 'string') return text
+  return text.replace(/[^\s"'`<>()[\]{},:]+/gu, (token) => emailAddressPattern.test(token) ? '***' : token)
+}
+
 @Component({
   changeDetection: ChangeDetectionStrategy.Eager,
   selector: 'app-about',
@@ -115,7 +122,7 @@ export class AboutComponent implements OnInit {
         for (let i = 0; i < feedbacks.length; i++) {
 
           feedbacks[i].comment = `<figcaption><p class="feedback-comment">${
-            feedbacks[i].comment
+            redactEmailAddresses(feedbacks[i].comment)
           }</p><div class="feedback-stars">(${this.stars[feedbacks[i].rating]})</div></figcaption>`
           feedbacks[i].comment = this.sanitizer.bypassSecurityTrustHtml(
             feedbacks[i].comment

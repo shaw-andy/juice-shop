@@ -239,6 +239,13 @@ export function diceCoefficient (s1: string, s2: string, n = 2): number {
   return (2.0 * intersectionSize) / (s1.length + s2.length - 2 * (n - 1))
 }
 
+// Requires a letter TLD so package specifiers like "express-jwt@0.1.3" survive, which several challenges look for in feedback
+const emailAddressPattern = /(?:@|＠|%40|&#0*64;|&#x0*40;|&commat;)[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)*\.\p{L}{2,}/iu
+export const redactEmailAddresses = (text: string) => {
+  if (typeof text !== 'string') return text
+  return text.replace(/[^\s"'`<>()[\]{},:]+/gu, (token) => emailAddressPattern.test(token) ? '***' : token)
+}
+
 /**
  * Wrapper for asynchronous Express route handlers to ensure any rejected promises are caught and passed to the next() function.
  * TODO: Revisit the need for this wrapper once the project is migrated to Express 5 which supports async handlers natively.
