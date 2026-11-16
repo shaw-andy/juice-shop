@@ -4,6 +4,7 @@
  */
 
 import config from 'config'
+import crypto from 'node:crypto'
 import { type Request, type Response } from 'express'
 import { BasketModel } from '../models/basket'
 import { UserModel } from '../models/user'
@@ -12,12 +13,46 @@ import * as utils from '../lib/utils'
 import { challenges } from '../data/datacache'
 import { generateSecret, verifySync } from 'otplib'
 import * as security from '../lib/insecurity'
+import { resetFailedLogins } from '../lib/loginThrottle'
+
+// Must stay unknown to clients, so it cannot come from the hardcoded keys in lib/insecurity
+const passwordProofKey = crypto.randomBytes(32)
+
+function passwordProof (userId: number, nonce: string) {
+  return crypto.createHmac('sha256', passwordProofKey).update(`${userId}:${nonce}`).digest('hex')
+}
+
+function hasPasswordProof (userId: unknown, nonce: unknown, proof: unknown) {
+  if (typeof userId !== 'number' || typeof nonce !== 'string' || typeof proof !== 'string') {
+    return false
+  }
+  const expected = Buffer.from(passwordProof(userId, nonce))
+  const actual = Buffer.from(proof)
+  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected)
+}
+
+// Wrong passwords for 2FA accounts get a token too, so the login response does not confirm a correct password
+export function secondFactorRequired (userId: number, passwordVerified: boolean) {
+  const nonce = crypto.randomBytes(16).toString('hex')
+  const proof = passwordVerified ? passwordProof(userId, nonce) : crypto.randomBytes(32).toString('hex')
+  return {
+    status: 'totp_token_required',
+    data: {
+      tmpToken: security.authorize({
+        userId,
+        type: 'password_valid_needs_second_factor_token',
+        nonce,
+        proof
+      })
+    }
+  }
+}
 
 export async function verify (req: Request, res: Response) {
   const { tmpToken, totpToken } = req.body
 
   try {
-    const { userId, type } = security.verify(tmpToken) && security.decode(tmpToken)
+    const { userId, type, nonce, proof } = security.verify(tmpToken) && security.decode(tmpToken)
 
     if (type !== 'password_valid_needs_second_factor_token') {
       throw new Error('Invalid token type')
@@ -32,9 +67,10 @@ export async function verify (req: Request, res: Response) {
 
     const plainUser = utils.queryResultToJson(user)
 
-    if (!isValid) {
+    if (!isValid || !hasPasswordProof(userId, nonce, proof)) {
       return res.status(401).send()
     }
+    await resetFailedLogins(user.email)
     challengeUtils.solveIf(challenges.twoFactorAuthUnsafeSecretStorageChallenge, () => { return user.email === 'wurstbrot@' + config.get<string>('application.domain') })
 
     const [basket] = await BasketModel.findOrCreate({ where: { UserId: userId } })

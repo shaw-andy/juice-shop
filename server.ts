@@ -54,6 +54,8 @@ import logger from './lib/logger'
 import * as utils from './lib/utils'
 import * as antiCheat from './lib/antiCheat'
 import * as security from './lib/insecurity'
+import { loginThrottle } from './lib/loginThrottle'
+import { isPasswordTooShort, passwordTooShortMessage } from './lib/passwordPolicy'
 import validateConfig from './lib/startup/validateConfig'
 import cleanupFtpFolder from './lib/startup/cleanupFtpFolder'
 import customizeEasterEgg from './lib/startup/customizeEasterEgg' // vuln-code-snippet hide-line
@@ -495,6 +497,18 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   /* Verifying DB related challenges can be postponed until the next request for challenges is coming via finale */
   app.use(verify.databaseRelatedChallenges())
 
+  /* User registration: password policy check after the challenge verifications and before finale takes over */
+  app.post('/api/Users', (req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) { // already rejected by the empty email/password check, which still calls next()
+      return
+    }
+    if (isPasswordTooShort(req.body?.password)) {
+      res.status(400).send(passwordTooShortMessage)
+      return
+    }
+    next()
+  })
+
   // vuln-code-snippet start registerAdminChallenge
   /* Generated API endpoints */
   finale.initialize({ app, sequelize: seq })
@@ -612,7 +626,7 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   }
 
   /* Custom Restful API */
-  app.post('/rest/user/login', login())
+  app.post('/rest/user/login', loginThrottle, login())
   app.get('/rest/user/change-password', utils.asyncHandler(changePassword()))
   app.post('/rest/user/reset-password', utils.asyncHandler(resetPassword()))
   app.get('/rest/user/security-question', utils.asyncHandler(securityQuestion()))

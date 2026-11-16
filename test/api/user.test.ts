@@ -77,7 +77,7 @@ void describe('/api/Users', () => {
     assert.equal(res.body.data.role, 'admin')
   })
 
-  void it('POST new blank user', async () => {
+  void it('POST new blank user is rejected', async () => {
     const res = await request(app)
       .post('/api/Users')
       .set(jsonHeader)
@@ -85,28 +85,23 @@ void describe('/api/Users', () => {
         email: ' ',
         password: ' '
       })
-    assert.equal(res.status, 201)
-    assert.ok(res.headers['content-type']?.includes('application/json'))
-    assert.equal(typeof res.body.data.id, 'number')
-    assert.equal(typeof res.body.data.createdAt, 'string')
-    assert.equal(typeof res.body.data.updatedAt, 'string')
-    assert.equal(res.body.data.password, undefined)
+    assert.equal(res.status, 400)
   })
 
-  void it('POST same blank user in database', async () => {
+  void it('POST same user in database', async () => {
     await request(app)
       .post('/api/Users')
       .set(jsonHeader)
       .send({
         email: 'blank-duplicate@test.test',
-        password: ' '
+        password: 'PLACEHOLDER-password'
       })
     const res = await request(app)
       .post('/api/Users')
       .set(jsonHeader)
       .send({
         email: 'blank-duplicate@test.test',
-        password: ' '
+        password: 'PLACEHOLDER-password'
       })
     assert.equal(res.status, 400)
     assert.ok(res.headers['content-type']?.includes('application/json'))
@@ -118,7 +113,7 @@ void describe('/api/Users', () => {
       .set(jsonHeader)
       .send({
         email: ' test@gmail.com',
-        password: ' test'
+        password: ' PLACEHOLDER-password'
       })
     assert.equal(res.status, 201)
     assert.ok(res.headers['content-type']?.includes('application/json'))

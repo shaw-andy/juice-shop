@@ -19,19 +19,11 @@ export function login () {
       .then((authenticatedUser) => {
         const user = utils.queryResultToJson(authenticatedUser)
         if (user.data?.id && user.data.totpSecret !== '') {
-          res.status(401).json({
-            status: 'totp_token_required',
-            data: {
-              tmpToken: security.authorize({
-                userId: user.data.id,
-                type: 'password_valid_needs_second_factor_token'
-              })
-            }
-          })
+          res.status(401).json(secondFactorRequired(user.data.id, true))
         } else if (user.data?.id) {
           afterLogin(user.data, res, next)
         } else {
-          res.status(401).send(res.__('Invalid email or password.'))
+          return rejectInvalidLogin(req, res)
         }
       }).catch((error: Error) => {
         next(error)

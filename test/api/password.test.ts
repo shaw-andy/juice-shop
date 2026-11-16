@@ -32,7 +32,7 @@ void describe('/rest/user/change-password', () => {
     const { token } = await login(app, { email: 'kuni@be.rt', password: 'kunigunde' })
 
     const res = await request(app)
-      .get('/rest/user/change-password?current=kunigunde&new=foo&repeat=foo')
+      .get('/rest/user/change-password?current=kunigunde&new=foofoofoo&repeat=foofoofoo')
       .set({ Authorization: 'Bearer ' + token })
 
     assert.equal(res.status, 200)
@@ -45,7 +45,7 @@ void describe('/rest/user/change-password', () => {
     })
 
     const res = await request(app)
-      .get('/rest/user/change-password?current=definetely_wrong&new=blubb&repeat=blubb')
+      .get('/rest/user/change-password?current=definetely_wrong&new=blubblubb&repeat=blubblubb')
       .set({ Authorization: 'Bearer ' + token })
 
     assert.equal(res.status, 401)
@@ -181,8 +181,8 @@ void describe('/rest/user/reset-password', () => {
       .send({
         email: 'bjoern@' + config.get<string>('application.domain'),
         answer: '25436',
-        new: '12345',
-        repeat: '12345'
+        new: '123456789',
+        repeat: '123456789'
       })
 
     assert.equal(res.status, 401)

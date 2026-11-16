@@ -58,7 +58,7 @@ void describe('/api/SecurityAnswers/:id', () => {
       .set({ 'content-type': 'application/json' })
       .send({
         email: 'new.user@te.st',
-        password: '12345'
+        password: '12345678'
       })
 
     assert.equal(userRes.status, 201)

@@ -57,7 +57,7 @@ export class ChangePasswordComponent {
 
   public newPasswordControl: UntypedFormControl = new UntypedFormControl('', [
     Validators.required,
-    Validators.minLength(5),
+    Validators.minLength(8),
     Validators.maxLength(40)
   ])
 
@@ -65,7 +65,7 @@ export class ChangePasswordComponent {
     '',
     [
       Validators.required,
-      Validators.minLength(5),
+      Validators.minLength(8),
       Validators.maxLength(40),
       matchValidator(this.newPasswordControl)
     ]

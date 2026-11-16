@@ -25,8 +25,8 @@ describe('/#/register', () => {
                 },
                 body: JSON.stringify({
                   email: '<iframe src="javascript:alert(`xss`)">',
-                  password: 'XSSed',
-                  passwordRepeat: 'XSSed',
+                  password: 'XSSed-password',
+                  passwordRepeat: 'XSSed-password',
                   role: 'admin'
                 })
               }

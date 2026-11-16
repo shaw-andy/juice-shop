@@ -12,6 +12,7 @@ import * as challengeUtils from '../lib/challengeUtils'
 import { challenges, users } from '../data/datacache'
 import * as security from '../lib/insecurity'
 import { UserModel } from '../models/user'
+import { isPasswordTooShort, passwordTooShortMessage } from '../lib/passwordPolicy'
 
 export function resetPassword () {
   return async ({ body, connection }: Request, res: Response, next: NextFunction) => {
@@ -29,6 +30,10 @@ export function resetPassword () {
     }
     if (newPassword !== repeatPassword) {
       res.status(401).send(res.__('New and repeated password do not match.'))
+      return
+    }
+    if (isPasswordTooShort(newPassword)) {
+      res.status(400).send(passwordTooShortMessage)
       return
     }
     try {

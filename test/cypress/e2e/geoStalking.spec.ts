@@ -12,8 +12,8 @@ describe('/#/photo-wall', () => {
             cy.get('#email').type(`john@${appDomain}`)
             cy.wait('@securityQuestion')
             cy.get('#securityAnswer').should('not.be.disabled').focus().type(answer)
-            cy.get('#newPassword').focus().type('123456')
-            cy.get('#newPasswordRepeat').focus().type('123456')
+            cy.get('#newPassword').focus().type('12345678')
+            cy.get('#newPasswordRepeat').focus().type('12345678')
             cy.get('#resetButton').click()
 
             cy.expectChallengeSolved({ challenge: 'Meta Geo Stalking' })
@@ -31,8 +31,8 @@ describe('/#/photo-wall', () => {
             cy.get('#email').type(`emma@${appDomain}`)
             cy.wait('@securityQuestion')
             cy.get('#securityAnswer').should('not.be.disabled').focus().type(answer)
-            cy.get('#newPassword').focus().type('123456')
-            cy.get('#newPasswordRepeat').focus().type('123456')
+            cy.get('#newPassword').focus().type('12345678')
+            cy.get('#newPasswordRepeat').focus().type('12345678')
             cy.get('#resetButton').click()
 
             cy.expectChallengeSolved({ challenge: 'Visual Geo Stalking' })

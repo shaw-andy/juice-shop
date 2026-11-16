@@ -13,6 +13,7 @@ import { UserModel } from '../models/user'
 import * as models from '../models/index'
 import { type User } from '../data/types'
 import * as utils from '../lib/utils'
+import { secondFactorRequired } from './2fa'
 
 // vuln-code-snippet start loginAdminChallenge loginBenderChallenge loginJimChallenge
 export function login () {
@@ -35,25 +36,26 @@ export function login () {
       .then((authenticatedUser) => { // vuln-code-snippet neutral-line loginAdminChallenge loginBenderChallenge loginJimChallenge
         const user = utils.queryResultToJson(authenticatedUser)
         if (user.data?.id && user.data.totpSecret !== '') {
-          res.status(401).json({
-            status: 'totp_token_required',
-            data: {
-              tmpToken: security.authorize({
-                userId: user.data.id,
-                type: 'password_valid_needs_second_factor_token'
-              })
-            }
-          })
+          res.status(401).json(secondFactorRequired(user.data.id, true))
         } else if (user.data?.id) {
           afterLogin(user.data, res, next)
         } else {
-          res.status(401).send(res.__('Invalid email or password.'))
+          return rejectInvalidLogin(req, res)
         }
       }).catch((error: Error) => {
         next(error)
       })
   }
   // vuln-code-snippet end loginAdminChallenge loginBenderChallenge loginJimChallenge
+
+  async function rejectInvalidLogin (req: Request, res: Response) {
+    const account = await UserModel.findOne({ where: { email: String(req.body.email || '') } })
+    if (account && account.totpSecret !== '') {
+      res.status(401).json(secondFactorRequired(account.id, false))
+    } else {
+      res.status(401).send(res.__('Invalid email or password.'))
+    }
+  }
 
   function verifyPreLoginChallenges (req: Request) {
     challengeUtils.solveIf(challenges.weakPasswordChallenge, () => { return req.body.email === 'admin@' + config.get<string>('application.domain') && req.body.password === 'admin123' })
