@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core'
 import { environment } from '../../environments/environment'
 import { HttpClient } from '@angular/common/http'
 import { catchError, map } from 'rxjs/operators'
+import { pathSegment } from './path-segment'
 import { type Observable } from 'rxjs'
 
 export interface result {
@@ -26,7 +27,7 @@ export class CodeFixesService {
   private readonly host = this.hostServer + '/snippets/fixes'
 
   get (key: string): Observable<Fixes> {
-    return this.http.get(this.host + `/${key}`).pipe(map((response: Fixes) => response), catchError((error: any) => { throw error }))
+    return this.http.get(this.host + `/${pathSegment(key)}`).pipe(map((response: Fixes) => response), catchError((error: any) => { throw error }))
   }
 
   check (key: string, selectedFix: number): any {

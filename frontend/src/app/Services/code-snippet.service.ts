@@ -7,6 +7,7 @@ import { environment } from '../../environments/environment'
 import { Injectable, inject } from '@angular/core'
 import { HttpClient } from '@angular/common/http'
 import { catchError, map } from 'rxjs/operators'
+import { pathSegment } from './path-segment'
 import { type Observable } from 'rxjs'
 
 export interface CodeSnippet {
@@ -28,6 +29,6 @@ export class CodeSnippetService {
   private readonly host = this.hostServer + '/snippets'
 
   get (key: string): Observable<CodeSnippet> {
-    return this.http.get<CodeSnippet>(`${this.host}/${key}`).pipe(map((response: CodeSnippet) => response), catchError((err) => { throw err }))
+    return this.http.get<CodeSnippet>(`${this.host}/${pathSegment(key)}`).pipe(map((response: CodeSnippet) => response), catchError((err) => { throw err }))
   }
 }

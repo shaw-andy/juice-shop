@@ -7,6 +7,7 @@ import { environment } from '../../environments/environment'
 import { Injectable, inject } from '@angular/core'
 import { HttpClient } from '@angular/common/http'
 import { catchError, map } from 'rxjs/operators'
+import { pathSegment } from './path-segment'
 
 @Injectable({
   providedIn: 'root'
@@ -18,7 +19,7 @@ export class ProductReviewService {
   private readonly host = this.hostServer + '/rest/products'
 
   get (id: number) {
-    return this.http.get(`${this.host}/${id}/reviews`).pipe(
+    return this.http.get(`${this.host}/${pathSegment(id)}/reviews`).pipe(
       map((response: any) => response.data), catchError((err: Error) => {
         throw err
       })
@@ -26,7 +27,7 @@ export class ProductReviewService {
   }
 
   create (id: number, review: { message: string, author: string }) {
-    return this.http.put(`${this.host}/${id}/reviews`, review).pipe(map((response: any) => response.data),
+    return this.http.put(`${this.host}/${pathSegment(id)}/reviews`, review).pipe(map((response: any) => response.data),
       catchError((err) => { throw err })
     )
   }

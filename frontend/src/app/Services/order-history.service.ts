@@ -7,6 +7,7 @@ import { environment } from '../../environments/environment'
 import { Injectable, inject } from '@angular/core'
 import { HttpClient } from '@angular/common/http'
 import { catchError, map } from 'rxjs/operators'
+import { pathSegment } from './path-segment'
 
 @Injectable({
   providedIn: 'root'
@@ -26,6 +27,6 @@ export class OrderHistoryService {
   }
 
   toggleDeliveryStatus (id: number, params) {
-    return this.http.put(`${this.host}/${id}/delivery-status`, params).pipe(map((response: any) => response.data), catchError((err) => { throw err }))
+    return this.http.put(`${this.host}/${pathSegment(id)}/delivery-status`, params).pipe(map((response: any) => response.data), catchError((err) => { throw err }))
   }
 }

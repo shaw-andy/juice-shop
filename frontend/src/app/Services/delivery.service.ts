@@ -7,6 +7,7 @@ import { environment } from '../../environments/environment'
 import { Injectable, inject } from '@angular/core'
 import { HttpClient } from '@angular/common/http'
 import { catchError, map } from 'rxjs/operators'
+import { pathSegment } from './path-segment'
 import { type DeliveryMethod } from '../Models/deliveryMethod.model'
 
 interface DeliveryMultipleMethodResponse {
@@ -34,6 +35,6 @@ export class DeliveryService {
 
   getById (id) {
 
-    return this.http.get(`${this.host}/${id}`).pipe(map((response: DeliverySingleMethodResponse) => response.data), catchError((err) => { throw err }))
+    return this.http.get(`${this.host}/${pathSegment(id)}`).pipe(map((response: DeliverySingleMethodResponse) => response.data), catchError((err) => { throw err }))
   }
 }

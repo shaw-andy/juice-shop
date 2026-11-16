@@ -7,6 +7,7 @@ import { environment } from '../../environments/environment'
 import { Injectable, inject } from '@angular/core'
 import { HttpClient } from '@angular/common/http'
 import { catchError, map } from 'rxjs/operators'
+import { pathSegment } from './path-segment'
 import type { Observable } from 'rxjs'
 import { Hint } from '../Models/hint.model'
 
@@ -24,6 +25,6 @@ export class HintService {
   }
 
   put (id: number, params): Observable<Hint> {
-    return this.http.put(`${this.host}/${id}`, params).pipe(map((response: any) => response.data), catchError((error) => { throw error }))
+    return this.http.put(`${this.host}/${pathSegment(id)}`, params).pipe(map((response: any) => response.data), catchError((error) => { throw error }))
   }
 }
