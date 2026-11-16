@@ -271,7 +271,7 @@ async function createCards (UserId: number, cards: StaticUserCard[]) {
     return await CardModel.create({
       UserId,
       fullName: card.fullName,
-      cardNum: Number(card.cardNum),
+      cardNum: String(card.cardNum),
       expMonth: card.expMonth,
       expYear: card.expYear
     }).catch((err: unknown) => {
