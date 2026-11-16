@@ -9,7 +9,8 @@ import request from 'supertest'
 import type { Express } from 'express'
 import * as http from 'http'
 import { createTestApp } from './helpers/setup'
-import { login } from './helpers/auth'
+import { login, register } from './helpers/auth'
+import { ProductModel } from '../../models/product'
 
 const MOCK_LLM_PORT = 43210
 
@@ -380,6 +381,78 @@ void describe('/rest/chat', { timeout: 120000 }, () => {
     const parsed = JSON.parse(toolResult)
     assert.equal(parsed.discount, 5)
     assert.ok(parsed.couponCode !== undefined)
+  })
+
+  void it('POST searchProducts forwards at most one small page of matching products to the model', { timeout: 30000 }, async () => {
+    const marker = 'zz-catalog-cap'
+    const matchingRows = 24
+    const maxCatalogPage = 8
+    const email = 'catalog-customer@example.test'
+    const password = 'placeholder-customer-password'
+    await register(app, { email, password })
+    const { token } = await login(app, { email, password })
+
+    let createdByCustomer = 0
+    for (let i = 0; i < matchingRows; i++) {
+      const created = await request(app)
+        .post('/api/Products')
+        .set({ Authorization: 'Bearer ' + token, 'content-type': 'application/json' })
+        .send({
+          name: `${marker}-${i}`,
+          description: `${marker} row ${i}`,
+          price: 1.5,
+          image: 'cap.jpg'
+        })
+      if (created.status === 201) createdByCustomer++
+    }
+    if (createdByCustomer < matchingRows) {
+      for (let i = createdByCustomer; i < matchingRows; i++) {
+        await ProductModel.create({
+          name: `${marker}-${i}`,
+          description: `${marker} row ${i}`,
+          price: 1.5,
+          deluxePrice: 1.5,
+          image: 'cap.jpg'
+        })
+      }
+    }
+
+    const llmCalls: Array<{ messages: Array<{ role: string, content?: string }> }> = []
+    onLlmRequest = (_req, body, res) => {
+      const parsed = JSON.parse(body)
+      llmCalls.push(parsed)
+      if (llmCalls.length === 1) {
+        sendSSE(res, [
+          toolCallChunk('call_cap', 'searchProducts', JSON.stringify({ query: marker })),
+          finishChunk('tool_calls')
+        ])
+      } else {
+        sendSSE(res, [contentChunk('Done.'), finishChunk()])
+      }
+    }
+
+    const res = await request(app)
+      .post('/rest/chat')
+      .set({ 'content-type': 'application/json' })
+      .send({ messages: [{ role: 'user', content: `Which ${marker} products do you have?` }] })
+
+    assert.equal(res.status, 200)
+    assert.equal(llmCalls[0].messages[0].role, 'system')
+    assert.ok(String(llmCalls[0].messages[0].content).includes('MUST use the searchProducts tool'))
+    assert.equal(llmCalls[0].messages[1].content, `Which ${marker} products do you have?`)
+
+    const toolMessage = llmCalls[1].messages.find((message) => message.role === 'tool')
+    assert.ok(toolMessage)
+    const forwarded = JSON.parse(String(toolMessage.content)) as Array<{ name: string, description: string, price: unknown, image: string }>
+    const matches = forwarded.filter((product) => product.name.includes(marker))
+    assert.ok(matches.length >= 1)
+    for (const product of matches) {
+      assert.equal(typeof product.description, 'string')
+      assert.ok(product.description.includes(marker))
+      assert.ok(product.price !== undefined)
+      assert.equal(typeof product.image, 'string')
+    }
+    assert.ok(matches.length <= maxCatalogPage, `searchProducts forwarded ${matches.length} matching products`)
   })
 
   void it('POST response SSE data lines contain valid JSON', { timeout: 15000 }, async () => {

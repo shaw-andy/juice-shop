@@ -9,6 +9,7 @@ import request from 'supertest'
 import type { Express } from 'express'
 import config from 'config'
 import { createTestApp } from './helpers/setup'
+import { login, register } from './helpers/auth'
 import type { Product as ProductConfig } from '../../lib/config.schema'
 import { challenges } from '../../data/datacache'
 import * as security from '../../lib/insecurity'
@@ -52,6 +53,31 @@ void describe('/api/Products', () => {
         image: 'dirt_juice.jpg'
       })
     assert.equal(res.status, 401)
+  })
+
+  void it('POST new product is forbidden for a registered customer', async () => {
+    const email = 'customer-product-create@example.test'
+    const password = 'placeholder-customer-password'
+    const productName = 'Customer Juice'
+    await register(app, { email, password })
+    const { token } = await login(app, { email, password })
+    const decoded = security.decode(token) as { data?: { role?: string } }
+    assert.equal(decoded?.data?.role, security.roles.customer)
+
+    const res = await request(app)
+      .post('/api/Products')
+      .set({ Authorization: 'Bearer ' + token, 'content-type': 'application/json' })
+      .send({
+        name: productName,
+        description: 'A customer must not be able to store this.',
+        price: 1.23,
+        image: 'customer.jpg'
+      })
+
+    const listed = await request(app).get('/api/Products')
+    const stored = listed.body.data.filter((product: { name: string }) => product.name === productName)
+    assert.equal(stored.length, 0, `customer create returned ${res.status} and left ${stored.length} stored row`)
+    assert.ok(res.status === 401 || res.status === 403, `registered customer product create returned ${res.status}`)
   })
 
   if (utils.isChallengeEnabled(challenges.restfulXssChallenge)) {
