@@ -21,6 +21,7 @@ import { MatIconButton, MatButtonModule } from '@angular/material/button'
 import { MatIconModule } from '@angular/material/icon'
 
 import { MatCardModule, MatCardTitle, MatCardContent } from '@angular/material/card'
+import { MatPaginator, type PageEvent } from '@angular/material/paginator'
 
 library.add(faTwitter, faMastodon, faBold)
 
@@ -29,7 +30,7 @@ library.add(faTwitter, faMastodon, faBold)
   selector: 'app-photo-wall',
   templateUrl: './photo-wall.component.html',
   styleUrls: ['./photo-wall.component.scss'],
-  imports: [MatCardModule, MatIconModule, MatIconButton, MatCardTitle, TranslateModule, MatCardContent, FormsModule, ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatLabel, MatInputModule, MatError]
+  imports: [MatCardModule, MatIconModule, MatIconButton, MatCardTitle, TranslateModule, MatCardContent, FormsModule, ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatLabel, MatInputModule, MatError, MatPaginator]
 })
 export class PhotoWallComponent implements OnInit {
   private readonly photoWallService = inject(PhotoWallService)
@@ -40,34 +41,19 @@ export class PhotoWallComponent implements OnInit {
   public imagePreview: string
   public form: UntypedFormGroup = new UntypedFormGroup({
     image: new UntypedFormControl('', { validators: [Validators.required], asyncValidators: [mimeType] }),
-    caption: new UntypedFormControl('', [Validators.required])
+    caption: new UntypedFormControl('', [Validators.required, Validators.maxLength(200)])
   })
 
   public slideshowDataSource: { url: string, caption: string }[] = []
+  public readonly pageSize = 10
+  public pageIndex = 0
+  public totalMemories = 0
   public twitterHandle = null
   public blueSkyHandle = null
   public mastodonHandle = null
 
   ngOnInit (): void {
-    this.slideshowDataSource = []
-    this.photoWallService.get().pipe(catchError(err => {
-      console.log(err)
-
-      return EMPTY
-    })).subscribe((memories) => {
-      if (memories.length === 0) {
-        this.emptyState = true
-      } else {
-        this.emptyState = false
-      }
-      for (const memory of memories) {
-        if (memory.User?.username) {
-
-          memory.caption = `${memory.caption} (© ${memory.User.username})`
-        }
-        this.slideshowDataSource.push({ url: memory.imagePath, caption: memory.caption })
-      }
-    })
+    this.loadPage(0)
 
     this.configurationService.getApplicationConfiguration().pipe(catchError(err => {
       console.log(err)
@@ -96,6 +82,30 @@ export class PhotoWallComponent implements OnInit {
         }
       }
     })
+  }
+
+  loadPage (pageIndex: number) {
+    this.photoWallService.get(pageIndex * this.pageSize, this.pageSize).pipe(catchError(err => {
+      console.log(err)
+
+      return EMPTY
+    })).subscribe(({ memories, total }) => {
+      this.pageIndex = pageIndex
+      this.totalMemories = total
+      this.emptyState = memories.length === 0
+      this.slideshowDataSource = []
+      for (const memory of memories) {
+        if (memory.User?.username) {
+
+          memory.caption = `${memory.caption} (© ${memory.User.username})`
+        }
+        this.slideshowDataSource.push({ url: memory.imagePath, caption: memory.caption })
+      }
+    })
+  }
+
+  onPageChange (event: PageEvent) {
+    this.loadPage(event.pageIndex)
   }
 
   onImagePicked (event: Event) {

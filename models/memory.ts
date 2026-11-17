@@ -12,6 +12,8 @@ import {
   type Sequelize
 } from 'sequelize'
 
+export const MEMORY_CAPTION_MAX_LENGTH = 200
+
 class Memory extends Model<
 InferAttributes<Memory>,
 InferCreationAttributes<Memory>
@@ -33,7 +35,10 @@ const MemoryModelInit = (sequelize: Sequelize) => {
         primaryKey: true,
         autoIncrement: true
       },
-      caption: DataTypes.STRING,
+      caption: {
+        type: DataTypes.STRING(MEMORY_CAPTION_MAX_LENGTH),
+        validate: { len: [0, MEMORY_CAPTION_MAX_LENGTH] }
+      },
       imagePath: DataTypes.STRING
     },
     {

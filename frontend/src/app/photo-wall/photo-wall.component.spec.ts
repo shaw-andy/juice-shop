@@ -28,6 +28,8 @@ import { MatSnackBar } from '@angular/material/snack-bar'
 import { EventEmitter } from '@angular/core'
 import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http'
 
+const page = (memories: any[], total = memories.length) => of({ memories, total })
+
 describe('PhotoWallComponent', () => {
     let component: PhotoWallComponent
     let fixture: ComponentFixture<PhotoWallComponent>
@@ -45,7 +47,7 @@ describe('PhotoWallComponent', () => {
             get: vi.fn().mockName("PhotoWallService.get"),
             addMemory: vi.fn().mockName("PhotoWallService.addMemory")
         }
-        photoWallService.get.mockReturnValue(of([]))
+        photoWallService.get.mockReturnValue(page([]))
         photoWallService.addMemory.mockReturnValue(of({}))
         translateService = {
             get: vi.fn().mockName("TranslateService.get")
@@ -100,16 +102,31 @@ describe('PhotoWallComponent', () => {
     })
 
     it('should make emptyState true and hold no memories when get API gives empty response', () => {
-        photoWallService.get.mockReturnValue(of([]))
+        photoWallService.get.mockReturnValue(page([]))
         component.ngOnInit()
         expect(component.emptyState).toBe(true)
         expect(component.slideshowDataSource).toEqual([])
     })
 
     it('should make emptyState false when get API gives non empty response', () => {
-        photoWallService.get.mockReturnValue(of([{ imagePath: '', caption: '' }]))
+        photoWallService.get.mockReturnValue(page([{ imagePath: '', caption: '' }]))
         component.ngOnInit()
         expect(component.emptyState).toBe(false)
+    })
+
+    it('should request the first page of memories on init', () => {
+        photoWallService.get.mockClear()
+        component.ngOnInit()
+        expect(photoWallService.get).toHaveBeenCalledWith(0, 10)
+    })
+
+    it('should replace the shown memories with the requested page on page change', () => {
+        photoWallService.get.mockReturnValue(page([{ imagePath: 'k.png', caption: 'K' }], 11))
+        component.onPageChange({ pageIndex: 1, pageSize: 10, length: 11 })
+        expect(photoWallService.get).toHaveBeenCalledWith(10, 10)
+        expect(component.pageIndex).toBe(1)
+        expect(component.totalMemories).toBe(11)
+        expect(component.slideshowDataSource).toEqual([{ url: 'k.png', caption: 'K' }])
     })
 
     it('should log error from get API call directly to browser console', () => {
@@ -175,7 +192,7 @@ describe('PhotoWallComponent', () => {
     })
 
     it('should append uploader username to the caption when memory has a user', () => {
-        photoWallService.get.mockReturnValue(of([{ imagePath: 'a.png', caption: 'Hi', User: { username: 'alice' } }]))
+        photoWallService.get.mockReturnValue(page([{ imagePath: 'a.png', caption: 'Hi', User: { username: 'alice' } }]))
         component.ngOnInit()
         expect(component.slideshowDataSource[0].caption).toBe('Hi (© alice)')
     })
@@ -233,7 +250,7 @@ describe('PhotoWallComponent', () => {
 
     describe('template rendering', () => {
         it('should render the empty-state card when no memories are loaded', () => {
-            photoWallService.get.mockReturnValue(of([]))
+            photoWallService.get.mockReturnValue(page([]))
             component.ngOnInit()
             fixture.detectChanges()
             const compiled: HTMLElement = fixture.nativeElement
@@ -242,7 +259,7 @@ describe('PhotoWallComponent', () => {
         })
 
         it('should render the grid with one tile per memory when memories exist', () => {
-            photoWallService.get.mockReturnValue(of([
+            photoWallService.get.mockReturnValue(page([
                 { imagePath: 'a.png', caption: 'A' },
                 { imagePath: 'b.png', caption: 'B' }
             ]))
@@ -254,7 +271,7 @@ describe('PhotoWallComponent', () => {
         })
 
         it('should render social share buttons only when matching handles are configured', () => {
-            photoWallService.get.mockReturnValue(of([{ imagePath: 'a.png', caption: 'A' }]))
+            photoWallService.get.mockReturnValue(page([{ imagePath: 'a.png', caption: 'A' }]))
             configurationService.getApplicationConfiguration.mockReturnValue(of({
                 application: { social: { twitterUrl: 'https://twitter.com/juice', blueSkyUrl: 'https://bsky.app/profile/juice', mastodonUrl: 'https://mastodon.social/@juice' } }
             }))
@@ -267,7 +284,7 @@ describe('PhotoWallComponent', () => {
         })
 
         it('should not render social share buttons when no social handles are configured', () => {
-            photoWallService.get.mockReturnValue(of([{ imagePath: 'a.png', caption: 'A' }]))
+            photoWallService.get.mockReturnValue(page([{ imagePath: 'a.png', caption: 'A' }]))
             configurationService.getApplicationConfiguration.mockReturnValue(of({ application: {} }))
             component.ngOnInit()
             fixture.detectChanges()
