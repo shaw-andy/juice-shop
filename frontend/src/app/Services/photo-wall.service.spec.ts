@@ -28,10 +28,20 @@ describe('PhotoWallService', () => {
 
         let res
         service.get().subscribe((data) => (res = data))
-        const req = httpMock.expectOne('http://localhost:3000/rest/memories/')
-        req.flush({ data: 'apiResponse' })
+        const req = httpMock.expectOne('http://localhost:3000/rest/memories/?offset=0&limit=10')
+        req.flush({ data: 'apiResponse', total: 1 })
         expect(req.request.method).toBe('GET')
-        expect(res).toBe('apiResponse')
+        expect(res).toEqual({ memories: 'apiResponse', total: 1 })
+        httpMock.verify()
+    })
+
+    it('should request the given page of memories from the api', () => {
+        const service = TestBed.inject(PhotoWallService)
+        const httpMock = TestBed.inject(HttpTestingController)
+
+        service.get(20, 10).subscribe()
+        const req = httpMock.expectOne('http://localhost:3000/rest/memories/?offset=20&limit=10')
+        req.flush({ data: [], total: 0 })
         httpMock.verify()
     })
 
@@ -54,7 +64,7 @@ describe('PhotoWallService', () => {
 
         let capturedError: any
         service.get().subscribe({ next: () => { }, error: (e) => { capturedError = e } })
-        const req = httpMock.expectOne('http://localhost:3000/rest/memories/')
+        const req = httpMock.expectOne('http://localhost:3000/rest/memories/?offset=0&limit=10')
         req.flush(null, { status: 503, statusText: 'Service Unavailable' })
         expect(capturedError).toBeTruthy()
         expect(capturedError.status).toBe(503)

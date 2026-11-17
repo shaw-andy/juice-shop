@@ -5,6 +5,7 @@
 
 import { z } from 'zod'
 import { CHALLENGE_KEYS, type ChallengeKey } from '../models/challenge'
+import { MEMORY_CAPTION_MAX_LENGTH } from '../models/memory'
 
 // -- Application sub-schemas --
 
@@ -141,7 +142,7 @@ export const ProductSchema = z.object({
 
 export const MemorySchema = z.object({
   image: z.string(),
-  caption: z.string(),
+  caption: z.string().max(MEMORY_CAPTION_MAX_LENGTH),
   user: z.string().optional(),
   geoStalkingMetaSecurityQuestion: z.number().optional(),
   geoStalkingMetaSecurityAnswer: z.string().optional(),

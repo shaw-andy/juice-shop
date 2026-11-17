@@ -47,6 +47,14 @@
             </span>
           }
         </div>
+        <mat-paginator
+          [length]="totalMemories"
+          [pageSize]="pageSize"
+          [pageIndex]="pageIndex"
+          [hidePageSize]="true"
+          (page)="onPageChange($event)"
+          color="tertiary">
+        </mat-paginator>
       } @else {
         <mat-card appearance="outlined" class="mat-elevation-z0 emptyState">
           <div class="mdc-card">
@@ -86,7 +94,7 @@
               }
               <mat-form-field appearance="outline" color="tertiary">
                 <mat-label translate>LABEL_CAPTION</mat-label>
-                <input formControlName="caption" type="text" matInput>
+                <input formControlName="caption" type="text" maxlength="200" matInput>
                 @if (form.get('caption').invalid) {
                   <mat-error translate>{{'MANDATORY_CAPTION' | translate}}</mat-error>
                 }
