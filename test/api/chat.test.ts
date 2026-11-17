@@ -8,8 +8,13 @@ import assert from 'node:assert/strict'
 import request from 'supertest'
 import type { Express } from 'express'
 import * as http from 'http'
+import type { AddressInfo } from 'node:net'
+import { Server } from 'socket.io'
+import { io as ioClient, type Socket } from 'socket.io-client'
 import { createTestApp } from './helpers/setup'
 import { login } from './helpers/auth'
+import { challenges, notifications, users } from '../../data/datacache'
+import * as security from '../../lib/insecurity'
 
 const MOCK_LLM_PORT = 43210
 
@@ -406,5 +411,201 @@ void describe('/rest/chat', { timeout: 120000 }, () => {
       if (parsed.choices[0].finish_reason) continue
       assert.ok(parsed.choices[0].delta)
     }
+  })
+})
+
+const AI_DEBUGGING_KEY = 'aiDebuggingChallenge'
+
+function forgedNonAdminToken (): string {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url')
+  const payload = Buffer.from(JSON.stringify({ data: { role: 'customer' } })).toString('base64url')
+  return `${header}.${payload}.placeholder`
+}
+
+function sessionToken (user: { id: number, role: string, email: string }): string {
+  return security.authorize({ data: { id: user.id, role: user.role, email: user.email } })
+}
+
+async function resetAiDebuggingChallenge (): Promise<void> {
+  const challenge = challenges.aiDebuggingChallenge
+  assert.ok(challenge)
+  challenge.solved = false
+  await challenge.save()
+  for (let i = notifications.length - 1; i >= 0; i--) {
+    if (notifications[i].key === AI_DEBUGGING_KEY) {
+      notifications.splice(i, 1)
+    }
+  }
+}
+
+function answerWithToolCall (name: string, args: string): void {
+  let callCount = 0
+  onLlmRequest = (_req, _body, res) => {
+    callCount++
+    if (callCount === 1) {
+      sendSSE(res, [
+        toolCallChunk('call_ai_debug', name, args),
+        finishChunk('tool_calls')
+      ])
+    } else {
+      sendSSE(res, [contentChunk('Done.'), finishChunk()])
+    }
+  }
+}
+
+async function postChat (headers: Record<string, string>, content: string) {
+  return await request(app)
+    .post('/rest/chat')
+    .set({ 'content-type': 'application/json', ...headers })
+    .send({ messages: [{ role: 'user', content }] })
+}
+
+async function assertSharedAiDebuggingUnsolved (): Promise<void> {
+  const inMemorySolved = challenges.aiDebuggingChallenge.solved
+  await new Promise((resolve) => setTimeout(resolve, 50))
+
+  const persisted = await challenges.aiDebuggingChallenge.sequelize!.query(
+    'SELECT solved FROM Challenges WHERE key = :key',
+    { replacements: { key: AI_DEBUGGING_KEY } }
+  ) as [Array<{ solved: number | boolean }>, unknown]
+  const listed = await request(app).get('/api/Challenges')
+  const row = listed.body.data.find((challenge: { key: string }) => challenge.key === AI_DEBUGGING_KEY)
+  assert.equal(inMemorySolved, false)
+  assert.equal(Boolean(persisted[0][0].solved), false)
+
+  assert.equal(listed.status, 200)
+  assert.ok(row)
+  assert.equal(Boolean(row.solved), false)
+
+  assert.equal(notifications.some((notification) => notification.key === AI_DEBUGGING_KEY), false)
+}
+
+async function withOtherVisitor (run: () => Promise<void>): Promise<void> {
+  const httpServer = http.createServer()
+  const scoreboard = new Server(httpServer)
+  await new Promise<void>((resolve) => {
+    httpServer.listen(0, '127.0.0.1', () => { resolve() })
+  })
+  const port = (httpServer.address() as AddressInfo).port
+  const previousIo = (global as { io?: Server }).io
+  ;(global as { io?: Server }).io = scoreboard
+  const visitor: Socket = ioClient(`http://127.0.0.1:${port}`, { transports: ['websocket'] })
+  const heard: Array<{ key?: string }> = []
+  visitor.on('challenge solved', (payload: { key?: string }) => { heard.push(payload) })
+  await new Promise<void>((resolve, reject) => {
+    visitor.on('connect', () => { resolve() })
+    visitor.on('connect_error', reject)
+  })
+  try {
+    await run()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    assert.equal(heard.filter((payload) => payload?.key === AI_DEBUGGING_KEY).length, 0)
+  } finally {
+    visitor.close()
+    ;(global as { io?: Server }).io = previousIo
+    scoreboard.close()
+    await new Promise<void>((resolve) => { httpServer.close(() => { resolve() }) })
+  }
+}
+
+void describe('aiDebuggingChallenge shared scoreboard', { timeout: 120000 }, () => {
+  void it('does not mark the shared challenge solved for an anonymous tool call', { timeout: 15000 }, async () => {
+    await resetAiDebuggingChallenge()
+    answerWithToolCall('searchProducts', '{"query":"apple"}')
+
+    await withOtherVisitor(async () => {
+      const res = await postChat(
+        { Cookie: 'show_tool_calls=true' },
+        'Do you have apple juice?'
+      )
+      assert.equal(res.status, 200)
+      assert.ok(res.text.includes('searchProducts'))
+      await assertSharedAiDebuggingUnsolved()
+    })
+  })
+
+  void it('does not mark the shared challenge solved for any other chatbot tool', { timeout: 20000 }, async () => {
+    const tools = [
+      ['getProductReviews', '{"id":"1"}', 'Show me reviews for product 1'],
+      ['getOrderById', '{"orderId":"abcd-0123456789abcdef"}', 'Look up my order'],
+      ['generateCoupon', '{"discount":5}', 'Give me a coupon']
+    ]
+    for (const [name, args, content] of tools) {
+      await resetAiDebuggingChallenge()
+      answerWithToolCall(name, args)
+      const res = await postChat({ Cookie: 'show_tool_calls=true' }, content)
+      assert.equal(res.status, 200)
+      assert.ok(res.text.includes(name))
+      await assertSharedAiDebuggingUnsolved()
+    }
+  })
+
+  void it('does not mark the shared challenge solved when the bearer token is not verified', { timeout: 15000 }, async () => {
+    await resetAiDebuggingChallenge()
+    answerWithToolCall('searchProducts', '{"query":"apple"}')
+
+    const res = await postChat(
+      { Cookie: 'show_tool_calls=true', Authorization: 'Bearer ' + forgedNonAdminToken() },
+      'Do you have apple juice?'
+    )
+    assert.equal(res.status, 200)
+    assert.ok(res.text.includes('searchProducts'))
+    await assertSharedAiDebuggingUnsolved()
+  })
+
+  void it('does not mark the shared challenge solved for a verified non-admin session', { timeout: 15000 }, async () => {
+    await resetAiDebuggingChallenge()
+    assert.equal(users.jim.role, 'customer')
+    answerWithToolCall('searchProducts', '{"query":"apple"}')
+
+    const res = await postChat(
+      {
+        Cookie: 'show_tool_calls=true',
+        Authorization: 'Bearer ' + sessionToken(users.jim)
+      },
+      'Do you have apple juice?'
+    )
+    assert.equal(res.status, 200)
+    assert.ok(res.text.includes('searchProducts'))
+    await assertSharedAiDebuggingUnsolved()
+  })
+
+  void it('leaves the shared challenge unsolved without the cookie', { timeout: 15000 }, async () => {
+    await resetAiDebuggingChallenge()
+    answerWithToolCall('searchProducts', '{"query":"apple"}')
+
+    const res = await postChat({}, 'Do you have apple juice?')
+    assert.equal(res.status, 200)
+    assert.ok(res.text.includes('searchProducts'))
+    await assertSharedAiDebuggingUnsolved()
+  })
+
+  void it('leaves the shared challenge unsolved when the model does not call a tool', { timeout: 15000 }, async () => {
+    await resetAiDebuggingChallenge()
+    onLlmRequest = (_req, _body, res) => {
+      sendSSE(res, [contentChunk('Hello'), finishChunk()])
+    }
+
+    const res = await postChat({ Cookie: 'show_tool_calls=true' }, 'Hi')
+    assert.equal(res.status, 200)
+    assert.ok(!res.text.includes('tool_calls'))
+    await assertSharedAiDebuggingUnsolved()
+  })
+
+  void it('leaves the shared challenge unsolved for a verified admin session', { timeout: 15000 }, async () => {
+    await resetAiDebuggingChallenge()
+    assert.equal(users.admin.role, 'admin')
+    answerWithToolCall('searchProducts', '{"query":"apple"}')
+
+    const res = await postChat(
+      {
+        Cookie: 'show_tool_calls=true',
+        Authorization: 'Bearer ' + sessionToken(users.admin)
+      },
+      'Do you have apple juice?'
+    )
+    assert.equal(res.status, 200)
+    assert.ok(res.text.includes('searchProducts'))
+    await assertSharedAiDebuggingUnsolved()
   })
 })
