@@ -5,11 +5,13 @@
 
 // @ts-expect-error FIXME no typescript definitions for z85 :(
 import z85 from 'z85'
-import { describe, it } from 'node:test'
+import { describe, it, mock } from 'node:test'
 import assert from 'node:assert/strict'
 import * as security from '../../lib/insecurity'
 import type { UserModel } from '@juice-shop/models/user'
 import type { Request } from 'express'
+
+type ResponseWithUser = Parameters<typeof security.authenticatedUsers.put>[1]
 
 void describe('insecurity', () => {
   void describe('cutOffPoisonNullByte', () => {
@@ -210,11 +212,51 @@ void describe('insecurity', () => {
     })
   })
 
+  void describe('verify', () => {
+    void it('accepts a freshly issued token', () => {
+      assert.equal(security.verify(security.authorize({ data: { id: 1 } })), true)
+    })
+
+    void it('rejects a token once its six hour lifetime has passed', () => {
+      const token = security.authorize({ data: { id: 1 } })
+      mock.timers.enable({ apis: ['Date'], now: Date.now() + 6 * 60 * 60 * 1000 + 1000 })
+      try {
+        assert.equal(security.verify(token), false)
+      } finally {
+        mock.timers.reset()
+      }
+    })
+
+    void it('rejects a missing token', () => {
+      assert.equal(security.verify(''), false)
+    })
+  })
+
+  void describe('claimsRole', () => {
+    void it('returns true if the token payload names the role', () => {
+      const token = security.authorize({ data: { role: 'deluxe' } })
+      assert.equal(security.claimsRole({ headers: { authorization: `Bearer ${token}` } } as unknown as Request, 'deluxe'), true)
+    })
+
+    void it('returns false for another role or no token', () => {
+      const token = security.authorize({ data: { role: 'customer' } })
+      assert.equal(security.claimsRole({ headers: { authorization: `Bearer ${token}` } } as unknown as Request, 'deluxe'), false)
+      assert.equal(security.claimsRole({ headers: {} } as unknown as Request, 'deluxe'), false)
+    })
+  })
+
   void describe('isCustomer', () => {
-    void it('returns true if decoded token has customer role', () => {
-      const user = { data: { role: 'customer' } }
+    void it('returns true if token belongs to a signed-in customer session', () => {
+      const user = { data: { id: 106, role: 'customer' } }
       const token = security.authorize(user)
+      security.authenticatedUsers.put(token, user as unknown as ResponseWithUser)
       assert.equal(security.isCustomer({ headers: { authorization: `Bearer ${token}` } } as unknown as Request), true)
+    })
+
+    void it('returns false if customer token has no signed-in session', () => {
+      const user = { data: { id: 107, role: 'customer' } }
+      const token = security.authorize(user)
+      assert.equal(security.isCustomer({ headers: { authorization: `Bearer ${token}` } } as unknown as Request), false)
     })
 
     void it('returns false if decoded token has other role', () => {
@@ -229,10 +271,33 @@ void describe('insecurity', () => {
   })
 
   void describe('isDeluxe', () => {
-    void it('returns true if decoded token has deluxe role and valid deluxe token', () => {
-      const user = { data: { email: 'deluxe@juice-sh.op', role: 'deluxe', deluxeToken: security.deluxeToken('deluxe@juice-sh.op') } }
+    void it('returns true if token belongs to a signed-in deluxe session with valid deluxe token', () => {
+      const user = { data: { id: 101, email: 'deluxe@juice-sh.op', role: 'deluxe', deluxeToken: security.deluxeToken('deluxe@juice-sh.op') } }
       const token = security.authorize(user)
+      security.authenticatedUsers.put(token, user as unknown as ResponseWithUser)
       assert.equal(security.isDeluxe({ headers: { authorization: `Bearer ${token}` } } as unknown as Request), true)
+    })
+
+    void it('returns false if deluxe token has no signed-in session', () => {
+      const user = { data: { id: 108, email: 'deluxe@juice-sh.op', role: 'deluxe', deluxeToken: security.deluxeToken('deluxe@juice-sh.op') } }
+      const token = security.authorize(user)
+      assert.equal(security.isDeluxe({ headers: { authorization: `Bearer ${token}` } } as unknown as Request), false)
+    })
+
+    void it('returns false if deluxe session was only restored from the token', () => {
+      const user = { data: { id: 102, email: 'deluxe@juice-sh.op', role: 'deluxe', deluxeToken: security.deluxeToken('deluxe@juice-sh.op') } }
+      const token = security.authorize(user)
+      security.authenticatedUsers.restore(token, security.decode(token))
+      assert.equal(security.isDeluxe({ headers: { authorization: `Bearer ${token}` } } as unknown as Request), false)
+    })
+
+    void it('returns false after the session user was removed', () => {
+      const user = { data: { id: 103, email: 'deluxe@juice-sh.op', role: 'deluxe', deluxeToken: security.deluxeToken('deluxe@juice-sh.op') } }
+      const token = security.authorize(user)
+      security.authenticatedUsers.put(token, user as unknown as ResponseWithUser)
+      security.authenticatedUsers.removeUser(103)
+      assert.equal(security.authenticatedUsers.get(token), undefined)
+      assert.equal(security.isDeluxe({ headers: { authorization: `Bearer ${token}` } } as unknown as Request), false)
     })
 
     void it('returns false if decoded token has deluxe role but invalid deluxe token', () => {
@@ -282,14 +347,34 @@ void describe('insecurity', () => {
   })
 
   void describe('middlewares', () => {
-    void it('isAccounting should allow next() for accounting role', () => {
-      const user = { data: { role: 'accounting' } }
+    void it('isAccounting should allow next() for signed-in accounting session', () => {
+      const user = { data: { id: 104, role: 'accounting' } }
       const token = security.authorize(user)
+      security.authenticatedUsers.put(token, user as unknown as ResponseWithUser)
       const req = { headers: { authorization: `Bearer ${token}` } } as any
       let nextCalled = false
       const next = () => { nextCalled = true }
       security.isAccounting()(req, {} as any, next)
       assert.ok(nextCalled)
+    })
+
+    void it('isAccounting should return 403 once the token lifetime has passed', () => {
+      const user = { data: { id: 105, role: 'accounting' } }
+      const token = security.authorize(user)
+      security.authenticatedUsers.put(token, user as unknown as ResponseWithUser)
+      const req = { headers: { authorization: `Bearer ${token}` } } as any
+      let statusSet = 0
+      const res = {
+        status: (s: number) => { statusSet = s; return res },
+        json: () => {}
+      } as any
+      mock.timers.enable({ apis: ['Date'], now: Date.now() + 6 * 60 * 60 * 1000 + 1000 })
+      try {
+        security.isAccounting()(req, res, () => {})
+      } finally {
+        mock.timers.reset()
+      }
+      assert.equal(statusSet, 403)
     })
 
     void it('isAccounting should return 403 for other roles', () => {

@@ -95,6 +95,8 @@ async function quantityCheck (req: Request, res: Response, next: NextFunction, i
     } else {
       res.status(400).json({ error: res.__('We are out of stock! Sorry for the inconvenience.') })
     }
+  } else if (security.claimsRole(req, security.roles.deluxe)) {
+    res.status(401).json({ error: 'Deluxe membership could not be confirmed. Please log in again.' })
   } else {
     res.status(400).json({ error: res.__('You can order only up to {{quantity}} items of this product.', { quantity: product.limitPerUser.toString() }) })
   }
