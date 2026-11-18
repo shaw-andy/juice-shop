@@ -32,11 +32,17 @@ interface IAuthenticatedUsers {
   tokenMap: Record<string, ResponseWithUser>
   idMap: Record<string, string>
   put: (token: string, user: ResponseWithUser) => void
+  restore: (token: string, user: ResponseWithUser) => void
   get: (token?: string) => ResponseWithUser | undefined
+  removeUser: (id: number) => void
   tokenOf: (user: UserModel) => string | undefined
   from: (req: Request) => ResponseWithUser | undefined
   updateFrom: (req: Request, user: ResponseWithUser) => any
 }
+
+const tokenLifetimeInSeconds = 6 * 60 * 60
+// Only sessions created at sign-in by this process; entries rebuilt from a presented token are left out
+const issuedSessions = new WeakSet<ResponseWithUser>()
 
 export const hash = (data: string) => crypto.createHash('md5').update(data).digest('hex')
 export const hmac = (data: string) => crypto.createHmac('sha256', 'pa4qacea4VK9t9nGv7yZtwmj').update(data).digest('hex')
@@ -52,8 +58,14 @@ export const cutOffPoisonNullByte = (str: string) => {
 export const isAuthorized = () => expressJwt(({ secret: publicKey }) as any)
 export const denyAll = () => expressJwt({ secret: '' + Math.random() } as any)
 export const authorize = (user = {}) => jwt.sign(user, privateKey, { expiresIn: '6h', algorithm: 'RS256' })
-export const verify = (token: string) => token ? (jws.verify as ((token: string, secret: string) => boolean))(token, publicKey) : false
 export const decode = (token: string) => { return jws.decode(token)?.payload }
+// jsonwebtoken@0.4.0 ignores expiresIn and writes no exp claim, so the lifetime is enforced from iat
+const isWithinLifetime = (payload: any) => {
+  const now = Date.now()
+  return typeof payload?.iat === 'number' && now < (payload.iat + tokenLifetimeInSeconds) * 1000 &&
+    (payload.exp === undefined || (typeof payload.exp === 'number' && now < payload.exp * 1000))
+}
+export const verify = (token: string) => token ? (jws.verify as ((token: string, secret: string) => boolean))(token, publicKey) && isWithinLifetime(decode(token)) : false
 
 export const sanitizeHtml = (html: string) => sanitizeHtmlLib(html)
 export const sanitizeLegacy = (input = '') => input.replace(/<(?:\w+)\W+?[\w]/gi, '')
@@ -71,11 +83,23 @@ export const authenticatedUsers: IAuthenticatedUsers = {
   tokenMap: {},
   idMap: {},
   put: function (token: string, user: ResponseWithUser) {
+    this.restore(token, user)
+    issuedSessions.add(user)
+  },
+  restore: function (token: string, user: ResponseWithUser) {
     this.tokenMap[token] = user
     this.idMap[user.data.id] = token
   },
   get: function (token?: string) {
     return token ? this.tokenMap[utils.unquote(token)] : undefined
+  },
+  removeUser: function (id: number) {
+    for (const [token, user] of Object.entries(this.tokenMap)) {
+      if (user?.data?.id === id) {
+        delete this.tokenMap[token]
+      }
+    }
+    delete this.idMap[id]
   },
   tokenOf: function (user: UserModel) {
     return user ? this.idMap[user.id] : undefined
@@ -86,7 +110,11 @@ export const authenticatedUsers: IAuthenticatedUsers = {
   },
   updateFrom: function (req: Request, user: ResponseWithUser) {
     const token = utils.jwtFrom(req)
-    this.put(token, user)
+    const previous = this.get(token)
+    this.restore(token, user)
+    if (previous !== undefined && issuedSessions.has(previous)) {
+      issuedSessions.add(user)
+    }
   }
 }
 
@@ -151,10 +179,18 @@ export const deluxeToken = (email: string) => {
   return hmac.update(email + roles.deluxe).digest('hex')
 }
 
+const issuedSessionUserFrom = (req: Request) => {
+  const token = utils.jwtFrom(req)
+  if (!verify(token)) {
+    return undefined
+  }
+  const session = authenticatedUsers.get(token)
+  return session !== undefined && issuedSessions.has(session) ? session.data : undefined
+}
+
 export const isAccounting = () => {
   return (req: Request, res: Response, next: NextFunction) => {
-    const decodedToken = verify(utils.jwtFrom(req)) && decode(utils.jwtFrom(req))
-    if (decodedToken?.data?.role === roles.accounting) {
+    if (issuedSessionUserFrom(req)?.role === roles.accounting) {
       next()
     } else {
       res.status(403).json({ error: 'Malicious activity detected' })
@@ -163,13 +199,17 @@ export const isAccounting = () => {
 }
 
 export const isDeluxe = (req: Request) => {
-  const decodedToken = verify(utils.jwtFrom(req)) && decode(utils.jwtFrom(req))
-  return decodedToken?.data?.role === roles.deluxe && decodedToken?.data?.deluxeToken && decodedToken?.data?.deluxeToken === deluxeToken(decodedToken?.data?.email)
+  const user = issuedSessionUserFrom(req)
+  return user?.role === roles.deluxe && !!user.deluxeToken && user.deluxeToken === deluxeToken(user.email)
 }
 
 export const isCustomer = (req: Request) => {
-  const decodedToken = verify(utils.jwtFrom(req)) && decode(utils.jwtFrom(req))
-  return decodedToken?.data?.role === roles.customer
+  return issuedSessionUserFrom(req)?.role === roles.customer
+}
+
+export const claimsRole = (req: Request, role: string) => {
+  const token = utils.jwtFrom(req)
+  return token ? decode(token)?.data?.role === role : false
 }
 
 export const appendUserId = () => {
@@ -188,7 +228,7 @@ export const updateAuthenticatedUsers = () => (req: Request, res: Response, next
   if (token && authenticatedUsers.get(token) === undefined) {
     jwt.verify(token, publicKey, (err: Error | null, decoded: any) => {
       if (err === null && decoded?.data !== undefined) {
-        authenticatedUsers.put(token, decoded)
+        authenticatedUsers.restore(token, decoded)
         res.cookie('token', token)
       }
     })
