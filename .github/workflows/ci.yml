@@ -17,6 +17,8 @@ on:
       - 'LICENSE'
       - 'data/static/i18n/*.json'
       - 'frontend/src/assets/i18n/*.json'
+permissions:
+  contents: read
 env:
   NODE_DEFAULT_VERSION: 24
   NODE_OPTIONS: "--max_old_space_size=4096"
@@ -48,7 +50,15 @@ jobs:
         with:
           node-version: ${{ env.NODE_DEFAULT_VERSION }}
       - name: "Install application"
-        run: npm install
+        run: |
+          npm install --ignore-scripts
+          npm rebuild sqlite3
+          cd frontend
+          npm install --ignore-scripts
+          cd ..
+          npm run build:frontend
+          npm run --silent build:server || true
+        shell: bash
       - name: "Check coding challenges for accidental code discrepancies"
         run: npm run rsn
   frontend-test:
@@ -68,7 +78,15 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: "Install application"
         if: github.repository == 'juice-shop/juice-shop' || (github.repository != 'juice-shop/juice-shop' && matrix.os == 'ubuntu-latest' && matrix.node-version == '24')
-        run: npm install
+        run: |
+          npm install --ignore-scripts
+          npm rebuild sqlite3
+          cd frontend
+          npm install --ignore-scripts
+          cd ..
+          npm run build:frontend
+          npm run --silent build:server || true
+        shell: bash
       - name: "Execute frontend unit tests"
         if: github.repository == 'juice-shop/juice-shop' || (github.repository != 'juice-shop/juice-shop' && matrix.os == 'ubuntu-latest' && matrix.node-version == '24')
         uses: nick-invision/retry@7152eba30c6575329ac0576536151aca5a72780e #v3.0.0
@@ -107,7 +125,15 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: "Install application"
         if: github.repository == 'juice-shop/juice-shop' || (github.repository != 'juice-shop/juice-shop' && matrix.os == 'ubuntu-latest' && matrix.node-version == '24')
-        run: npm install
+        run: |
+          npm install --ignore-scripts
+          npm rebuild sqlite3
+          cd frontend
+          npm install --ignore-scripts
+          cd ..
+          npm run build:frontend
+          npm run --silent build:server || true
+        shell: bash
       - name: "Execute server unit tests"
         if: github.repository == 'juice-shop/juice-shop' || (github.repository != 'juice-shop/juice-shop' && matrix.os == 'ubuntu-latest' && matrix.node-version == '24')
         uses: nick-invision/retry@7152eba30c6575329ac0576536151aca5a72780e #v3.0.0
@@ -144,7 +170,15 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: "Install application"
         if: github.repository == 'juice-shop/juice-shop' || (github.repository != 'juice-shop/juice-shop' && matrix.os == 'ubuntu-latest' && matrix.node-version == '24')
-        run: npm install
+        run: |
+          npm install --ignore-scripts
+          npm rebuild sqlite3
+          cd frontend
+          npm install --ignore-scripts
+          cd ..
+          npm run build:frontend
+          npm run --silent build:server || true
+        shell: bash
       - name: "Execute integration tests"
         if: github.repository == 'juice-shop/juice-shop' || (github.repository != 'juice-shop/juice-shop' && matrix.os == 'ubuntu-latest' && matrix.node-version == '24')
         uses: nick-invision/retry@7152eba30c6575329ac0576536151aca5a72780e #v3.0.0
@@ -200,7 +234,15 @@ jobs:
           node-version: ${{ env.NODE_DEFAULT_VERSION }}
       - name: "Install application"
         if: github.repository == 'juice-shop/juice-shop' || (github.repository != 'juice-shop/juice-shop' && matrix.os == 'ubuntu-latest' && matrix.node-version == '24')
-        run: npm install
+        run: |
+          npm install --ignore-scripts
+          npm rebuild sqlite3
+          cd frontend
+          npm install --ignore-scripts
+          cd ..
+          npm run build:frontend
+          npm run --silent build:server || true
+        shell: bash
       - name: "Execute server tests for each custom configuration"
         uses: nick-invision/retry@7152eba30c6575329ac0576536151aca5a72780e #v3.0.0
         with:
@@ -235,7 +277,14 @@ jobs:
       - name: "Install CLI tools"
         run: npm install -g @angular/cli
       - name: "Install application"
-        run: npm install
+        run: |
+          npm install --ignore-scripts
+          npm rebuild sqlite3 cypress
+          cd frontend
+          npm install --ignore-scripts
+          cd ..
+          npm run build:frontend
+          npm run --silent build:server || true
       - name: "Execute end-to-end tests on Ubuntu"
         if: ${{ matrix.os == 'ubuntu-latest' }}
         uses: cypress-io/github-action@57b70560982e6a11d23d4b8bec7f8a487cdbb71b #v6.7.8
@@ -290,7 +339,13 @@ jobs:
           echo "PCKG_CPU_ARCH=x64" >> $GITHUB_ENV
       - name: "Package application"
         run: |
-          npm install --production
+          npm install --production --ignore-scripts
+          npm rebuild sqlite3
+          cd frontend
+          npm install --ignore-scripts
+          cd ..
+          npm run build:frontend
+          npm run --silent build:server || true
           npm run package:ci
       - name: "Unpack application archive"
         run: |
@@ -383,6 +438,9 @@ jobs:
       - smoke-test
       - coverage-report
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: "Slack workflow notification"
         uses: Gamesight/slack-workflow-status@68bf00d0dbdbcb206c278399aa1ef6c14f74347a #v1.3.0
