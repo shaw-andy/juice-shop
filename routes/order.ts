@@ -71,19 +71,11 @@ export function placeOrder () {
           let totalPrice = 0
           const basketProducts: Product[] = []
           let totalPoints = 0
+          const stockItems: Array<{ productId: number, quantity: number }> = []
           for (const { BasketItem, price, deluxePrice, name, id } of basket.Products ?? []) {
             if (BasketItem != null) {
               challengeUtils.solveIf(challenges.christmasSpecialChallenge, () => { return BasketItem.ProductId === products.christmasSpecial.id })
-              try {
-                const quantityRow = await QuantityModel.findOne({ where: { ProductId: BasketItem.ProductId } })
-                if (quantityRow) {
-                  const newQuantity = quantityRow.quantity - BasketItem.quantity
-                  await QuantityModel.update({ quantity: newQuantity }, { where: { ProductId: BasketItem.ProductId } })
-                }
-              } catch (error: unknown) {
-                next(error)
-                return
-              }
+              stockItems.push({ productId: BasketItem.ProductId, quantity: BasketItem.quantity })
               let itemPrice: number
               if (security.isDeluxe(req)) {
                 itemPrice = deluxePrice
@@ -143,15 +135,30 @@ export function placeOrder () {
 
           challengeUtils.solveIf(challenges.negativeOrderChallenge, () => { return totalPrice < 0 })
 
+          if (req.body.UserId && req.body.orderDetails?.paymentId === 'wallet') {
+            const wallet = await WalletModel.findOne({ where: { UserId: req.body.UserId } })
+            if (!((wallet != null) && wallet.balance >= totalPrice)) {
+              next(new Error('Insufficient wallet balance.'))
+              return
+            }
+          }
+
+          try {
+            for (const item of stockItems) {
+              const quantityRow = await QuantityModel.findOne({ where: { ProductId: item.productId } })
+              if (quantityRow) {
+                const newQuantity = quantityRow.quantity - item.quantity
+                await QuantityModel.update({ quantity: newQuantity }, { where: { ProductId: item.productId } })
+              }
+            }
+          } catch (error: unknown) {
+            next(error)
+            return
+          }
+
           if (req.body.UserId) {
             if (req.body.orderDetails && req.body.orderDetails.paymentId === 'wallet') {
-              const wallet = await WalletModel.findOne({ where: { UserId: req.body.UserId } })
-              if ((wallet != null) && wallet.balance >= totalPrice) {
-                await WalletModel.decrement({ balance: totalPrice }, { where: { UserId: req.body.UserId } })
-              } else {
-                next(new Error('Insufficient wallet balance.'))
-                return
-              }
+              await WalletModel.decrement({ balance: totalPrice }, { where: { UserId: req.body.UserId } })
             }
             try {
               await WalletModel.increment({ balance: totalPoints }, { where: { UserId: req.body.UserId } })
