@@ -204,11 +204,11 @@ export class NavbarComponent implements OnInit {
   }
 
   checkLanguage () {
-    if (this.cookieService.get('language')) {
-      const langKey = this.cookieService.get('language')
-      this.translate.use(langKey)
-      this.selectedLanguage = this.languages.find((y: { key: string }) => y.key === langKey)
-      this.shortKeyLang = this.languages.find((y: { key: string }) => y.key === langKey).shortKey
+    const language = this.findLanguage(this.cookieService.get('language'))
+    if (language) {
+      this.translate.use(language.key)
+      this.selectedLanguage = language
+      this.shortKeyLang = language.shortKey
     } else {
       this.changeLanguage('en')
       this.selectedLanguage = this.languages.find((y: { key: string }) => y.key === 'en')
@@ -250,22 +250,27 @@ export class NavbarComponent implements OnInit {
   }
 
   changeLanguage (langKey: string) {
-    this.translate.use(langKey)
+    const language = this.findLanguage(langKey)
+    if (!language) {
+      return
+    }
+    this.translate.use(language.key)
     const expires = new Date()
     expires.setFullYear(expires.getFullYear() + 1)
-    this.cookieService.put('language', langKey, { expires })
-    if (this.languages.find((y: { key: string }) => y.key === langKey)) {
-      const language = this.languages.find((y: { key: string }) => y.key === langKey)
-      this.shortKeyLang = language.shortKey
+    this.cookieService.put('language', language.key, { expires })
+    this.shortKeyLang = language.shortKey
 
-      const snackBarRef = this.snackBar.open(`Language has been changed to ${language.lang}`, 'Force page reload', {
-        duration: 5000,
-        panelClass: ['mat-body']
-      })
-      snackBarRef.onAction().subscribe(() => {
-        this.windowRefService.nativeWindow.location.reload()
-      })
-    }
+    const snackBarRef = this.snackBar.open(`Language has been changed to ${language.lang}`, 'Force page reload', {
+      duration: 5000,
+      panelClass: ['mat-body']
+    })
+    snackBarRef.onAction().subscribe(() => {
+      this.windowRefService.nativeWindow.location.reload()
+    })
+  }
+
+  private findLanguage (langKey: string | undefined) {
+    return langKey ? this.languages.find((y: { key: string }) => y.key === langKey) : undefined
   }
 
   getScoreBoardStatus () {

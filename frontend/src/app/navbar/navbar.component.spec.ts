@@ -336,8 +336,14 @@ describe('NavbarComponent', () => {
 
     it('should set selected a language', () => {
         vi.spyOn(translateService, 'use').mockImplementation((lang: any) => lang)
+        component.changeLanguage('en')
+        expect(translateService.use).toHaveBeenCalledWith('en')
+    })
+
+    it('should not use a language that is not in the language list', () => {
+        vi.spyOn(translateService, 'use').mockImplementation((lang: any) => lang)
         component.changeLanguage('xx')
-        expect(translateService.use).toHaveBeenCalledWith('xx')
+        expect(translateService.use).not.toHaveBeenCalledWith('xx')
     })
 
     describe('template rendering', () => {

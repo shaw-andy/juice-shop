@@ -70,7 +70,7 @@ export class LocalBackupService {
       if (backup.version === this.VERSION) {
         this.restoreCookie('welcomebanner_status', backup.banners?.welcomeBannerStatus)
         this.restoreCookie('cookieconsent_status', backup.banners?.cookieConsentStatus)
-        this.restoreCookie('language', backup.language)
+        this.restoreCookie('language', /^[A-Za-z]{2,3}(_[A-Za-z]{2})?$/.test(backup.language ?? '') ? backup.language : undefined)
         this.restoreCookie('continueCodeFindIt', backup.continueCodeFindIt)
         this.restoreCookie('continueCodeFixIt', backup.continueCodeFixIt)
         this.restoreCookie('continueCode', backup.continueCode)
