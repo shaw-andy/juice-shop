@@ -268,7 +268,7 @@ void describe('order', () => {
     mock.method(BasketModel, 'findOne', async () => basket)
     mock.method(security.authenticatedUsers, 'from', () => ({ data: { email: 'test@juice-sh.op' } }))
     mock.method(QuantityModel, 'findOne', async () => ({ quantity: 10 }))
-    mock.method(QuantityModel, 'update', async () => [1])
+    const updateQuantity = mock.method(QuantityModel, 'update', async () => [1])
     req.body.UserId = 1
     req.body.orderDetails = { paymentId: 'wallet' }
     mock.method(WalletModel, 'findOne', async () => ({ balance: 10 }))
@@ -281,5 +281,42 @@ void describe('order', () => {
     const err = await p as Error
 
     assert.match(err.message, /Insufficient wallet balance/)
+    assert.equal(updateQuantity.mock.calls.length, 0)
+  })
+
+  void it('should reduce stock when wallet balance covers the order', async () => {
+    const basket = {
+      id: 1,
+      Products: [{
+        BasketItem: { ProductId: 1, quantity: 2 },
+        price: 10,
+        deluxePrice: 5,
+        name: 'Product 1',
+        id: 1
+      }],
+      update: mock.fn(async () => {}),
+      coupon: null
+    }
+    mock.method(BasketModel, 'findOne', async () => basket)
+    mock.method(security.authenticatedUsers, 'from', () => ({ data: { email: 'test@juice-sh.op' } }))
+    mock.method(QuantityModel, 'findOne', async () => ({ quantity: 10 }))
+    const updateQuantity = mock.method(QuantityModel, 'update', async () => [1])
+    req.body.UserId = 1
+    req.body.orderDetails = { paymentId: 'wallet' }
+    mock.method(WalletModel, 'findOne', async () => ({ balance: 100 }))
+    mock.method(WalletModel, 'decrement', async () => {})
+    mock.method(WalletModel, 'increment', async () => {})
+    mock.method(db.ordersCollection, 'insert', async () => {})
+    mock.method(BasketItemModel, 'destroy', async () => {})
+
+    const p = new Promise((resolve) => {
+      res.json = (data: any) => { resolve(data) }
+    })
+
+    placeOrder()(req, res, next)
+    await p
+
+    assert.equal(updateQuantity.mock.calls.length, 1)
+    assert.deepEqual(updateQuantity.mock.calls[0].arguments[0], { quantity: 8 })
   })
 })
