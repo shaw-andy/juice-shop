@@ -95,13 +95,13 @@ export function placeOrder () {
               const product = {
                 quantity: BasketItem.quantity,
                 id,
-                name: req.__(name),
+                name: req.__(name ?? ''),
                 price: itemPrice,
                 total: itemTotal,
                 bonus: itemBonus
               }
               basketProducts.push(product)
-              doc.text(`${BasketItem.quantity}x ${req.__(name)} ${req.__('ea.')} ${itemPrice} = ${itemTotal}¤`)
+              doc.text(`${BasketItem.quantity}x ${req.__(name ?? '')} ${req.__('ea.')} ${itemPrice} = ${itemTotal}¤`)
               doc.moveDown()
               totalPrice += itemTotal
               totalPoints += itemBonus
