@@ -29,13 +29,20 @@ export const variableDependencies: Record<string, Dependency> = {
   }
 }
 
-export const domainDependencies: Record<string, Dependency> = {
-  'https://www.alchemy.com/': {
+export interface DomainDependency extends Dependency {
+  url: string
+}
+
+// Keys are fixed identifiers because they end up in public challenge records; the url must stay server-side
+export const domainDependencies: Record<string, DomainDependency> = {
+  ALCHEMY_API: {
+    url: 'https://www.alchemy.com/',
     dependency: 'Alchemy API',
     documentation: 'https://howto-web3.owasp-juice.shop',
     dependentChallenges: ['"Mint the Honey Pot" challenge', '"Wallet Depletion" challenge']
   },
-  [config.get<string>('application.chatBot.llmApiUrl')]: {
+  LLM_API: {
+    url: config.get<string>('application.chatBot.llmApiUrl'),
     dependency: 'LLM API',
     documentation: 'https://howto-llm.owasp-juice.shop',
     dependentChallenges: ['"Chatbot Prompt Injection" challenge', '"Greedy Chatbot Manipulation" challenge', '"AI Debugging" challenge', '"System Prompt Extraction" challenge']
@@ -67,18 +74,18 @@ const validatePreconditions = async ({ exitOnFailure = true } = {}) => {
   ])
   const asyncConditions = asyncResults.every(condition => condition)
 
-  const alchemyDomainReachable = await checkIfDomainReachable('https://www.alchemy.com/')
+  const alchemyDomainReachable = await checkIfDomainReachable(domainDependencies.ALCHEMY_API.url)
   const alchemyEnvVarExists = checkIfEnvironmentVariableExists('ALCHEMY_API_KEY')
-  preconditionResults['https://www.alchemy.com/'] = alchemyDomainReachable
+  preconditionResults.ALCHEMY_API = alchemyDomainReachable
   preconditionResults.ALCHEMY_API_KEY = alchemyEnvVarExists
   if (!alchemyDomainReachable || !alchemyEnvVarExists) {
     logger.info(`Check ${colors.bold('https://howto-web3.owasp-juice.shop')} for instructions on how to set up and configure the Alchemy API`)
   }
-  const llmApiUrl = config.get<string>('application.chatBot.llmApiUrl')
+  const llmApiUrl = domainDependencies.LLM_API.url
   const llmApiReachable = await checkIfDomainReachable(llmApiUrl)
   let llmApiKeyEnvVarExists = true
   let llmModelAvailable = true
-  preconditionResults[llmApiUrl] = llmApiReachable
+  preconditionResults.LLM_API = llmApiReachable
   if (llmApiReachable) {
     const llmModel = config.get<string>('application.chatBot.model')
     llmModelAvailable = await checkIfLlmModelAvailable(llmApiUrl)
@@ -167,8 +174,10 @@ export const checkIfDomainReachable = async (domain: string) => {
     return true
   } catch {
     logger.warn(`Domain ${colors.bold(domain)} is not reachable (${colors.yellow('WARNING')})`)
-    domainDependencies[domain].dependentChallenges.forEach((dependency: string) => {
-      logger.warn(`${colors.italic(dependency)} will not work as intended without access to ${colors.bold(domain)}`)
+    Object.values(domainDependencies).filter(({ url }) => url === domain).forEach(({ dependentChallenges }) => {
+      dependentChallenges.forEach((dependency: string) => {
+        logger.warn(`${colors.italic(dependency)} will not work as intended without access to ${colors.bold(domain)}`)
+      })
     })
     return false
   }

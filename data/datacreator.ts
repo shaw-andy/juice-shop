@@ -108,9 +108,9 @@ async function createChallenges () {
         challengeDependencies.push({ ...dependency, key: variable, missing: !preconditionResults[variable] })
       }
     }
-    for (const [domain, dependency] of Object.entries(domainDependencies)) {
+    for (const [id, dependency] of Object.entries(domainDependencies)) {
       if (dependency.dependentChallenges.some(dep => dep.includes(challenge.name) || dep.includes(challenge.key))) {
-        challengeDependencies.push({ ...dependency, key: domain, missing: !preconditionResults[domain] })
+        challengeDependencies.push({ dependency: dependency.dependency, documentation: dependency.documentation, key: id, missing: !preconditionResults[id] })
       }
     }
 
