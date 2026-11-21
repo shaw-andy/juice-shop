@@ -589,14 +589,14 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
     if (name === 'Product') {
       resource.list.fetch.after((req: Request, res: Response, context: { instance: any[], continue: any }) => {
         for (let i = 0; i < context.instance.length; i++) {
-          context.instance[i].name = req.__(context.instance[i].name)
-          context.instance[i].description = req.__(context.instance[i].description)
+          context.instance[i].name = req.__(context.instance[i].name ?? '')
+          context.instance[i].description = req.__(context.instance[i].description ?? '')
         }
         return context.continue
       })
       resource.read.send.before((req: Request, res: Response, context: { instance: { name: string, description: string }, continue: any }) => {
-        context.instance.name = req.__(context.instance.name)
-        context.instance.description = req.__(context.instance.description)
+        context.instance.name = req.__(context.instance.name ?? '')
+        context.instance.description = req.__(context.instance.description ?? '')
         return context.continue
       })
     }

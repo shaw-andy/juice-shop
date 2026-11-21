@@ -108,6 +108,29 @@ void describe('/api/Products/:id', () => {
     assert.equal(res.body.data.description, '<a href="http://kimminich.de" target="_blank">More...</a>')
   })
 
+  void it('GET all products still succeeds after a product description is cleared to null', async () => {
+    const update = await request(app)
+      .put('/api/Products/1')
+      .set(jsonHeader)
+      .send({ description: null })
+    assert.equal(update.status, 200)
+
+    const list = await request(app).get('/api/Products')
+    assert.equal(list.status, 200)
+    assert.ok(Array.isArray(list.body.data))
+    assert.ok(list.body.data.length > 1)
+    const cleared = list.body.data.find((product: { id: number }) => product.id === 1)
+    assert.equal(cleared.description, '')
+
+    const single = await request(app).get('/api/Products/1')
+    assert.equal(single.status, 200)
+    assert.equal(single.body.data.description, '')
+
+    const search = await request(app).get('/rest/products/search').query({ q: 'Apple' })
+    assert.equal(search.status, 200)
+    assert.ok(Array.isArray(search.body.data))
+  })
+
   void it('DELETE existing product is forbidden via public API', async () => {
     const res = await request(app)
       .delete('/api/Products/1')
