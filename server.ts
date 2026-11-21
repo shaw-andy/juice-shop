@@ -54,6 +54,7 @@ import logger from './lib/logger'
 import * as utils from './lib/utils'
 import * as antiCheat from './lib/antiCheat'
 import * as security from './lib/insecurity'
+import { guardTranslatedMarkup } from './lib/translationMarkup'
 import validateConfig from './lib/startup/validateConfig'
 import cleanupFtpFolder from './lib/startup/cleanupFtpFolder'
 import customizeEasterEgg from './lib/startup/customizeEasterEgg' // vuln-code-snippet hide-line
@@ -322,6 +323,7 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
     autoReload: process.env.NODE_ENV !== 'test'
   })
   app.use(i18n.init)
+  app.use(guardTranslatedMarkup())
 
   app.use(bodyParser.urlencoded({ extended: true }))
   /* File Upload */
