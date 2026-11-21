@@ -4,9 +4,22 @@ import { provideRouter } from '@angular/router'
 
 import { ChallengeCardComponent } from './challenge-card.component'
 import { type Config } from '../../../../app/Services/configuration.service'
-import { TranslateModule } from '@ngx-translate/core'
+import { TranslateModule, TranslateService } from '@ngx-translate/core'
 import { MatIconModule } from '@angular/material/icon'
-import { MatTooltipModule } from '@angular/material/tooltip'
+import { MatTooltip, MatTooltipModule } from '@angular/material/tooltip'
+
+const configuredModelAddress = 'http://model.internal.example/v1'
+
+function loadDependencyTranslations() {
+    const translate = TestBed.inject(TranslateService)
+    translate.setTranslation('en', {
+        TAG_EXTERNAL_DEPENDENCY_DESCRIPTION: 'Marks challenges strictly depending on an external service, local endpoint, or API key in order to be solvable.',
+        TAG_EXTERNAL_DEPENDENCY_PRESENT: '{{dependency}} was available during server start. This challenge should work as intended unless {{dependency}} becomes unavailable at runtime.',
+        TAG_EXTERNAL_DEPENDENCY_MISSING: '{{dependency}} was not available during server start. This challenge will likely not work. Click to read the documentation for setting up this dependency.'
+    }, true)
+    translate.setDefaultLang('en')
+    translate.use('en')
+}
 
 describe('ChallengeCard', () => {
     let component: ChallengeCardComponent
@@ -41,6 +54,12 @@ describe('ChallengeCard', () => {
         fixture.componentRef.setInput('applicationConfiguration', defaultAppConfig)
 
         fixture.detectChanges()
+    }
+
+    function dependencyTooltip(className: string): string {
+        const element = fixture.debugElement.query((node) => node.nativeElement?.classList?.contains(className))
+        expect(element).toBeTruthy()
+        return element!.injector.get(MatTooltip).message
     }
 
     function appendCodeToFixture(text: string) {
@@ -360,6 +379,48 @@ describe('ChallengeCard', () => {
                 .find((b) => b.textContent?.includes('1/3'))
             expect(hintBadge).toBeTruthy()
             expect(hintBadge?.querySelector('mat-icon')?.textContent).toContain('lightbulb_outlined')
+        })
+
+        it('should keep the configured model address out of an available dependency tooltip', async () => {
+            loadDependencyTranslations()
+            fixture.componentRef.setInput('challenge', {
+                ...defaultChallenge,
+                tagList: ['Requires LLM API'],
+                ChallengeDependencies: [{
+                    name: 'LLM API',
+                    missing: false,
+                    documentation: null,
+                    key: configuredModelAddress
+                }]
+            })
+            fixture.detectChanges()
+            await fixture.whenStable()
+            fixture.detectChanges()
+
+            const message = dependencyTooltip('tag-available-dependency')
+            expect(message).toContain('LLM API')
+            expect(message).not.toContain(configuredModelAddress)
+        })
+
+        it('should keep the configured model address out of a missing dependency tooltip', async () => {
+            loadDependencyTranslations()
+            fixture.componentRef.setInput('challenge', {
+                ...defaultChallenge,
+                tagList: ['Requires LLM API'],
+                ChallengeDependencies: [{
+                    name: 'LLM API',
+                    missing: true,
+                    documentation: 'https://howto-llm.owasp-juice.shop',
+                    key: configuredModelAddress
+                }]
+            })
+            fixture.detectChanges()
+            await fixture.whenStable()
+            fixture.detectChanges()
+
+            const message = dependencyTooltip('tag-missing-dependency')
+            expect(message).toContain('LLM API')
+            expect(message).not.toContain(configuredModelAddress)
         })
 
         it('should disable the hint badge and show solid lightbulb when no next hint is available', () => {
