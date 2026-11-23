@@ -10,6 +10,7 @@ import * as models from '../models/index'
 import { UserModel } from '../models/user'
 import { challenges } from '../data/datacache'
 import * as challengeUtils from '../lib/challengeUtils'
+import { translateProductName, translateProductDescription } from '../lib/productTranslation'
 
 class ErrorWithParent extends Error {
   parent: Error | undefined
@@ -62,8 +63,8 @@ export function searchProducts () {
           })
         } // vuln-code-snippet hide-end
         for (let i = 0; i < products.length; i++) {
-          products[i].name = req.__(products[i].name)
-          products[i].description = req.__(products[i].description)
+          products[i].name = translateProductName(req, products[i])
+          products[i].description = translateProductDescription(req, products[i])
         }
         res.json(utils.queryResultToJson(products))
       }).catch((error: ErrorWithParent) => {

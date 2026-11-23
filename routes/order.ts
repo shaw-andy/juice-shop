@@ -18,6 +18,7 @@ import { BasketModel } from '../models/basket'
 import { WalletModel } from '../models/wallet'
 import * as security from '../lib/insecurity'
 import * as utils from '../lib/utils'
+import { translateProductName } from '../lib/productTranslation'
 import * as db from '../data/mongodb'
 
 interface Product {
@@ -92,16 +93,17 @@ export function placeOrder () {
               }
               const itemTotal = itemPrice * BasketItem.quantity
               const itemBonus = Math.round(itemPrice / 10) * BasketItem.quantity
+              const translatedName = translateProductName(req, { id, name })
               const product = {
                 quantity: BasketItem.quantity,
                 id,
-                name: req.__(name),
+                name: translatedName,
                 price: itemPrice,
                 total: itemTotal,
                 bonus: itemBonus
               }
               basketProducts.push(product)
-              doc.text(`${BasketItem.quantity}x ${req.__(name)} ${req.__('ea.')} ${itemPrice} = ${itemTotal}¤`)
+              doc.text(`${BasketItem.quantity}x ${translatedName} ${req.__('ea.')} ${itemPrice} = ${itemTotal}¤`)
               doc.moveDown()
               totalPrice += itemTotal
               totalPoints += itemBonus
