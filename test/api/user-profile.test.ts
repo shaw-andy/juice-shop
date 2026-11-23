@@ -119,7 +119,7 @@ void describe('/profile', () => {
     assert.ok(res.text.includes('not_a_defined_symbol'))
   })
 
-  void it('GET user profile still evaluates SSTI payload when #{} is NOT at the start of the username', async () => {
+  void it('GET user profile renders username as text when #{} is NOT at the start of the username', async () => {
     await request(app)
       .post('/profile')
       .set('Cookie', authHeader.Cookie)
@@ -133,7 +133,8 @@ void describe('/profile', () => {
 
     assert.equal(res.status, 200)
     assert.ok(res.headers['content-type']?.includes('text/html'))
-    assert.ok(res.text.includes('A49'))
+    assert.ok(!res.text.includes('A49'))
+    assert.ok(res.text.includes('A#{7*7}'))
   })
 
   void it('GET user profile does NOT evaluate SSTI payload in safe mode', async (t) => {
