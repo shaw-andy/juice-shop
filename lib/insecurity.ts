@@ -56,7 +56,6 @@ export const verify = (token: string) => token ? (jws.verify as ((token: string,
 export const decode = (token: string) => { return jws.decode(token)?.payload }
 
 export const sanitizeHtml = (html: string) => sanitizeHtmlLib(html)
-export const sanitizeLegacy = (input = '') => input.replace(/<(?:\w+)\W+?[\w]/gi, '')
 export const sanitizeFilename = (filename: string) => sanitizeFilenameLib(filename)
 export const sanitizeSecure = (html: string): string => {
   const sanitized = sanitizeHtml(html)

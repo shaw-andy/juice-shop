@@ -139,27 +139,6 @@ void describe('insecurity', () => {
     })
   })
 
-  void describe('sanitizeLegacy', () => {
-    void it('returns empty string for undefined input', () => {
-      assert.equal(security.sanitizeLegacy(), '')
-      assert.equal(security.sanitizeLegacy(undefined), '')
-    })
-
-    void it('returns input unchanged for plain text input', () => {
-      assert.equal(security.sanitizeLegacy('bkimminich'), 'bkimminich')
-      assert.equal(security.sanitizeLegacy('Kosh III.'), 'Kosh III.')
-    })
-
-    void it('removes all opening tags and subsequent character from HTML input', () => {
-      assert.equal(security.sanitizeLegacy('<h1>Hello</h1>'), 'ello</h1>')
-      assert.equal(security.sanitizeLegacy('<img src="test">'), 'rc="test">')
-    })
-
-    void it('can be bypassed to allow working HTML payload to be returned', () => {
-      assert.equal(security.sanitizeLegacy('<<a|ascript>alert(`xss`)</script>'), '<script>alert(`xss`)</script>')
-    })
-  })
-
   void describe('sanitizeSecure', () => {
     void it('handles empty inputs by returning their string representation', () => {
       assert.equal(security.sanitizeSecure(''), '')
