@@ -9,6 +9,7 @@ import { BasketModel } from '../models/basket'
 import * as challengeUtils from '../lib/challengeUtils'
 
 import * as utils from '../lib/utils'
+import { translateProductName } from '../lib/productTranslation'
 import * as security from '../lib/insecurity'
 import { challenges } from '../data/datacache'
 
@@ -24,7 +25,7 @@ export function retrieveBasket () {
       })
       if (((basket?.Products) != null) && basket.Products.length > 0) {
         for (let i = 0; i < basket.Products.length; i++) {
-          basket.Products[i].name = req.__(basket.Products[i].name)
+          basket.Products[i].name = translateProductName(req, basket.Products[i])
         }
       }
 

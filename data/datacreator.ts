@@ -435,6 +435,7 @@ async function createProducts () {
           }
         ).then(async (persistedProduct) => {
           if (persistedProduct != null) {
+            datacache.seededProductTexts[persistedProduct.id] = { name: persistedProduct.name, description: persistedProduct.description }
             if (useForChristmasSpecialChallenge) { datacache.products.christmasSpecial = persistedProduct }
             if (urlForProductTamperingChallenge) {
               datacache.products.osaft = persistedProduct
