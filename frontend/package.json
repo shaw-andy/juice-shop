@@ -85,6 +85,9 @@
   },
   "overrides": {
     "lru-cache@^11": "~11.2.7",
+    "lmdb": {
+      "msgpackr": "2.1.4"
+    },
     "angularx-qrcode": {
       "@angular/core": "$@angular/core",
       "@angular/common": "$@angular/common"
