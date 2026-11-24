@@ -18,6 +18,7 @@ import { ComplaintModel } from '../models/complaint'
 import { FeedbackModel } from '../models/feedback'
 import * as security from '../lib/insecurity'
 import * as utils from '../lib/utils'
+import logger from '../lib/logger'
 import { buildSystemPrompt } from './chat'
 
 export const emptyUserRegistration = () => (req: Request, res: Response, next: NextFunction) => {
@@ -152,8 +153,8 @@ async function checkPatternInFeedbackAndComplaints (
       const isCheating = rows.some((row: any) => antiCheat.checkForSourceFileOverlap(challenge.key, row.comment ?? ''))
       challengeUtils.solve(challenge, false, isCheating)
     }
-  }).catch(() => {
-    throw new Error('Unable to retrieve feedback details. Please try again')
+  }).catch((err: unknown) => {
+    logger.warn('Unable to retrieve feedback details: ' + utils.getErrorMessage(err))
   })
 
   const complaintCheck = ComplaintModel.findAndCountAll({
@@ -163,8 +164,8 @@ async function checkPatternInFeedbackAndComplaints (
       const isCheating = rows.some((row: any) => antiCheat.checkForSourceFileOverlap(challenge.key, row.message ?? ''))
       challengeUtils.solve(challenge, false, isCheating)
     }
-  }).catch(() => {
-    throw new Error('Unable to retrieve complaint details. Please try again')
+  }).catch((err: unknown) => {
+    logger.warn('Unable to retrieve complaint details: ' + utils.getErrorMessage(err))
   })
 
   await Promise.all([feedbackCheck, complaintCheck])
@@ -222,13 +223,16 @@ function changeProductChallenge (osaft: Product) {
         break
       }
     }
-    if (urlForProductTamperingChallenge) {
-      if (!osaft.description.includes(`${urlForProductTamperingChallenge}`)) {
-        if (osaft.description.includes(`<a href="${config.get<string>('challenges.overwriteUrlForProductTamperingChallenge')}" target="_blank">`)) {
+    const description: unknown = osaft.description
+    if (urlForProductTamperingChallenge && typeof description === 'string') {
+      if (!description.includes(`${urlForProductTamperingChallenge}`)) {
+        if (description.includes(`<a href="${config.get<string>('challenges.overwriteUrlForProductTamperingChallenge')}" target="_blank">`)) {
           challengeUtils.solve(challenges.changeProductChallenge)
         }
       }
     }
+  }, (err: unknown) => {
+    logger.warn('Unable to reload product details: ' + utils.getErrorMessage(err))
   })
 }
 
@@ -237,8 +241,8 @@ function feedbackChallenge () {
     if (count === 0) {
       challengeUtils.solve(challenges.feedbackChallenge)
     }
-  }).catch(() => {
-    throw new Error('Unable to retrieve feedback details. Please try again')
+  }).catch((err: unknown) => {
+    logger.warn('Unable to retrieve feedback details: ' + utils.getErrorMessage(err))
   })
 }
 
