@@ -18,10 +18,13 @@
   ]
 
   for (const { name, exclude, model, include } of autoModels) {
+    const visibleAttributes = Object.keys((model as ModelStatic<Model>).getAttributes()).filter(attribute => !exclude.some(excluded => excluded === attribute))
     const resource = finale.resource({
       model,
       endpoints: [`/api/${name}s`, `/api/${name}s/:id`],
       excludeAttributes: exclude,
+      search: { param: 'q', attributes: visibleAttributes },
+      sort: { param: 'sort', attributes: visibleAttributes },
       pagination: false,
       include
     })

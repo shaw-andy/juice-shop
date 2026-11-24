@@ -959,15 +959,15 @@
 	"registerAdminChallenge_2.ts": {
 		"added": [
 			5,
-			28,
-			29,
-			30,
+			31,
+			32,
 			33,
-			34,
-			35
+			36,
+			37,
+			38
 		],
 		"removed": [
-			28
+			31
 		]
 	},
 	"registerAdminChallenge_3_correct.ts": {
