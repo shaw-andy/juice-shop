@@ -18,6 +18,7 @@ import serveIndex from 'serve-index'
 import bodyParser from 'body-parser'
 // @ts-expect-error FIXME due to non-existing type definitions for finale-rest
 import * as finale from 'finale-rest'
+import { type Model, type ModelStatic } from 'sequelize'
 import compression from 'compression'
 // @ts-expect-error FIXME due to non-existing type definitions for express-robots-txt
 import robots from 'express-robots-txt'
@@ -517,10 +518,13 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   ]
 
   for (const { name, exclude, model, include } of autoModels) {
+    const visibleAttributes = Object.keys((model as ModelStatic<Model>).getAttributes()).filter(attribute => !exclude.some(excluded => excluded === attribute))
     const resource = finale.resource({
       model,
       endpoints: [`/api/${name}s`, `/api/${name}s/:id`],
       excludeAttributes: exclude,
+      search: { param: 'q', attributes: visibleAttributes },
+      sort: { param: 'sort', attributes: visibleAttributes },
       pagination: false,
       include
     })
@@ -535,6 +539,16 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
       }) // vuln-code-snippet neutral-line registerAdminChallenge
     } // vuln-code-snippet neutral-line registerAdminChallenge
     // vuln-code-snippet end registerAdminChallenge
+
+    // finale turns every query parameter named like a model attribute into a filter, including excluded ones
+    if (exclude.length > 0) {
+      resource.list.fetch.before((req: Request, res: Response, context: { error: (status: number, message: string) => unknown, continue: any }) => {
+        if (exclude.some(attribute => Object.prototype.hasOwnProperty.call(req.query, attribute))) {
+          return context.error(400, 'Filtering not allowed on given attributes')
+        }
+        return context.continue
+      })
+    }
 
     // translate challenge descriptions on-the-fly
     if (name === 'Challenge') {
