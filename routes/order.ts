@@ -32,6 +32,11 @@ interface Product {
 export function placeOrder () {
   return (req: Request, res: Response, next: NextFunction) => {
     const id = req.params.id
+    const couponData: unknown = req.body.couponData
+    if (couponData != null && !isBase64CouponData(couponData)) {
+      res.status(400).json({ error: 'Invalid coupon data' })
+      return
+    }
     BasketModel.findOne({ where: { id }, include: [{ model: ProductModel, paranoid: false, as: 'Products' }] })
       .then(async (basket: BasketModel | null) => {
         if (basket != null) {
@@ -108,7 +113,7 @@ export function placeOrder () {
             }
           }
           doc.moveDown()
-          const discount = calculateApplicableDiscount(basket, req) ?? 0
+          const discount = calculateApplicableDiscount(basket, couponData ?? undefined) ?? 0
           let discountAmount = '0'
           if (discount > 0) {
             discountAmount = (totalPrice * (discount / 100)).toFixed(2)
@@ -187,13 +192,19 @@ export function placeOrder () {
   }
 }
 
-function calculateApplicableDiscount (basket: BasketModel, req: Request) {
+const COUPON_DATA_MAX_LENGTH = 64
+
+function isBase64CouponData (couponData: unknown): couponData is string {
+  return typeof couponData === 'string' && couponData.length <= COUPON_DATA_MAX_LENGTH && /^[A-Za-z0-9+/]*={0,2}$/.test(couponData)
+}
+
+function calculateApplicableDiscount (basket: BasketModel, encodedCouponData?: string) {
   const discount = security.discountFromCoupon(basket.coupon ?? undefined)
   if (discount) {
     challengeUtils.solveIf(challenges.forgedCouponChallenge, () => { return (discount ?? 0) >= 80 })
     return discount
-  } else if (req.body.couponData) {
-    const couponData = Buffer.from(req.body.couponData, 'base64').toString().split('-')
+  } else if (encodedCouponData) {
+    const couponData = Buffer.from(encodedCouponData, 'base64').toString().split('-')
     const couponCode = couponData[0]
     const couponDate = Number(couponData[1])
     const campaign = campaigns[couponCode as keyof typeof campaigns]
