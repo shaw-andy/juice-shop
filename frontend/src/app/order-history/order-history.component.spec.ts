@@ -160,7 +160,7 @@ describe('AccountingComponent', () => {
     it('should open the order confirmation PDF in a new tab using the basket host server', () => {
         const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
         component.openConfirmationPDF('abc123')
-        expect(openSpy).toHaveBeenCalledWith('http://host.example/ftp/order_abc123.pdf', '_blank')
+        expect(openSpy).toHaveBeenCalledWith('http://host.example/rest/order-confirmation/abc123', '_blank')
         openSpy.mockRestore()
     })
 
