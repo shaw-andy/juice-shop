@@ -67,18 +67,21 @@ export const sanitizeSecure = (html: string): string => {
   }
 }
 
+const ownValue = <T>(map: Record<string, T>, key: string): T | undefined =>
+  Object.prototype.hasOwnProperty.call(map, key) ? map[key] : undefined
+
 export const authenticatedUsers: IAuthenticatedUsers = {
-  tokenMap: {},
-  idMap: {},
+  tokenMap: Object.create(null),
+  idMap: Object.create(null),
   put: function (token: string, user: ResponseWithUser) {
     this.tokenMap[token] = user
     this.idMap[user.data.id] = token
   },
   get: function (token?: string) {
-    return token ? this.tokenMap[utils.unquote(token)] : undefined
+    return token ? ownValue(this.tokenMap, utils.unquote(token)) : undefined
   },
   tokenOf: function (user: UserModel) {
-    return user ? this.idMap[user.id] : undefined
+    return user ? ownValue(this.idMap, String(user.id)) : undefined
   },
   from: function (req: Request) {
     const token = utils.jwtFrom(req)
@@ -175,7 +178,7 @@ export const isCustomer = (req: Request) => {
 export const appendUserId = () => {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
-      req.body.UserId = authenticatedUsers.tokenMap[utils.jwtFrom(req)].data.id
+      req.body.UserId = authenticatedUsers.get(utils.jwtFrom(req))!.data.id
       next()
     } catch (error: unknown) {
       res.status(401).json({ status: 'error', message: utils.getErrorMessage(error) })
