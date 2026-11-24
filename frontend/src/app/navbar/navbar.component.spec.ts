@@ -79,11 +79,13 @@ describe('NavbarComponent', () => {
         userService = {
             whoAmI: vi.fn().mockName("UserService.whoAmI"),
             getLoggedInState: vi.fn().mockName("UserService.getLoggedInState"),
-            saveLastLoginIp: vi.fn().mockName("UserService.saveLastLoginIp")
+            saveLastLoginIp: vi.fn().mockName("UserService.saveLastLoginIp"),
+            logout: vi.fn().mockName("UserService.logout")
         }
         userService.whoAmI.mockReturnValue(of({}))
         userService.getLoggedInState.mockReturnValue(of(true))
         userService.saveLastLoginIp.mockReturnValue(of({}))
+        userService.logout.mockReturnValue(of({}))
         userService.isLoggedIn = {
             next: vi.fn().mockName("userService.isLoggedIn.next")
         }
@@ -326,6 +328,21 @@ describe('NavbarComponent', () => {
     it('should save the last login IP address', () => {
         component.logout()
         expect(userService.saveLastLoginIp).toHaveBeenCalled()
+    })
+
+    it('should end the session on the server', () => {
+        component.logout()
+        expect(userService.logout).toHaveBeenCalled()
+    })
+
+    it('should still remove the authentication token when ending the session on the server fails', () => {
+        userService.logout.mockReturnValue(throwError('Error'))
+        console.log = vi.fn()
+        const removeItemSpy = vi.spyOn(Storage.prototype, 'removeItem')
+        component.logout()
+        expect(console.log).toHaveBeenCalledWith('Error')
+        expect(removeItemSpy).toHaveBeenCalledWith('token')
+        expect(cookieService.remove).toHaveBeenCalledWith('token')
     })
 
     it('should forward to main page', async () => {

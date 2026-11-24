@@ -72,6 +72,10 @@ export class UserService {
     return this.http.get(this.hostServer + '/rest/saveLoginIp').pipe(map((response: any) => response), catchError((err) => { throw err }))
   }
 
+  logout () {
+    return this.http.post(this.hostServer + '/rest/user/logout', {}).pipe(catchError((err) => { throw err }))
+  }
+
   deluxeStatus () {
     return this.http.get(this.hostServer + '/rest/deluxe-membership').pipe(map((response: any) => response.data), catchError((err) => { throw err }))
   }
