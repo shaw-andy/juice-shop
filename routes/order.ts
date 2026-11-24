@@ -4,7 +4,7 @@
  */
 
 import fs from 'node:fs'
-import path from 'node:path'
+import net from 'node:net'
 import config from 'config'
 import { type Request, type Response, type NextFunction } from 'express'
 
@@ -19,6 +19,7 @@ import { WalletModel } from '../models/wallet'
 import * as security from '../lib/insecurity'
 import * as utils from '../lib/utils'
 import * as db from '../data/mongodb'
+import { orderConfirmationFile, prepareOrderConfirmationsDir, retainOrderConfirmation } from '../lib/orderConfirmations'
 
 interface Product {
   quantity: number
@@ -29,32 +30,105 @@ interface Product {
   bonus: number
 }
 
+const maxOrdersPerWindow = 5
+const orderWindowMs = 15 * 60 * 1000
+
+function createCheckoutAllowance () {
+  const windows = new Map<string, { orders: number, resetAt: number }>()
+  setInterval(() => {
+    const now = Date.now()
+    for (const [key, window] of windows) {
+      if (window.resetAt <= now) windows.delete(key)
+    }
+  }, orderWindowMs).unref()
+
+  return (keys: string[]) => {
+    const now = Date.now()
+    const keyWindows = keys.map((key) => {
+      let window = windows.get(key)
+      if (window === undefined || window.resetAt <= now) {
+        window = { orders: 0, resetAt: now + orderWindowMs }
+        windows.set(key, window)
+      }
+      return window
+    })
+    if (keyWindows.some(({ orders }) => orders >= maxOrdersPerWindow)) {
+      return undefined
+    }
+    keyWindows.forEach((window) => { window.orders++ })
+    let released = false
+    return () => {
+      if (!released) {
+        released = true
+        keyWindows.forEach((window) => { window.orders-- })
+      }
+    }
+  }
+}
+
+function clientAddressKey (address = '') {
+  const ipv4 = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(address)
+  if (ipv4 !== null) return ipv4[1]
+  if (!net.isIPv6(address) || address.includes('.')) return address
+  const [head, tail] = address.toLowerCase().split('::')
+  const headGroups = head === '' ? [] : head.split(':')
+  const tailGroups = tail === undefined || tail === '' ? [] : tail.split(':')
+  const groups = [...headGroups, ...Array(8 - headGroups.length - tailGroups.length).fill('0'), ...tailGroups].map((group) => group.padStart(4, '0'))
+  // Group IPv6 clients by /56 prefix, as a single subscriber usually controls at least that much address space
+  return `${groups.slice(0, 3).join(':')}:${groups[3].slice(0, 2)}00::/56`
+}
+
 export function placeOrder () {
+  const reserveCheckout = createCheckoutAllowance()
+  const basketsInCheckout = new Set<number>()
+
   return (req: Request, res: Response, next: NextFunction) => {
+    const customer = security.authenticatedUsers.from(req)
+    const releaseCheckout = reserveCheckout([`user:${customer?.data?.id}`, `address:${clientAddressKey(req.socket?.remoteAddress)}`])
+    if (releaseCheckout === undefined) {
+      res.status(429).json({ status: 'error', message: 'Too many orders, please try again later.' })
+      return
+    }
+    let lockedBasketId: number | undefined
+    const unlockBasket = () => {
+      if (lockedBasketId !== undefined) basketsInCheckout.delete(lockedBasketId)
+    }
+    const fail = (error: unknown) => {
+      unlockBasket()
+      releaseCheckout()
+      next(error)
+    }
+    const failAfterOrderStored = (error: unknown) => {
+      unlockBasket()
+      next(error)
+    }
+
     const id = req.params.id
     BasketModel.findOne({ where: { id }, include: [{ model: ProductModel, paranoid: false, as: 'Products' }] })
       .then(async (basket: BasketModel | null) => {
         if (basket != null) {
-          const customer = security.authenticatedUsers.from(req)
-          const email = customer ? customer.data ? customer.data.email : '' : ''
+          if (customer?.data?.id === undefined || basket.UserId !== customer.data.id) {
+            releaseCheckout()
+            res.status(403).json({ status: 'error', message: 'You are not allowed to check out this basket.' })
+            return
+          }
+          if (!(basket.Products ?? []).some(({ BasketItem }) => BasketItem != null && BasketItem.quantity > 0)) {
+            releaseCheckout()
+            res.status(400).json({ status: 'error', message: 'Your basket does not contain any products.' })
+            return
+          }
+          if (basketsInCheckout.has(basket.id)) {
+            releaseCheckout()
+            res.status(409).json({ status: 'error', message: 'This basket is already being checked out.' })
+            return
+          }
+          lockedBasketId = basket.id
+          basketsInCheckout.add(basket.id)
+          const email = customer.data.email ?? ''
           const orderId = security.hash(email).slice(0, 4) + '-' + utils.randomHexString(16)
-          const pdfFile = `order_${orderId}.pdf`
           const { default: PDFDocument } = await import('pdfkit')
           const doc = new PDFDocument()
           const date = new Date().toJSON().slice(0, 10)
-          const fileWriter = doc.pipe(fs.createWriteStream(path.join('ftp/', pdfFile)))
-
-          fileWriter.on('finish', () => {
-            void (async () => {
-              try {
-                void basket.update({ coupon: null })
-                await BasketItemModel.destroy({ where: { BasketId: id } })
-                res.json({ orderConfirmation: orderId })
-              } catch (error: unknown) {
-                next(error)
-              }
-            })()
-          })
 
           doc.font('Times-Roman').fontSize(40).text(config.get<string>('application.name'), { align: 'center' })
           doc.moveTo(70, 115).lineTo(540, 115).stroke()
@@ -81,7 +155,7 @@ export function placeOrder () {
                   await QuantityModel.update({ quantity: newQuantity }, { where: { ProductId: BasketItem.ProductId } })
                 }
               } catch (error: unknown) {
-                next(error)
+                fail(error)
                 return
               }
               let itemPrice: number
@@ -149,18 +223,19 @@ export function placeOrder () {
               if ((wallet != null) && wallet.balance >= totalPrice) {
                 await WalletModel.decrement({ balance: totalPrice }, { where: { UserId: req.body.UserId } })
               } else {
-                next(new Error('Insufficient wallet balance.'))
+                fail(new Error('Insufficient wallet balance.'))
                 return
               }
             }
             try {
               await WalletModel.increment({ balance: totalPoints }, { where: { UserId: req.body.UserId } })
             } catch (error: unknown) {
-              next(error)
+              fail(error)
               return
             }
           }
 
+          await prepareOrderConfirmationsDir()
           db.ordersCollection.insert({
             promotionalAmount: discountAmount,
             paymentId: req.body.orderDetails ? req.body.orderDetails.paymentId : null,
@@ -174,16 +249,41 @@ export function placeOrder () {
             deliveryPrice: deliveryAmount,
             eta: deliveryMethod.eta.toString()
           }).then(() => {
+            const pdfFile = orderConfirmationFile(orderId)
+            const fileWriter = doc.pipe(fs.createWriteStream(pdfFile))
+            fileWriter.on('error', failAfterOrderStored)
+            fileWriter.on('finish', () => {
+              retainOrderConfirmation(pdfFile)
+              void (async () => {
+                try {
+                  void basket.update({ coupon: null })
+                  await BasketItemModel.destroy({ where: { BasketId: basket.id } })
+                  unlockBasket()
+                  res.json({ orderConfirmation: orderId })
+                } catch (error: unknown) {
+                  failAfterOrderStored(error)
+                }
+              })()
+            })
             doc.end()
-          }).catch((error: unknown) => {
-            next(error)
-          })
+          }, fail).catch(failAfterOrderStored)
         } else {
-          next(new Error(`Basket with id=${id} does not exist.`))
+          fail(new Error(`Basket with id=${id} does not exist.`))
         }
-      }).catch((error: unknown) => {
-        next(error)
-      })
+      }).catch(fail)
+  }
+}
+
+export function serveOrderConfirmation () {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const orderId = req.params.id
+    if (!/^[\w-]+$/.test(orderId)) {
+      res.status(400).json({ status: 'error', message: 'Invalid order id.' })
+      return
+    }
+    res.sendFile(orderConfirmationFile(orderId), (error) => {
+      if (error != null) next(error)
+    })
   }
 }
 
