@@ -27,6 +27,9 @@ export const solveIf = function (challenge: any, criteria: () => any, isRestore:
 }
 
 export const solve = async function (challenge: ChallengeModel, isRestore = false, isCheating = false) {
+  if (challenge.solved && !isRestore) {
+    return
+  }
   challenge.solved = true
   const solvedChallenge = await challenge.save()
 
@@ -110,7 +113,10 @@ export const findChallengeById = (challengeId: number) => {
 
 export const solveFindIt = async function (key: ChallengeKey, isRestore: boolean = false) {
   const solvedChallenge = challenges[key]
-  await ChallengeModel.update({ codingChallengeStatus: 1 }, { where: { key, codingChallengeStatus: { [Op.lt]: 2 } } })
+  const [updated] = await ChallengeModel.update({ codingChallengeStatus: 1 }, { where: { key, codingChallengeStatus: { [Op.lt]: 1 } } })
+  if (updated === 0) {
+    return
+  }
   logger.info(`${isRestore ? colors.grey('Restored') : colors.green('Solved')} 'Find It' phase of coding challenge ${colors.cyan(solvedChallenge.key)} (${solvedChallenge.name})`)
   if (!isRestore) {
     accuracy.storeFindItVerdict(solvedChallenge.key, true)
@@ -122,7 +128,10 @@ export const solveFindIt = async function (key: ChallengeKey, isRestore: boolean
 
 export const solveFixIt = async function (key: ChallengeKey, isRestore: boolean = false) {
   const solvedChallenge = challenges[key]
-  await ChallengeModel.update({ codingChallengeStatus: 2 }, { where: { key } })
+  const [updated] = await ChallengeModel.update({ codingChallengeStatus: 2 }, { where: { key, codingChallengeStatus: { [Op.lt]: 2 } } })
+  if (updated === 0) {
+    return
+  }
   logger.info(`${isRestore ? colors.grey('Restored') : colors.green('Solved')} 'Fix It' phase of coding challenge ${colors.cyan(solvedChallenge.key)} (${solvedChallenge.name})`)
   if (!isRestore) {
     accuracy.storeFixItVerdict(solvedChallenge.key, true)
