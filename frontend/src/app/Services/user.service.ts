@@ -51,8 +51,8 @@ export class UserService {
   }
 
   changePassword (passwords: Passwords) {
-    return this.http.get(this.hostServer + '/rest/user/change-password?current=' + passwords.current + '&new=' +
-    passwords.new + '&repeat=' + passwords.repeat).pipe(map((response: any) => response.user), catchError((err) => { throw err.error }))
+    return this.http.get(this.hostServer + '/rest/user/change-password?current=' + encodeURIComponent(String(passwords.current)) + '&new=' +
+    encodeURIComponent(String(passwords.new)) + '&repeat=' + encodeURIComponent(String(passwords.repeat))).pipe(map((response: any) => response.user), catchError((err) => { throw err.error }))
   }
 
   resetPassword (params: any) {
