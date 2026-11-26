@@ -45,7 +45,6 @@ application:
     overlayMap: 'https://shop.defcon.org/cdn/shop/files/defcon-hawaiian_720x.png?v=1732927277'
 challenges:
   overwriteUrlForProductTamperingChallenge: 'https://discord.com/invite/defcon'
-  safetyMode: disabled
 hackingInstructor:
   avatarImage: 'https://training.defcon.org/cdn/shop/files/DCTraining_sticker1.jpg?v=1692301964&width=600'
 products:

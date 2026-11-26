@@ -9,7 +9,7 @@ application:
     showOnFirstStart: false
 challenges:
   showHints: false
-  safetyMode: disabled
+  safetyMode: enabled
 hackingInstructor:
   isEnabled: false
 ctf:
