@@ -21,6 +21,24 @@ function favicon () {
   return utils.extractFilename(config.get('application.favicon'))
 }
 
+// Linear-time equivalents of /#{(.*)}/ and /;[ ]*script-src(.)*'unsafe-inline'/, whose greedy
+// wildcards backtrack quadratically on long user-controlled values.
+const lineTerminators = /[\n\r\u2028\u2029]/
+
+function containsPugInterpolation (value: string) {
+  return value.split(lineTerminators).some(line => {
+    const start = line.indexOf('#{')
+    return start !== -1 && line.lastIndexOf('}') >= start + 2
+  })
+}
+
+function injectsUnsafeInlineScriptSrc (value: string) {
+  return value.split(lineTerminators).some(line => {
+    const directive = /;[ ]*script-src/.exec(line)
+    return directive !== null && line.includes("'unsafe-inline'", directive.index + directive[0].length)
+  })
+}
+
 export function getUserProfile () {
   return async (req: Request, res: Response, next: NextFunction) => {
     let template: string
@@ -55,7 +73,7 @@ export function getUserProfile () {
     const theme = themes[themeKey] || themes['bluegrey-lightgreen']
 
     if (utils.isChallengeEnabled(challenges.usernameXssChallenge)) {
-      if (username?.match(/#{(.*)}/) !== null) {
+      if (username == null || containsPugInterpolation(username)) {
         req.app.locals.abused_ssti_bug = true
         const code = username?.substring(2, username.length - 1)
         try {
@@ -91,7 +109,7 @@ export function getUserProfile () {
       const CSP = `img-src 'self' ${user?.profileImage}; script-src 'self' 'unsafe-eval'`
 
       challengeUtils.solveIf(challenges.usernameXssChallenge, () => {
-        return username && user?.profileImage.match(/;[ ]*script-src(.)*'unsafe-inline'/g) !== null && username.includes('<script>alert(`xss`)</script>')
+        return username && injectsUnsafeInlineScriptSrc(user.profileImage) && username.includes('<script>alert(`xss`)</script>')
       })
 
       res.set({
