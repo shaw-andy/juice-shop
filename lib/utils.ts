@@ -64,10 +64,12 @@ export const version = (module?: string) => {
   }
 }
 
+const hasPrivateCtfKey = () => process.env.CTF_KEY !== undefined && process.env.CTF_KEY !== ''
+
 let cachedCtfKey: string | undefined
 const getCtfKey = () => {
   if (!cachedCtfKey) {
-    if (process.env.CTF_KEY !== undefined && process.env.CTF_KEY !== '') {
+    if (hasPrivateCtfKey()) {
       cachedCtfKey = process.env.CTF_KEY
     } else {
       const data = fs.readFileSync('ctf.key', 'utf8')
@@ -151,6 +153,11 @@ export function getChallengeEnablementStatus (challenge: Challenge,
   } = { isDocker, isHeroku, isWindows }): ChallengeEnablementStatus {
   if (!challenge?.disabledEnv) {
     return { enabled: true, disabledBecause: null }
+  }
+
+  // Potentially harmful challenges allow code execution, which would expose a private CTF_KEY and thereby every flag
+  if (hasPrivateCtfKey()) {
+    safetyModeSetting = 'enabled'
   }
 
   if (safetyModeSetting === 'disabled') {
