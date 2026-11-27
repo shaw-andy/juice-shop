@@ -575,12 +575,12 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
     if (name === 'Hint') {
       resource.list.fetch.after((req: Request, res: Response, context: { instance: string | any[], continue: any }) => {
         for (let i = 0; i < context.instance.length; i++) {
-          context.instance[i].text = req.__(context.instance[i].text)
+          context.instance[i].text = req.__(context.instance[i].text ?? '')
         }
         return context.continue
       })
       resource.read.send.before((req: Request, res: Response, context: { instance: { text: string }, continue: any }) => {
-        context.instance.text = req.__(context.instance.text)
+        context.instance.text = req.__(context.instance.text ?? '')
         return context.continue
       })
     }
