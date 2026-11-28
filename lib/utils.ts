@@ -180,11 +180,28 @@ export function isChallengeEnabled (challenge: Challenge): boolean {
 export const parseJsonCustom = (jsonString: string) => {
   const parser = clarinet.parser()
   const result: any[] = []
-  parser.onkey = parser.onopenobject = (k: any) => {
-    result.push({ key: k, value: null })
+  const containers: Array<'object' | 'array'> = []
+  const inTopLevelObject = () => containers.length === 1 && containers[0] === 'object'
+  const recordKey = (k: any) => {
+    if (inTopLevelObject() && typeof k === 'string') {
+      result.push({ key: k, value: null })
+    }
+  }
+  parser.onopenobject = (k: any) => {
+    containers.push('object')
+    recordKey(k)
+  }
+  parser.onkey = recordKey
+  parser.onopenarray = () => {
+    containers.push('array')
+  }
+  parser.oncloseobject = parser.onclosearray = () => {
+    containers.pop()
   }
   parser.onvalue = (v: any) => {
-    result[result.length - 1].value = v
+    if (inTopLevelObject()) {
+      result[result.length - 1].value = v
+    }
   }
   parser.write(jsonString)
   parser.close()
