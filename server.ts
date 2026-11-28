@@ -173,7 +173,6 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.locals.captchaReqId = 1
   app.locals.captchaBypassReqTimes = []
   app.locals.abused_ssti_bug = false
-  app.locals.abused_ssrf_bug = false
 
   /* Compression for all requests */
   app.use(compression())

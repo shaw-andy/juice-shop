@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+import crypto from 'node:crypto'
 import { type NextFunction, type Request, type Response } from 'express'
 import { Op } from 'sequelize'
 import jwt from 'jsonwebtoken'
@@ -96,16 +97,35 @@ export const jwtChallenges = () => (req: Request, res: Response, next: NextFunct
   next()
 }
 
-export const serverSideChallenges = () => (req: Request, res: Response, next: NextFunction) => {
-  if (req.query.key === 'tRy_H4rd3r_n0thIng_iS_Imp0ssibl3') {
-    if (challengeUtils.notSolved(challenges.sstiChallenge) && req.app.locals.abused_ssti_bug === true) {
-      challengeUtils.solve(challenges.sstiChallenge)
-      res.status(204).send()
-      return
-    }
+const serverSideRequestHeader = 'x-juice-shop-request'
+const pendingServerSideRequests = new Set<string>()
 
-    if (challengeUtils.notSolved(challenges.ssrfChallenge) && req.app.locals.abused_ssrf_bug === true) {
-      challengeUtils.solve(challenges.ssrfChallenge)
+export async function fetchAsServerSideRequest (url: string) {
+  const token = crypto.randomBytes(32).toString('hex')
+  pendingServerSideRequests.add(token)
+  try {
+    return await fetch(url, { headers: { [serverSideRequestHeader]: token } })
+  } finally {
+    pendingServerSideRequests.delete(token)
+  }
+}
+
+// req.ip honors X-Forwarded-For because "trust proxy" is enabled, so only the raw socket address proves a local caller
+function isFromLoopback (req: Request) {
+  return utils.toSimpleIpAddress(req.socket.remoteAddress ?? '').startsWith('127.')
+}
+
+export const serverSideChallenges = () => (req: Request, res: Response, next: NextFunction) => {
+  if (req.query.key === 'tRy_H4rd3r_n0thIng_iS_Imp0ssibl3' && isFromLoopback(req)) {
+    const token = req.get(serverSideRequestHeader)
+    if (token !== undefined && pendingServerSideRequests.has(token)) {
+      if (challengeUtils.notSolved(challenges.ssrfChallenge)) {
+        challengeUtils.solve(challenges.ssrfChallenge)
+        res.status(204).send()
+        return
+      }
+    } else if (challengeUtils.notSolved(challenges.sstiChallenge) && req.app.locals.abused_ssti_bug === true) {
+      challengeUtils.solve(challenges.sstiChallenge)
       res.status(204).send()
       return
     }
