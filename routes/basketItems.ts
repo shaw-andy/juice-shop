@@ -19,28 +19,18 @@ interface RequestWithRawBody extends Request {
 export function addBasketItem () {
   return async (req: Request, res: Response, next: NextFunction) => {
     const result = utils.parseJsonCustom((req as RequestWithRawBody).rawBody)
-    const productIds = []
-    const basketIds = []
-    const quantities = []
-
-    for (let i = 0; i < result.length; i++) {
-      if (result[i].key === 'ProductId') {
-        productIds.push(result[i].value)
-      } else if (result[i].key === 'BasketId') {
-        basketIds.push(result[i].value)
-      } else if (result[i].key === 'quantity') {
-        quantities.push(result[i].value)
-      }
-    }
+    const basketIds = result.filter((entry) => entry.key === 'BasketId').map((entry) => entry.value)
+    const checkedBasketId = basketIds.length > 0 ? basketIds[0] : req.body.BasketId
 
     const user = security.authenticatedUsers.from(req)
-    if (user && basketIds[0] && basketIds[0] !== 'undefined' && Number(user.bid) != Number(basketIds[0])) { // eslint-disable-line eqeqeq
+    if (user && checkedBasketId && checkedBasketId !== 'undefined' && Number(user.bid) != Number(checkedBasketId)) { // eslint-disable-line eqeqeq
       res.status(401).send('{\'error\' : \'Invalid BasketId\'}')
     } else {
+      // ProductId and quantity must be the exact values quantityCheckBeforeBasketItemAddition validated
       const basketItem = {
-        ProductId: productIds[productIds.length - 1],
-        BasketId: basketIds[basketIds.length - 1],
-        quantity: quantities[quantities.length - 1]
+        ProductId: req.body.ProductId,
+        BasketId: req.body.BasketId,
+        quantity: req.body.quantity
       }
       challengeUtils.solveIf(challenges.basketManipulateChallenge, () => { return user && basketItem.BasketId && basketItem.BasketId !== 'undefined' && user.bid != basketItem.BasketId }) // eslint-disable-line eqeqeq
 

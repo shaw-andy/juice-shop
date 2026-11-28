@@ -188,14 +188,20 @@ void describe('utils', () => {
       assert.deepEqual(result, [{ key: 'key', value: 'value' }])
     })
 
-    void it('parses a nested JSON object', () => {
-      const json = '{"key": {"nested": "value"}}'
+    void it('only records keys of the top-level object', () => {
+      const json = '{"key": {"nested": "value"}, "list": [{"key": "inner"}, "item"], "other": 1}'
       const result = utils.parseJsonCustom(json)
-      // clarinet's onkey/onopenobject will produce entries for both keys
-      assert.equal(result.length, 2)
-      assert.equal(result[0].key, 'key')
-      assert.equal(result[1].key, 'nested')
-      assert.equal(result[1].value, 'value')
+      assert.deepEqual(result, [
+        { key: 'key', value: null },
+        { key: 'list', value: null },
+        { key: 'other', value: 1 }
+      ])
+    })
+
+    void it('keeps duplicate top-level keys in order', () => {
+      const json = '{"BasketId": "1", "BasketId": "2"}'
+      const result = utils.parseJsonCustom(json)
+      assert.deepEqual(result, [{ key: 'BasketId', value: '1' }, { key: 'BasketId', value: '2' }])
     })
   })
 
